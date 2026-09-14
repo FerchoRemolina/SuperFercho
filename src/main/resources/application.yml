@@ -1,6 +1,9 @@
 spring:
   application:
     name: superfercho
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   jpa:
     open-in-view: false
     hibernate:
@@ -21,3 +24,7 @@ server:
 
 superfercho:
   currency: COP
+  security:
+    jwt:
+      secret: ${SUPERFERCHO_JWT_SECRET}
+      expiration: 15m

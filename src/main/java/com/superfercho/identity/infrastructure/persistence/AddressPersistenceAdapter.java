@@ -1,7 +1,9 @@
 package com.superfercho.identity.infrastructure.persistence;
 
 import com.superfercho.identity.application.port.AddressRepository;
+import com.superfercho.identity.application.port.OwnedAddress;
 import com.superfercho.identity.domain.model.Address;
+import com.superfercho.identity.domain.model.AddressStatus;
 import com.superfercho.identity.infrastructure.persistence.mapper.AddressPersistenceMapper;
 import com.superfercho.identity.infrastructure.persistence.repository.AddressJpaRepository;
 import java.util.Optional;
@@ -32,5 +34,19 @@ public class AddressPersistenceAdapter implements AddressRepository {
     @Override
     public Optional<Address> findById(UUID id) {
         return addressJpaRepository.findById(id).map(addressPersistenceMapper::toDomain);
+    }
+
+    @Override
+    public Optional<OwnedAddress> findOwnedById(UUID id) {
+        return addressJpaRepository
+                .findById(id)
+                .map(entity -> new OwnedAddress(entity.getUserId(), addressPersistenceMapper.toDomain(entity)));
+    }
+
+    @Override
+    public Optional<Address> findActiveDefaultByUserId(UUID userId) {
+        return addressJpaRepository
+                .findByUserIdAndIsDefaultTrueAndStatus(userId, AddressStatus.ACTIVE)
+                .map(addressPersistenceMapper::toDomain);
     }
 }

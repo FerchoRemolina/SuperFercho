@@ -45,6 +45,8 @@ class IdentityPersistenceAdapterTest {
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "none");
         registry.add("spring.flyway.enabled", () -> "true");
+        registry.add(
+                "superfercho.security.jwt.secret", () -> "test-only-superfercho-jwt-secret-key-32b");
     }
 
     @Autowired

@@ -104,6 +104,77 @@ class AddressTest {
         assertEquals(activeDefault.id(), deactivated.id());
     }
 
+    @Test
+    void shouldUpdateDetailsAndPreserveIdentity() {
+        Address original = validAddress().isDefault(true).build();
+        Instant updatedAt = Instant.parse("2026-01-01T00:15:00Z");
+
+        Address updated = original.updateDetails(
+                "Oficina",
+                "Grace Hopper",
+                "Calle 9 # 8-7",
+                "Piso 2",
+                "Medellín",
+                "Antioquia",
+                "3009998888",
+                updatedAt);
+
+        assertEquals(original.id(), updated.id());
+        assertEquals(original.createdAt(), updated.createdAt());
+        assertTrue(updated.isDefault());
+        assertEquals(AddressStatus.ACTIVE, updated.status());
+        assertEquals("Oficina", updated.label());
+        assertEquals("Grace Hopper", updated.recipientName());
+        assertEquals(updatedAt, updated.updatedAt());
+    }
+
+    @Test
+    void shouldRejectUpdateDetailsWhenAddressIsInactive() {
+        Address inactive = validAddress().isDefault(false).status(AddressStatus.INACTIVE).build();
+
+        assertThrows(
+                InvalidAddressException.class,
+                () -> inactive.updateDetails(
+                        "Oficina",
+                        "Grace Hopper",
+                        "Calle 9 # 8-7",
+                        null,
+                        "Medellín",
+                        "Antioquia",
+                        "3009998888",
+                        Instant.parse("2026-01-01T00:15:00Z")));
+    }
+
+    @Test
+    void shouldMarkAddressAsDefault() {
+        Address address = validAddress().isDefault(false).build();
+
+        Address marked = address.markAsDefault(Instant.parse("2026-01-01T00:15:00Z"));
+
+        assertTrue(marked.isDefault());
+        assertEquals(address.id(), marked.id());
+    }
+
+    @Test
+    void shouldRejectMarkAsDefaultWhenAddressIsInactive() {
+        Address inactive = validAddress().isDefault(false).status(AddressStatus.INACTIVE).build();
+
+        assertThrows(
+                InvalidAddressException.class,
+                () -> inactive.markAsDefault(Instant.parse("2026-01-01T00:15:00Z")));
+    }
+
+    @Test
+    void shouldClearDefaultFlag() {
+        Address address = validAddress().isDefault(true).build();
+
+        Address cleared = address.clearDefault(Instant.parse("2026-01-01T00:15:00Z"));
+
+        assertFalse(cleared.isDefault());
+        assertEquals(AddressStatus.ACTIVE, cleared.status());
+        assertEquals(address.id(), cleared.id());
+    }
+
     private static AddressBuilder validAddress() {
         return new AddressBuilder();
     }

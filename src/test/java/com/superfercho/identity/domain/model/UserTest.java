@@ -61,6 +61,7 @@ class UserTest {
         User user = validUser().email("  Ada.Lovelace@Example.COM  ").build();
 
         assertEquals("ada.lovelace@example.com", user.email());
+        assertEquals("ada.lovelace@example.com", User.normalizeEmail("  Ada.Lovelace@Example.COM  "));
     }
 
     @Test

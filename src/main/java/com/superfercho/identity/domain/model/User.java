@@ -85,6 +85,10 @@ public final class User {
                 updatedAt);
     }
 
+    public static String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
+    }
+
     public UUID id() {
         return id;
     }
@@ -127,10 +131,6 @@ public final class User {
 
     public Instant updatedAt() {
         return updatedAt;
-    }
-
-    private static String normalizeEmail(String email) {
-        return email.trim().toLowerCase(Locale.ROOT);
     }
 
     private static void requireNonNull(Object value, String field) {

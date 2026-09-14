@@ -9,4 +9,10 @@ public interface UserRepository {
     User save(User user);
 
     Optional<User> findById(UUID id);
+
+    boolean existsByEmail(String email);
+
+    boolean existsByDocument(String documentType, String documentNumber);
+
+    Optional<User> findByEmail(String email);
 }

@@ -32,4 +32,19 @@ public class UserPersistenceAdapter implements UserRepository {
     public Optional<User> findById(UUID id) {
         return userJpaRepository.findById(id).map(userPersistenceMapper::toDomain);
     }
+
+    @Override
+    public boolean existsByEmail(String email) {
+        return userJpaRepository.existsByEmail(email);
+    }
+
+    @Override
+    public boolean existsByDocument(String documentType, String documentNumber) {
+        return userJpaRepository.existsByDocumentTypeAndDocumentNumber(documentType, documentNumber);
+    }
+
+    @Override
+    public Optional<User> findByEmail(String email) {
+        return userJpaRepository.findByEmail(email).map(userPersistenceMapper::toDomain);
+    }
 }

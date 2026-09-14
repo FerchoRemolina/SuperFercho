@@ -111,6 +111,68 @@ public final class Address {
                 updatedAt);
     }
 
+    public Address updateDetails(
+            String label,
+            String recipientName,
+            String addressLine,
+            String additionalInfo,
+            String city,
+            String department,
+            String phone,
+            Instant updatedAt) {
+        if (status != AddressStatus.ACTIVE) {
+            throw new InvalidAddressException("inactive address cannot be updated");
+        }
+        return create(
+                id,
+                label,
+                recipientName,
+                addressLine,
+                additionalInfo,
+                city,
+                department,
+                phone,
+                isDefault,
+                status,
+                createdAt,
+                updatedAt);
+    }
+
+    public Address markAsDefault(Instant updatedAt) {
+        if (status != AddressStatus.ACTIVE) {
+            throw new InvalidAddressException("inactive address cannot be a default address");
+        }
+        return create(
+                id,
+                label,
+                recipientName,
+                addressLine,
+                additionalInfo,
+                city,
+                department,
+                phone,
+                true,
+                status,
+                createdAt,
+                updatedAt);
+    }
+
+    public Address clearDefault(Instant updatedAt) {
+        return create(
+                id,
+                label,
+                recipientName,
+                addressLine,
+                additionalInfo,
+                city,
+                department,
+                phone,
+                false,
+                status,
+                createdAt,
+                updatedAt);
+    }
+
     public UUID id() {
         return id;
     }

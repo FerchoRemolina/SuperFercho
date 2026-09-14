@@ -9,4 +9,8 @@ public interface AddressRepository {
     Address save(UUID userId, Address address);
 
     Optional<Address> findById(UUID id);
+
+    Optional<OwnedAddress> findOwnedById(UUID id);
+
+    Optional<Address> findActiveDefaultByUserId(UUID userId);
 }
