@@ -1,6 +1,6 @@
 /**
  * Catalog module. Owns products, categories, prices, and stock.
- * Domain model and application use cases are implemented; persistence
- * and REST presentation are not implemented yet.
+ * Domain, application, and persistence are implemented; REST presentation
+ * is not implemented yet.
  */
 package com.superfercho.catalog;
