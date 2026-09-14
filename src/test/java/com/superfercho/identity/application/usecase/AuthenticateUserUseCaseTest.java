@@ -70,9 +70,12 @@ class AuthenticateUserUseCaseTest {
         UUID inactiveId = UUID.fromString("22222222-2222-2222-2222-222222222222");
         users.save(user(inactiveId, "inactive@example.com", UserStatus.INACTIVE, Role.CUSTOMER));
 
-        assertThrows(
+        InactiveUserException exception = assertThrows(
                 InactiveUserException.class,
                 () -> useCase.execute(new AuthenticateUserCommand("inactive@example.com", "secret")));
+
+        assertEquals("User is inactive", exception.getMessage());
+        assertTrue(!exception.getMessage().contains(inactiveId.toString()));
     }
 
     @Test

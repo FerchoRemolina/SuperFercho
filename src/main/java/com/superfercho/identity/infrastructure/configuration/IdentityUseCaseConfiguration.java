@@ -10,6 +10,7 @@ import com.superfercho.identity.application.port.UserRepository;
 import com.superfercho.identity.application.usecase.AddAddressUseCase;
 import com.superfercho.identity.application.usecase.AuthenticateUserUseCase;
 import com.superfercho.identity.application.usecase.DeactivateAddressUseCase;
+import com.superfercho.identity.application.usecase.ListAddressesUseCase;
 import com.superfercho.identity.application.usecase.RegisterCustomerUseCase;
 import com.superfercho.identity.application.usecase.SetDefaultAddressUseCase;
 import com.superfercho.identity.application.usecase.UpdateAddressUseCase;
@@ -51,6 +52,12 @@ public class IdentityUseCaseConfiguration {
                 return transaction.execute(status -> super.execute(command));
             }
         };
+    }
+
+    @Bean
+    ListAddressesUseCase listAddressesUseCase(
+            UserRepository userRepository, AddressRepository addressRepository) {
+        return new ListAddressesUseCase(userRepository, addressRepository);
     }
 
     @Bean

@@ -9,8 +9,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.superfercho.identity.application.dto.AddAddressCommand;
 import com.superfercho.identity.application.dto.AddressResult;
 import com.superfercho.identity.application.dto.DeactivateAddressCommand;
+import com.superfercho.identity.application.dto.ListAddressesCommand;
 import com.superfercho.identity.application.dto.SetDefaultAddressCommand;
 import com.superfercho.identity.application.dto.UpdateAddressCommand;
+import com.superfercho.identity.application.exception.AddressNotFoundException;
 import com.superfercho.identity.application.exception.AddressOwnershipException;
 import com.superfercho.identity.application.exception.InactiveAddressException;
 import com.superfercho.identity.application.exception.UserNotFoundException;
@@ -24,6 +26,7 @@ import com.superfercho.identity.domain.model.UserStatus;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +41,7 @@ class AddressUseCasesTest {
     private InMemoryUserRepository users;
     private InMemoryAddressRepository addresses;
     private AddAddressUseCase addAddress;
+    private ListAddressesUseCase listAddresses;
     private UpdateAddressUseCase updateAddress;
     private DeactivateAddressUseCase deactivateAddress;
     private SetDefaultAddressUseCase setDefaultAddress;
@@ -49,6 +53,7 @@ class AddressUseCasesTest {
         users.save(user(USER_ID, "owner@example.com", "1001"));
         users.save(user(OTHER_USER_ID, "other@example.com", "2002"));
         addAddress = new AddAddressUseCase(users, addresses, Clock.fixed(CREATED_AT, ZoneOffset.UTC));
+        listAddresses = new ListAddressesUseCase(users, addresses);
         Clock later = Clock.fixed(UPDATED_AT, ZoneOffset.UTC);
         updateAddress = new UpdateAddressUseCase(addresses, later);
         deactivateAddress = new DeactivateAddressUseCase(addresses, later);
@@ -77,6 +82,60 @@ class AddressUseCasesTest {
 
         assertThrows(
                 UserNotFoundException.class, () -> addAddress.execute(addCommand(missingUserId, "Casa", false)));
+    }
+
+    @Test
+    void shouldClearPreviousDefaultWhenAddingAnotherDefaultAddress() {
+        AddressResult first = addAddress.execute(addCommand(USER_ID, "Casa", true));
+
+        AddressResult second = addAddress.execute(addCommand(USER_ID, "Oficina", true));
+
+        assertTrue(second.isDefault());
+        assertFalse(addresses.findById(first.id()).orElseThrow().isDefault());
+        assertTrue(addresses.findById(second.id()).orElseThrow().isDefault());
+        assertEquals(AddressStatus.ACTIVE, addresses.findById(first.id()).orElseThrow().status());
+    }
+
+    @Test
+    void shouldListAddressesBelongingToUser() {
+        AddressResult first = addAddress.execute(addCommand(USER_ID, "Casa", true));
+        AddressResult second = addAddress.execute(addCommand(USER_ID, "Oficina", false));
+
+        List<AddressResult> result = listAddresses.execute(new ListAddressesCommand(USER_ID));
+
+        assertEquals(2, result.size());
+        assertEquals(first.id(), result.get(0).id());
+        assertEquals(second.id(), result.get(1).id());
+        assertEquals("Casa", result.get(0).label());
+        assertEquals("Oficina", result.get(1).label());
+    }
+
+    @Test
+    void shouldReturnEmptyListWhenUserHasNoAddresses() {
+        List<AddressResult> result = listAddresses.execute(new ListAddressesCommand(USER_ID));
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void shouldRejectListAddressesWhenUserDoesNotExist() {
+        UUID missingUserId = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
+
+        assertThrows(
+                UserNotFoundException.class,
+                () -> listAddresses.execute(new ListAddressesCommand(missingUserId)));
+    }
+
+    @Test
+    void shouldNotIncludeAddressesBelongingToAnotherUser() {
+        AddressResult own = addAddress.execute(addCommand(USER_ID, "Casa", false));
+        addAddress.execute(addCommand(OTHER_USER_ID, "Otro", true));
+
+        List<AddressResult> result = listAddresses.execute(new ListAddressesCommand(USER_ID));
+
+        assertEquals(1, result.size());
+        assertEquals(own.id(), result.get(0).id());
+        assertEquals("Casa", result.get(0).label());
     }
 
     @Test
@@ -124,6 +183,43 @@ class AddressUseCasesTest {
         assertFalse(deactivated.isDefault());
         assertEquals(created.id(), deactivated.id());
         assertEquals(UPDATED_AT, deactivated.updatedAt());
+    }
+
+    @Test
+    void shouldRejectDeactivateWhenAddressBelongsToAnotherUser() {
+        AddressResult created = addAddress.execute(addCommand(USER_ID, "Casa", false));
+
+        assertThrows(
+                AddressOwnershipException.class,
+                () -> deactivateAddress.execute(new DeactivateAddressCommand(OTHER_USER_ID, created.id())));
+        assertEquals(AddressStatus.ACTIVE, addresses.findById(created.id()).orElseThrow().status());
+    }
+
+    @Test
+    void shouldRejectDeactivateWhenAddressDoesNotExist() {
+        UUID missingAddressId = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
+
+        assertThrows(
+                AddressNotFoundException.class,
+                () -> deactivateAddress.execute(new DeactivateAddressCommand(USER_ID, missingAddressId)));
+    }
+
+    @Test
+    void shouldRejectUpdateWhenAddressDoesNotExist() {
+        UUID missingAddressId = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
+
+        assertThrows(
+                AddressNotFoundException.class,
+                () -> updateAddress.execute(updateCommand(USER_ID, missingAddressId, "Oficina")));
+    }
+
+    @Test
+    void shouldRejectSetDefaultWhenAddressDoesNotExist() {
+        UUID missingAddressId = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
+
+        assertThrows(
+                AddressNotFoundException.class,
+                () -> setDefaultAddress.execute(new SetDefaultAddressCommand(USER_ID, missingAddressId)));
     }
 
     @Test

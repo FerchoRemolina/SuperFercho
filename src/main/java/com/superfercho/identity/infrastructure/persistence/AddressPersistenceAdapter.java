@@ -6,9 +6,11 @@ import com.superfercho.identity.domain.model.Address;
 import com.superfercho.identity.domain.model.AddressStatus;
 import com.superfercho.identity.infrastructure.persistence.mapper.AddressPersistenceMapper;
 import com.superfercho.identity.infrastructure.persistence.repository.AddressJpaRepository;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -27,8 +29,12 @@ public class AddressPersistenceAdapter implements AddressRepository {
 
     @Override
     public Address save(UUID userId, Address address) {
-        return addressPersistenceMapper.toDomain(
-                addressJpaRepository.saveAndFlush(addressPersistenceMapper.toEntity(userId, address)));
+        try {
+            return addressPersistenceMapper.toDomain(
+                    addressJpaRepository.saveAndFlush(addressPersistenceMapper.toEntity(userId, address)));
+        } catch (DataIntegrityViolationException exception) {
+            throw IdentityConstraintViolationTranslator.translate(exception);
+        }
     }
 
     @Override
@@ -48,5 +54,12 @@ public class AddressPersistenceAdapter implements AddressRepository {
         return addressJpaRepository
                 .findByUserIdAndIsDefaultTrueAndStatus(userId, AddressStatus.ACTIVE)
                 .map(addressPersistenceMapper::toDomain);
+    }
+
+    @Override
+    public List<Address> findByUserId(UUID userId) {
+        return addressJpaRepository.findByUserId(userId).stream()
+                .map(addressPersistenceMapper::toDomain)
+                .toList();
     }
 }

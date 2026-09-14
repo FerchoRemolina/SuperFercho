@@ -36,7 +36,7 @@ public final class AuthenticateUserUseCase {
         String email = User.normalizeEmail(command.email());
         User user = userRepository.findByEmail(email).orElseThrow(InvalidCredentialsException::new);
         if (user.status() != UserStatus.ACTIVE) {
-            throw new InactiveUserException(user.id());
+            throw new InactiveUserException();
         }
         if (!passwordHasher.matches(command.password(), user.passwordHash())) {
             throw new InvalidCredentialsException();

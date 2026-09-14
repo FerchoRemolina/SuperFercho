@@ -7,6 +7,7 @@ import com.superfercho.identity.infrastructure.persistence.repository.UserJpaRep
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -24,8 +25,12 @@ public class UserPersistenceAdapter implements UserRepository {
 
     @Override
     public User save(User user) {
-        return userPersistenceMapper.toDomain(
-                userJpaRepository.saveAndFlush(userPersistenceMapper.toEntity(user)));
+        try {
+            return userPersistenceMapper.toDomain(
+                    userJpaRepository.saveAndFlush(userPersistenceMapper.toEntity(user)));
+        } catch (DataIntegrityViolationException exception) {
+            throw IdentityConstraintViolationTranslator.translate(exception);
+        }
     }
 
     @Override

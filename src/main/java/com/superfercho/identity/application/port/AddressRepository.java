@@ -1,6 +1,7 @@
 package com.superfercho.identity.application.port;
 
 import com.superfercho.identity.domain.model.Address;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -13,4 +14,6 @@ public interface AddressRepository {
     Optional<OwnedAddress> findOwnedById(UUID id);
 
     Optional<Address> findActiveDefaultByUserId(UUID userId);
+
+    List<Address> findByUserId(UUID userId);
 }

@@ -5,6 +5,7 @@ import com.superfercho.identity.application.port.OwnedAddress;
 import com.superfercho.identity.domain.model.Address;
 import com.superfercho.identity.domain.model.AddressStatus;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,5 +37,13 @@ public final class InMemoryAddressRepository implements AddressRepository {
                 .map(OwnedAddress::address)
                 .filter(address -> address.isDefault() && address.status() == AddressStatus.ACTIVE)
                 .findFirst();
+    }
+
+    @Override
+    public List<Address> findByUserId(UUID userId) {
+        return addresses.values().stream()
+                .filter(owned -> owned.userId().equals(userId))
+                .map(OwnedAddress::address)
+                .toList();
     }
 }

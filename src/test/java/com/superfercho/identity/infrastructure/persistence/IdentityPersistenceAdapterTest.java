@@ -3,6 +3,9 @@ package com.superfercho.identity.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.superfercho.identity.application.exception.DocumentAlreadyExistsException;
+import com.superfercho.identity.application.exception.DuplicateDefaultAddressException;
+import com.superfercho.identity.application.exception.UserAlreadyExistsException;
 import com.superfercho.identity.application.port.AddressRepository;
 import com.superfercho.identity.application.port.UserRepository;
 import com.superfercho.identity.domain.model.Address;
@@ -15,7 +18,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -73,7 +75,7 @@ class IdentityPersistenceAdapterTest {
         userRepository.save(newUser("dup-email@example.com", "CC", "2001"));
 
         assertThatThrownBy(() -> userRepository.save(newUser("dup-email@example.com", "CE", "2002")))
-                .isInstanceOf(DataIntegrityViolationException.class);
+                .isInstanceOf(UserAlreadyExistsException.class);
     }
 
     @Test
@@ -81,7 +83,7 @@ class IdentityPersistenceAdapterTest {
         userRepository.save(newUser("doc-one@example.com", "CC", "3001"));
 
         assertThatThrownBy(() -> userRepository.save(newUser("doc-two@example.com", "CC", "3001")))
-                .isInstanceOf(DataIntegrityViolationException.class);
+                .isInstanceOf(DocumentAlreadyExistsException.class);
     }
 
     @Test
@@ -107,7 +109,7 @@ class IdentityPersistenceAdapterTest {
         assertThatThrownBy(
                         () -> addressRepository.save(
                                 user.id(), newAddress("Oficina", true, AddressStatus.ACTIVE)))
-                .isInstanceOf(DataIntegrityViolationException.class);
+                .isInstanceOf(DuplicateDefaultAddressException.class);
     }
 
     @Test
@@ -120,6 +122,18 @@ class IdentityPersistenceAdapterTest {
 
         assertThat(addressRepository.findById(work.id())).isPresent();
         assertThat(work.isDefault()).isFalse();
+    }
+
+    @Test
+    void shouldFindAddressesByUserId() {
+        User owner = userRepository.save(newUser("owner-addr@example.com", "CC", "7001"));
+        User other = userRepository.save(newUser("other-addr@example.com", "CC", "7002"));
+        Address own = addressRepository.save(owner.id(), newAddress("Casa", true, AddressStatus.ACTIVE));
+        addressRepository.save(other.id(), newAddress("Otro", true, AddressStatus.ACTIVE));
+
+        assertThat(addressRepository.findByUserId(owner.id()))
+                .extracting(Address::id)
+                .containsExactly(own.id());
     }
 
     private static User newUser(String email, String documentType, String documentNumber) {
