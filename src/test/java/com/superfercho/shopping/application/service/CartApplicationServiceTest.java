@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -17,6 +18,7 @@ import com.superfercho.shopping.application.dto.cart.ClearCartCommand;
 import com.superfercho.shopping.application.dto.cart.GetCartQuery;
 import com.superfercho.shopping.application.dto.cart.RemoveProductFromCartCommand;
 import com.superfercho.shopping.application.exception.CartNotFoundException;
+import com.superfercho.shopping.application.exception.DuplicateCustomerCartException;
 import com.superfercho.shopping.application.exception.ProductNotFoundException;
 import com.superfercho.shopping.application.port.out.CartRepositoryPort;
 import com.superfercho.shopping.application.port.out.ClockPort;
@@ -34,6 +36,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -97,6 +100,34 @@ class CartApplicationServiceTest {
     }
 
     @Test
+    void shouldReturnWinnerCartWhenCreateLosesRaceOnGet() {
+        when(cartRepository.findByCustomerId(CUSTOMER_ID))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(emptyCart()));
+        when(clockPort.currentTime()).thenReturn(NOW);
+        when(cartRepository.save(any(Cart.class))).thenThrow(new DuplicateCustomerCartException());
+
+        CartResponse response = cartService.execute(new GetCartQuery(CUSTOMER_ID));
+
+        assertEquals(CART_ID, response.id());
+        assertEquals(CUSTOMER_ID, response.customerId());
+        assertTrue(response.items().isEmpty());
+        verify(cartRepository, times(2)).findByCustomerId(CUSTOMER_ID);
+        verify(cartRepository).save(any(Cart.class));
+    }
+
+    @Test
+    void shouldPropagateDuplicateCustomerCartWhenWinnerCartIsMissingOnGet() {
+        when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.empty());
+        when(clockPort.currentTime()).thenReturn(NOW);
+        when(cartRepository.save(any(Cart.class))).thenThrow(new DuplicateCustomerCartException());
+
+        assertThrows(
+                DuplicateCustomerCartException.class, () -> cartService.execute(new GetCartQuery(CUSTOMER_ID)));
+        verify(cartRepository, times(2)).findByCustomerId(CUSTOMER_ID);
+    }
+
+    @Test
     void shouldAddNewProductToExistingCart() {
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(emptyCart()));
         when(clockPort.currentTime()).thenReturn(NOW);
@@ -148,6 +179,36 @@ class CartApplicationServiceTest {
         assertEquals(1, response.items().size());
         assertEquals(MILK_ID, response.items().get(0).productId());
         verify(cartRepository).save(any(Cart.class));
+    }
+
+    @Test
+    void shouldReapplyAddProductWhenInitialCartCreateLosesRace() {
+        when(cartRepository.findByCustomerId(CUSTOMER_ID))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(emptyCart()));
+        when(clockPort.currentTime()).thenReturn(NOW);
+        when(productCatalogPort.getProduct(MILK_ID)).thenReturn(Optional.of(new ProductCatalogInfo(MILK_ID, MILK_PRICE)));
+        when(cartRepository.save(any(Cart.class)))
+                .thenThrow(new DuplicateCustomerCartException())
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        CartResponse response =
+                cartService.execute(new AddProductToCartCommand(CUSTOMER_ID, MILK_ID, 2));
+
+        assertEquals(CART_ID, response.id());
+        assertEquals(1, response.items().size());
+        assertEquals(MILK_ID, response.items().get(0).productId());
+        assertEquals(2, response.items().get(0).quantity());
+        assertEquals(MILK_PRICE, response.items().get(0).priceAtAddition());
+
+        ArgumentCaptor<Cart> savedCarts = ArgumentCaptor.forClass(Cart.class);
+        verify(cartRepository, times(2)).save(savedCarts.capture());
+        Cart retriedSave = savedCarts.getAllValues().get(1);
+        assertEquals(CART_ID, retriedSave.id());
+        assertEquals(1, retriedSave.items().size());
+        assertEquals(MILK_ID, retriedSave.items().get(0).productId());
+        assertEquals(2, retriedSave.items().get(0).quantity());
+        verify(cartRepository, times(2)).findByCustomerId(CUSTOMER_ID);
     }
 
     @Test

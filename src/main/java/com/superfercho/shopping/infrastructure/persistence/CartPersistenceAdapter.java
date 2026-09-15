@@ -7,6 +7,7 @@ import com.superfercho.shopping.infrastructure.persistence.repository.CartJpaRep
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -24,8 +25,12 @@ public class CartPersistenceAdapter implements CartRepositoryPort {
 
     @Override
     public Cart save(Cart cart) {
-        return cartPersistenceMapper.toDomain(
-                cartJpaRepository.saveAndFlush(cartPersistenceMapper.toEntity(cart)));
+        try {
+            return cartPersistenceMapper.toDomain(
+                    cartJpaRepository.saveAndFlush(cartPersistenceMapper.toEntity(cart)));
+        } catch (DataIntegrityViolationException exception) {
+            throw ShoppingConstraintViolationTranslator.translate(exception);
+        }
     }
 
     @Override

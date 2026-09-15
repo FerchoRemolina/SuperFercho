@@ -9,6 +9,7 @@ import com.superfercho.shopping.application.dto.cart.ClearCartCommand;
 import com.superfercho.shopping.application.dto.cart.GetCartQuery;
 import com.superfercho.shopping.application.dto.cart.RemoveProductFromCartCommand;
 import com.superfercho.shopping.application.exception.CartNotFoundException;
+import com.superfercho.shopping.application.exception.DuplicateCustomerCartException;
 import com.superfercho.shopping.application.exception.ProductNotFoundException;
 import com.superfercho.shopping.application.port.in.AddProductToCartUseCase;
 import com.superfercho.shopping.application.port.in.ChangeCartItemQuantityUseCase;
@@ -56,7 +57,16 @@ public final class CartApplicationService
                 .orElseGet(() -> newCart(command.customerId(), now));
         Cart updated =
                 cart.addProduct(UUID.randomUUID(), command.productId(), command.quantity(), price, now);
-        return CartResponse.from(cartRepository.save(updated));
+        try {
+            return CartResponse.from(cartRepository.save(updated));
+        } catch (DuplicateCustomerCartException exception) {
+            Cart winner = cartRepository
+                    .findByCustomerId(command.customerId())
+                    .orElseThrow(() -> exception);
+            Cart retried =
+                    winner.addProduct(UUID.randomUUID(), command.productId(), command.quantity(), price, now);
+            return CartResponse.from(cartRepository.save(retried));
+        }
     }
 
     @Override
@@ -81,10 +91,16 @@ public final class CartApplicationService
     }
 
     private Cart getOrCreateCart(UUID customerId) {
-        return cartRepository.findByCustomerId(customerId).orElseGet(() -> {
-            Instant now = clockPort.currentTime();
+        return cartRepository.findByCustomerId(customerId).orElseGet(() -> createCart(customerId));
+    }
+
+    private Cart createCart(UUID customerId) {
+        Instant now = clockPort.currentTime();
+        try {
             return cartRepository.save(newCart(customerId, now));
-        });
+        } catch (DuplicateCustomerCartException exception) {
+            return cartRepository.findByCustomerId(customerId).orElseThrow(() -> exception);
+        }
     }
 
     private Cart newCart(UUID customerId, Instant now) {
