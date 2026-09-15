@@ -11,6 +11,7 @@ import com.superfercho.payments.infrastructure.persistence.repository.PaymentJpa
 import com.superfercho.platform.money.Money;
 import java.math.BigDecimal;
 import java.sql.PreparedStatement;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -176,8 +177,8 @@ class PaymentPersistenceAdapterTest {
                     statement.setString(4, currency);
                     statement.setString(5, paymentMethod);
                     statement.setString(6, status);
-                    statement.setObject(7, CREATED_AT);
-                    statement.setObject(8, CREATED_AT);
+                    statement.setTimestamp(7, Timestamp.from(CREATED_AT));
+                    statement.setTimestamp(8, Timestamp.from(CREATED_AT));
                     return statement;
                 });
     }

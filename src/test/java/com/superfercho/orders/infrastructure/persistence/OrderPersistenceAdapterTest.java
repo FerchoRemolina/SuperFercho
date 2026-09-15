@@ -14,6 +14,7 @@ import com.superfercho.orders.infrastructure.persistence.repository.OrderJpaRepo
 import com.superfercho.platform.money.Money;
 import java.math.BigDecimal;
 import java.sql.PreparedStatement;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -109,10 +110,12 @@ class OrderPersistenceAdapterTest {
 
     @Test
     void shouldFindOrdersByCustomerId() {
-        Order own = orderRepository.save(pendingOrder("ORD-P-1003", CUSTOMER_ID, PAYMENT_ID));
-        orderRepository.save(pendingOrder("ORD-P-1004", OTHER_CUSTOMER_ID, PAYMENT_ID));
+        UUID customerId = UUID.randomUUID();
+        UUID otherCustomerId = UUID.randomUUID();
+        Order own = orderRepository.save(pendingOrder("ORD-P-1003", customerId, PAYMENT_ID));
+        orderRepository.save(pendingOrder("ORD-P-1004", otherCustomerId, PAYMENT_ID));
 
-        assertThat(orderRepository.findByCustomerId(CUSTOMER_ID, PageRequest.of(0, 20)).items())
+        assertThat(orderRepository.findByCustomerId(customerId, PageRequest.of(0, 20)).items())
                 .extracting(Order::id)
                 .containsExactly(own.id());
     }
@@ -152,18 +155,24 @@ class OrderPersistenceAdapterTest {
     void shouldRejectInvalidQuantityAtDatabase() {
         UUID orderId = UUID.randomUUID();
         insertOrderHeader(orderId, "ORD-P-QTY");
-
-        assertThatThrownBy(() -> insertItemBypassingDomain(orderId, 0, new BigDecimal("10.50"), "COP"))
-                .isInstanceOf(DataIntegrityViolationException.class);
+        try {
+            assertThatThrownBy(() -> insertItemBypassingDomain(orderId, 0, new BigDecimal("10.50"), "COP"))
+                    .isInstanceOf(DataIntegrityViolationException.class);
+        } finally {
+            jdbcTemplate.update("delete from orders.orders where id = ?", orderId);
+        }
     }
 
     @Test
     void shouldRejectNegativeMoneyAtDatabase() {
         UUID orderId = UUID.randomUUID();
         insertOrderHeader(orderId, "ORD-P-MONEY");
-
-        assertThatThrownBy(() -> insertItemBypassingDomain(orderId, 1, new BigDecimal("-0.01"), "COP"))
-                .isInstanceOf(DataIntegrityViolationException.class);
+        try {
+            assertThatThrownBy(() -> insertItemBypassingDomain(orderId, 1, new BigDecimal("-0.01"), "COP"))
+                    .isInstanceOf(DataIntegrityViolationException.class);
+        } finally {
+            jdbcTemplate.update("delete from orders.orders where id = ?", orderId);
+        }
     }
 
     @Test
@@ -176,9 +185,12 @@ class OrderPersistenceAdapterTest {
     void shouldRejectNonCopCurrencyAtDatabase() {
         UUID orderId = UUID.randomUUID();
         insertOrderHeader(orderId, "ORD-P-CUR");
-
-        assertThatThrownBy(() -> insertItemBypassingDomain(orderId, 1, new BigDecimal("10.50"), "USD"))
-                .isInstanceOf(DataIntegrityViolationException.class);
+        try {
+            assertThatThrownBy(() -> insertItemBypassingDomain(orderId, 1, new BigDecimal("10.50"), "USD"))
+                    .isInstanceOf(DataIntegrityViolationException.class);
+        } finally {
+            jdbcTemplate.update("delete from orders.orders where id = ?", orderId);
+        }
     }
 
     @Test
@@ -259,8 +271,8 @@ class OrderPersistenceAdapterTest {
                     statement.setString(2, orderNumber);
                     statement.setObject(3, CUSTOMER_ID);
                     statement.setString(4, status);
-                    statement.setObject(5, CREATED_AT);
-                    statement.setObject(6, CREATED_AT);
+                    statement.setTimestamp(5, Timestamp.from(CREATED_AT));
+                    statement.setTimestamp(6, Timestamp.from(CREATED_AT));
                     return statement;
                 });
     }

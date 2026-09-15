@@ -7,6 +7,7 @@ import com.superfercho.shopping.application.port.out.ShoppingListRepositoryPort;
 import com.superfercho.shopping.domain.model.ShoppingList;
 import com.superfercho.shopping.domain.model.ShoppingListItem;
 import java.sql.PreparedStatement;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -156,8 +157,8 @@ class ShoppingListPersistenceAdapterTest {
                             """);
                     statement.setObject(1, listId);
                     statement.setObject(2, customerId);
-                    statement.setObject(3, CREATED_AT);
-                    statement.setObject(4, CREATED_AT);
+                    statement.setTimestamp(3, Timestamp.from(CREATED_AT));
+                    statement.setTimestamp(4, Timestamp.from(CREATED_AT));
                     return statement;
                 });
     }
@@ -175,7 +176,7 @@ class ShoppingListPersistenceAdapterTest {
                     statement.setObject(2, listId);
                     statement.setObject(3, PRODUCT_ID);
                     statement.setInt(4, quantity);
-                    statement.setObject(5, ITEM_CREATED_AT);
+                    statement.setTimestamp(5, Timestamp.from(ITEM_CREATED_AT));
                     return statement;
                 });
     }

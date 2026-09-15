@@ -13,6 +13,7 @@ import com.superfercho.orders.infrastructure.persistence.repository.CheckoutIdem
 import com.superfercho.platform.money.Money;
 import java.math.BigDecimal;
 import java.sql.PreparedStatement;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -284,8 +285,8 @@ class CheckoutIdempotencyPersistenceAdapterTest {
                     statement.setString(6, paymentStatus);
                     statement.setBigDecimal(7, amount);
                     statement.setString(8, currency);
-                    statement.setObject(9, CREATED_AT);
-                    statement.setObject(10, EXPIRES_AT);
+                    statement.setTimestamp(9, Timestamp.from(CREATED_AT));
+                    statement.setTimestamp(10, Timestamp.from(EXPIRES_AT));
                     return statement;
                 });
     }

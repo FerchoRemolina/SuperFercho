@@ -11,6 +11,7 @@ import com.superfercho.shopping.domain.model.CartStatus;
 import com.superfercho.shopping.infrastructure.persistence.repository.CartJpaRepository;
 import java.math.BigDecimal;
 import java.sql.PreparedStatement;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -201,8 +202,8 @@ class CartPersistenceAdapterTest {
                     statement.setObject(1, cartId);
                     statement.setObject(2, customerId);
                     statement.setString(3, status);
-                    statement.setObject(4, CREATED_AT);
-                    statement.setObject(5, CREATED_AT);
+                    statement.setTimestamp(4, Timestamp.from(CREATED_AT));
+                    statement.setTimestamp(5, Timestamp.from(CREATED_AT));
                     return statement;
                 });
     }
@@ -224,8 +225,8 @@ class CartPersistenceAdapterTest {
                     statement.setInt(4, quantity);
                     statement.setBigDecimal(5, unitPrice);
                     statement.setString(6, currency);
-                    statement.setObject(7, ADDED_AT);
-                    statement.setObject(8, ADDED_AT);
+                    statement.setTimestamp(7, Timestamp.from(ADDED_AT));
+                    statement.setTimestamp(8, Timestamp.from(ADDED_AT));
                     return statement;
                 });
     }

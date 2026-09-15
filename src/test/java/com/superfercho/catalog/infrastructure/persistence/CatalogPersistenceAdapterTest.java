@@ -17,6 +17,7 @@ import com.superfercho.catalog.domain.model.ProductStatus;
 import com.superfercho.platform.money.Money;
 import java.math.BigDecimal;
 import java.sql.PreparedStatement;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -251,8 +252,8 @@ class CatalogPersistenceAdapterTest {
                     statement.setObject(2, categoryId);
                     statement.setBigDecimal(3, price);
                     statement.setInt(4, stock);
-                    statement.setObject(5, NOW);
-                    statement.setObject(6, NOW);
+                    statement.setTimestamp(5, Timestamp.from(NOW));
+                    statement.setTimestamp(6, Timestamp.from(NOW));
                     return statement;
                 });
     }
