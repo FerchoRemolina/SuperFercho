@@ -22,6 +22,7 @@ class OrderTest {
     private static final UUID ORDER_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     private static final UUID CUSTOMER_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
     private static final UUID PRODUCT_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
+    private static final UUID PAYMENT_ID = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
     private static final Instant CREATED_AT = Instant.parse("2026-01-15T12:00:00Z");
     private static final Instant CANCELLATION_DEADLINE = CREATED_AT.plus(Order.CUSTOMER_CANCELLATION_WINDOW);
     private static final Instant AFTER_DEADLINE = Instant.parse("2026-01-15T12:15:00.001Z");
@@ -280,11 +281,199 @@ class OrderTest {
 
     @Test
     void shouldPreservePaymentIdWhenPresent() {
-        UUID paymentId = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
+        UUID paymentId = PAYMENT_ID;
         Order order = validOrder().paymentId(paymentId).build();
 
         assertEquals(paymentId, order.paymentId());
         assertEquals(paymentId, order.confirm(Instant.parse("2026-01-15T12:01:00Z")).paymentId());
+    }
+
+    @Test
+    void shouldReconstitutePendingOrder() {
+        Order reconstituted = reconstitute(
+                OrderStatus.PENDING, PAYMENT_ID, CREATED_AT, null, null, CREATED_AT);
+
+        assertReconstitutedIdentity(reconstituted);
+        assertEquals(OrderStatus.PENDING, reconstituted.status());
+        assertEquals(CREATED_AT, reconstituted.createdAt());
+        assertEquals(CREATED_AT, reconstituted.updatedAt());
+        assertNull(reconstituted.confirmedAt());
+        assertNull(reconstituted.cancelledAt());
+        assertEquals(PAYMENT_ID, reconstituted.paymentId());
+    }
+
+    @Test
+    void shouldReconstituteConfirmedOrderPreservingDistinctUpdatedAt() {
+        Instant updatedAt = Instant.parse("2026-01-15T12:20:00Z");
+        Instant confirmedAt = Instant.parse("2026-01-15T12:16:00Z");
+        Order reconstituted = reconstitute(
+                OrderStatus.CONFIRMED, PAYMENT_ID, CREATED_AT, confirmedAt, null, updatedAt);
+
+        assertEquals(OrderStatus.CONFIRMED, reconstituted.status());
+        assertEquals(confirmedAt, reconstituted.confirmedAt());
+        assertEquals(updatedAt, reconstituted.updatedAt());
+        assertNull(reconstituted.cancelledAt());
+        assertEquals(PAYMENT_ID, reconstituted.paymentId());
+    }
+
+    @Test
+    void shouldReconstitutePreparingReadyAndDeliveredOrders() {
+        Instant confirmedAt = Instant.parse("2026-01-15T12:16:00Z");
+        Instant updatedAt = Instant.parse("2026-01-15T13:00:00Z");
+
+        Order preparing =
+                reconstitute(OrderStatus.PREPARING, PAYMENT_ID, CREATED_AT, confirmedAt, null, updatedAt);
+        Order ready = reconstitute(OrderStatus.READY, PAYMENT_ID, CREATED_AT, confirmedAt, null, updatedAt);
+        Order delivered =
+                reconstitute(OrderStatus.DELIVERED, PAYMENT_ID, CREATED_AT, confirmedAt, null, updatedAt);
+
+        assertEquals(OrderStatus.PREPARING, preparing.status());
+        assertEquals(OrderStatus.READY, ready.status());
+        assertEquals(OrderStatus.DELIVERED, delivered.status());
+        assertEquals(confirmedAt, preparing.confirmedAt());
+        assertEquals(updatedAt, preparing.updatedAt());
+        assertEquals(confirmedAt, ready.confirmedAt());
+        assertEquals(updatedAt, ready.updatedAt());
+        assertEquals(confirmedAt, delivered.confirmedAt());
+        assertEquals(updatedAt, delivered.updatedAt());
+        assertNull(delivered.cancelledAt());
+    }
+
+    @Test
+    void shouldReconstituteCancelledOrder() {
+        Instant cancelledAt = Instant.parse("2026-01-15T12:10:00Z");
+        Order reconstituted = reconstitute(
+                OrderStatus.CANCELLED, PAYMENT_ID, CREATED_AT, null, cancelledAt, cancelledAt);
+
+        assertEquals(OrderStatus.CANCELLED, reconstituted.status());
+        assertEquals(cancelledAt, reconstituted.cancelledAt());
+        assertEquals(cancelledAt, reconstituted.updatedAt());
+        assertNull(reconstituted.confirmedAt());
+        assertEquals(PAYMENT_ID, reconstituted.paymentId());
+        assertEquals(validAddress(), reconstituted.shippingAddress());
+        assertEquals(milk(2), reconstituted.items().get(0));
+    }
+
+    @Test
+    void shouldRejectReconstitutePendingWithConfirmedAt() {
+        assertThrows(
+                InvalidOrderException.class,
+                () -> reconstitute(
+                        OrderStatus.PENDING,
+                        PAYMENT_ID,
+                        CREATED_AT,
+                        Instant.parse("2026-01-15T12:01:00Z"),
+                        null,
+                        CREATED_AT));
+    }
+
+    @Test
+    void shouldRejectReconstituteCancelledWithoutCancelledAt() {
+        assertThrows(
+                InvalidOrderException.class,
+                () -> reconstitute(OrderStatus.CANCELLED, PAYMENT_ID, CREATED_AT, null, null, CREATED_AT));
+    }
+
+    @Test
+    void shouldRejectReconstituteCancelledWithConfirmedAt() {
+        assertThrows(
+                InvalidOrderException.class,
+                () -> reconstitute(
+                        OrderStatus.CANCELLED,
+                        PAYMENT_ID,
+                        CREATED_AT,
+                        Instant.parse("2026-01-15T12:01:00Z"),
+                        Instant.parse("2026-01-15T12:10:00Z"),
+                        Instant.parse("2026-01-15T12:10:00Z")));
+    }
+
+    @Test
+    void shouldRejectReconstituteConfirmedWithoutConfirmedAt() {
+        assertThrows(
+                InvalidOrderException.class,
+                () -> reconstitute(OrderStatus.CONFIRMED, PAYMENT_ID, CREATED_AT, null, null, CREATED_AT));
+    }
+
+    @Test
+    void shouldRejectReconstituteWhenCreatedAtAfterUpdatedAt() {
+        assertThrows(
+                InvalidOrderException.class,
+                () -> reconstitute(
+                        OrderStatus.PENDING,
+                        PAYMENT_ID,
+                        Instant.parse("2026-01-15T12:10:00Z"),
+                        null,
+                        null,
+                        CREATED_AT));
+    }
+
+    @Test
+    void shouldRejectReconstituteWithoutItems() {
+        assertThrows(
+                InvalidOrderException.class,
+                () -> Order.reconstitute(
+                        ORDER_ID,
+                        new OrderNumber("ORD-1001"),
+                        CUSTOMER_ID,
+                        OrderStatus.PENDING,
+                        List.of(),
+                        validAddress(),
+                        PAYMENT_ID,
+                        CREATED_AT,
+                        null,
+                        null,
+                        CREATED_AT));
+    }
+
+    @Test
+    void shouldRejectReconstituteWhenRequiredIdentityIsNull() {
+        assertThrows(
+                InvalidOrderException.class,
+                () -> Order.reconstitute(
+                        null,
+                        new OrderNumber("ORD-1001"),
+                        CUSTOMER_ID,
+                        OrderStatus.PENDING,
+                        List.of(milk(2)),
+                        validAddress(),
+                        PAYMENT_ID,
+                        CREATED_AT,
+                        null,
+                        null,
+                        CREATED_AT));
+        assertThrows(
+                InvalidOrderException.class,
+                () -> reconstitute(null, PAYMENT_ID, CREATED_AT, null, null, CREATED_AT));
+    }
+
+    private static void assertReconstitutedIdentity(Order order) {
+        assertEquals(ORDER_ID, order.id());
+        assertEquals("ORD-1001", order.orderNumber().value());
+        assertEquals(CUSTOMER_ID, order.customerId());
+        assertEquals(1, order.items().size());
+        assertEquals(milk(2), order.items().get(0));
+        assertEquals(validAddress(), order.shippingAddress());
+    }
+
+    private static Order reconstitute(
+            OrderStatus status,
+            UUID paymentId,
+            Instant createdAt,
+            Instant confirmedAt,
+            Instant cancelledAt,
+            Instant updatedAt) {
+        return Order.reconstitute(
+                ORDER_ID,
+                new OrderNumber("ORD-1001"),
+                CUSTOMER_ID,
+                status,
+                List.of(milk(2)),
+                validAddress(),
+                paymentId,
+                createdAt,
+                confirmedAt,
+                cancelledAt,
+                updatedAt);
     }
 
     private static OrderBuilder validOrder() {

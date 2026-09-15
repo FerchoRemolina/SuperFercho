@@ -1,6 +1,6 @@
 /**
- * Orders module. Domain and application use cases are implemented.
- * Persistence, REST, and cross-module adapters are not implemented yet.
+ * Orders module. Domain, application use cases, and persistence are implemented.
+ * REST and cross-module adapters are not implemented yet.
  *
  * CheckoutUseCase is the intended local transaction boundary for checkout.
  */

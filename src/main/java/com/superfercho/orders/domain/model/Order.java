@@ -81,6 +81,32 @@ public final class Order {
                 updatedAt);
     }
 
+    public static Order reconstitute(
+            UUID id,
+            OrderNumber orderNumber,
+            UUID customerId,
+            OrderStatus status,
+            List<OrderItem> items,
+            ShippingAddressSnapshot shippingAddress,
+            UUID paymentId,
+            Instant createdAt,
+            Instant confirmedAt,
+            Instant cancelledAt,
+            Instant updatedAt) {
+        return of(
+                id,
+                orderNumber,
+                customerId,
+                status,
+                items,
+                shippingAddress,
+                paymentId,
+                createdAt,
+                confirmedAt,
+                cancelledAt,
+                updatedAt);
+    }
+
     public Order confirm(Instant currentTime) {
         Instant at = requireCurrentTime(currentTime);
         requireTransition(OrderStatus.CONFIRMED);
