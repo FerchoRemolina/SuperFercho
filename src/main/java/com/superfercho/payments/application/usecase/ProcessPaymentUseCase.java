@@ -5,6 +5,8 @@ import com.superfercho.payments.application.dto.ProcessPaymentCommand;
 import com.superfercho.payments.application.port.ClockPort;
 import com.superfercho.payments.application.port.PaymentRepository;
 import com.superfercho.payments.domain.model.Payment;
+import com.superfercho.payments.domain.model.PaymentMethod;
+import com.superfercho.payments.domain.model.PaymentStatus;
 import java.util.UUID;
 
 public final class ProcessPaymentUseCase {
@@ -23,9 +25,23 @@ public final class ProcessPaymentUseCase {
                 command.orderId(),
                 command.amount(),
                 command.paymentMethod(),
-                command.status(),
-                command.providerReference(),
+                simulatedStatus(command.paymentMethod()),
+                simulatedProviderReference(command.paymentMethod()),
                 clockPort.currentTime());
         return PaymentResponse.from(paymentRepository.save(payment));
+    }
+
+    private static PaymentStatus simulatedStatus(PaymentMethod paymentMethod) {
+        return switch (paymentMethod) {
+            case SIMULATED_CARD -> PaymentStatus.APPROVED;
+            case CASH_ON_DELIVERY -> PaymentStatus.PENDING;
+        };
+    }
+
+    private static String simulatedProviderReference(PaymentMethod paymentMethod) {
+        return switch (paymentMethod) {
+            case SIMULATED_CARD -> "sim-approved";
+            case CASH_ON_DELIVERY -> "cod-pending";
+        };
     }
 }
