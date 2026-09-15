@@ -1,0 +1,101 @@
+package com.superfercho.shopping.application.service;
+
+import com.superfercho.platform.money.Money;
+import com.superfercho.shopping.application.dto.ProductCatalogInfo;
+import com.superfercho.shopping.application.dto.cart.AddProductToCartCommand;
+import com.superfercho.shopping.application.dto.cart.CartResponse;
+import com.superfercho.shopping.application.dto.cart.ChangeCartItemQuantityCommand;
+import com.superfercho.shopping.application.dto.cart.ClearCartCommand;
+import com.superfercho.shopping.application.dto.cart.GetCartQuery;
+import com.superfercho.shopping.application.dto.cart.RemoveProductFromCartCommand;
+import com.superfercho.shopping.application.exception.CartNotFoundException;
+import com.superfercho.shopping.application.exception.ProductNotFoundException;
+import com.superfercho.shopping.application.port.in.AddProductToCartUseCase;
+import com.superfercho.shopping.application.port.in.ChangeCartItemQuantityUseCase;
+import com.superfercho.shopping.application.port.in.ClearCartUseCase;
+import com.superfercho.shopping.application.port.in.GetCartUseCase;
+import com.superfercho.shopping.application.port.in.RemoveProductFromCartUseCase;
+import com.superfercho.shopping.application.port.out.CartRepositoryPort;
+import com.superfercho.shopping.application.port.out.ClockPort;
+import com.superfercho.shopping.application.port.out.ProductCatalogPort;
+import com.superfercho.shopping.domain.model.Cart;
+import com.superfercho.shopping.domain.model.CartStatus;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+public final class CartApplicationService
+        implements GetCartUseCase,
+                AddProductToCartUseCase,
+                ChangeCartItemQuantityUseCase,
+                RemoveProductFromCartUseCase,
+                ClearCartUseCase {
+
+    private final CartRepositoryPort cartRepository;
+    private final ProductCatalogPort productCatalogPort;
+    private final ClockPort clockPort;
+
+    public CartApplicationService(
+            CartRepositoryPort cartRepository, ProductCatalogPort productCatalogPort, ClockPort clockPort) {
+        this.cartRepository = cartRepository;
+        this.productCatalogPort = productCatalogPort;
+        this.clockPort = clockPort;
+    }
+
+    @Override
+    public CartResponse execute(GetCartQuery query) {
+        return CartResponse.from(getOrCreateCart(query.customerId()));
+    }
+
+    @Override
+    public CartResponse execute(AddProductToCartCommand command) {
+        Instant now = clockPort.currentTime();
+        Money price = requireProduct(command.productId()).currentPrice();
+        Cart cart = cartRepository
+                .findByCustomerId(command.customerId())
+                .orElseGet(() -> newCart(command.customerId(), now));
+        Cart updated =
+                cart.addProduct(UUID.randomUUID(), command.productId(), command.quantity(), price, now);
+        return CartResponse.from(cartRepository.save(updated));
+    }
+
+    @Override
+    public CartResponse execute(ChangeCartItemQuantityCommand command) {
+        Instant now = clockPort.currentTime();
+        Cart updated = requireCart(command.customerId()).changeQuantity(command.productId(), command.quantity(), now);
+        return CartResponse.from(cartRepository.save(updated));
+    }
+
+    @Override
+    public CartResponse execute(RemoveProductFromCartCommand command) {
+        Instant now = clockPort.currentTime();
+        Cart updated = requireCart(command.customerId()).removeProduct(command.productId(), now);
+        return CartResponse.from(cartRepository.save(updated));
+    }
+
+    @Override
+    public CartResponse execute(ClearCartCommand command) {
+        Instant now = clockPort.currentTime();
+        Cart updated = requireCart(command.customerId()).clear(now);
+        return CartResponse.from(cartRepository.save(updated));
+    }
+
+    private Cart getOrCreateCart(UUID customerId) {
+        return cartRepository.findByCustomerId(customerId).orElseGet(() -> {
+            Instant now = clockPort.currentTime();
+            return cartRepository.save(newCart(customerId, now));
+        });
+    }
+
+    private Cart newCart(UUID customerId, Instant now) {
+        return Cart.create(UUID.randomUUID(), customerId, CartStatus.ACTIVE, List.of(), now, now);
+    }
+
+    private Cart requireCart(UUID customerId) {
+        return cartRepository.findByCustomerId(customerId).orElseThrow(() -> new CartNotFoundException(customerId));
+    }
+
+    private ProductCatalogInfo requireProduct(UUID productId) {
+        return productCatalogPort.getProduct(productId).orElseThrow(() -> new ProductNotFoundException(productId));
+    }
+}
