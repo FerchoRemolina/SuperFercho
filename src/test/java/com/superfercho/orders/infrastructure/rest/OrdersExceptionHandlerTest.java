@@ -6,6 +6,7 @@ import com.superfercho.catalog.application.dto.UnavailableProduct;
 import com.superfercho.identity.application.exception.UnauthenticatedUserException;
 import com.superfercho.orders.application.exception.IdempotencyConflictException;
 import com.superfercho.orders.application.exception.InvalidCheckoutException;
+import com.superfercho.orders.application.exception.InvalidOrderStatusUpdateException;
 import com.superfercho.orders.application.exception.OrderNotFoundException;
 import com.superfercho.orders.application.exception.OrderOwnershipException;
 import com.superfercho.orders.application.exception.PaymentDeclinedException;
@@ -105,6 +106,14 @@ class OrdersExceptionHandlerTest {
                         new InvalidOrderStateTransitionException(OrderStatus.CANCELLED, OrderStatus.PENDING)),
                 HttpStatus.CONFLICT,
                 "INVALID_ORDER_TRANSITION");
+    }
+
+    @Test
+    void shouldMapInvalidOrderStatusUpdateTo400() {
+        assertProblem(
+                handler.handleInvalidOrderStatusUpdate(new InvalidOrderStatusUpdateException(OrderStatus.CANCELLED)),
+                HttpStatus.BAD_REQUEST,
+                "INVALID_ORDER_STATUS_UPDATE");
     }
 
     @Test

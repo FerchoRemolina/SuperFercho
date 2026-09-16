@@ -5,14 +5,17 @@ import com.superfercho.orders.application.dto.CheckoutCommand;
 import com.superfercho.orders.application.dto.CheckoutItem;
 import com.superfercho.orders.application.dto.GetOrderCommand;
 import com.superfercho.orders.application.dto.ListOrdersCommand;
+import com.superfercho.orders.application.dto.UpdateOrderStatusCommand;
 import com.superfercho.orders.application.usecase.GetOrderUseCase;
 import com.superfercho.orders.application.usecase.ListOrdersUseCase;
+import com.superfercho.orders.application.usecase.UpdateOrderStatusUseCase;
 import com.superfercho.orders.infrastructure.configuration.TransactionalCancelOrderUseCase;
 import com.superfercho.orders.infrastructure.configuration.TransactionalCheckoutUseCase;
 import com.superfercho.orders.infrastructure.rest.dto.CheckoutRequest;
 import com.superfercho.orders.infrastructure.rest.dto.CheckoutRestResponse;
 import com.superfercho.orders.infrastructure.rest.dto.OrderRestResponse;
 import com.superfercho.orders.infrastructure.rest.dto.PagedOrdersRestResponse;
+import com.superfercho.orders.infrastructure.rest.dto.UpdateOrderStatusRequest;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
@@ -36,16 +39,19 @@ public class OrderController {
     private final TransactionalCancelOrderUseCase transactionalCancelOrderUseCase;
     private final GetOrderUseCase getOrderUseCase;
     private final ListOrdersUseCase listOrdersUseCase;
+    private final UpdateOrderStatusUseCase updateOrderStatusUseCase;
 
     public OrderController(
             TransactionalCheckoutUseCase transactionalCheckoutUseCase,
             TransactionalCancelOrderUseCase transactionalCancelOrderUseCase,
             GetOrderUseCase getOrderUseCase,
-            ListOrdersUseCase listOrdersUseCase) {
+            ListOrdersUseCase listOrdersUseCase,
+            UpdateOrderStatusUseCase updateOrderStatusUseCase) {
         this.transactionalCheckoutUseCase = transactionalCheckoutUseCase;
         this.transactionalCancelOrderUseCase = transactionalCancelOrderUseCase;
         this.getOrderUseCase = getOrderUseCase;
         this.listOrdersUseCase = listOrdersUseCase;
+        this.updateOrderStatusUseCase = updateOrderStatusUseCase;
     }
 
     @PostMapping
@@ -75,6 +81,13 @@ public class OrderController {
     @PostMapping("/{orderId}/cancel")
     public OrderRestResponse cancel(@PathVariable UUID orderId) {
         return OrderRestResponse.from(transactionalCancelOrderUseCase.execute(new CancelOrderCommand(orderId)));
+    }
+
+    @PostMapping("/{orderId}/status")
+    public OrderRestResponse updateStatus(
+            @PathVariable UUID orderId, @RequestBody UpdateOrderStatusRequest request) {
+        return OrderRestResponse.from(
+                updateOrderStatusUseCase.execute(new UpdateOrderStatusCommand(orderId, request.status())));
     }
 
     private static CheckoutCommand toCheckoutCommand(CheckoutRequest request, String idempotencyKey) {

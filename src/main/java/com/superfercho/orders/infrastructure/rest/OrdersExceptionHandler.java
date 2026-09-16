@@ -5,6 +5,7 @@ import com.superfercho.orders.application.exception.AddressNotAvailableException
 import com.superfercho.orders.application.exception.CartEmptyException;
 import com.superfercho.orders.application.exception.IdempotencyConflictException;
 import com.superfercho.orders.application.exception.InvalidCheckoutException;
+import com.superfercho.orders.application.exception.InvalidOrderStatusUpdateException;
 import com.superfercho.orders.application.exception.OrderNotFoundException;
 import com.superfercho.orders.application.exception.OrderOwnershipException;
 import com.superfercho.orders.application.exception.PaymentDeclinedException;
@@ -87,6 +88,11 @@ public class OrdersExceptionHandler {
     @ExceptionHandler(InvalidOrderStateTransitionException.class)
     ProblemDetail handleInvalidOrderTransition(InvalidOrderStateTransitionException exception) {
         return problem(HttpStatus.CONFLICT, "INVALID_ORDER_TRANSITION", exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidOrderStatusUpdateException.class)
+    ProblemDetail handleInvalidOrderStatusUpdate(InvalidOrderStatusUpdateException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "INVALID_ORDER_STATUS_UPDATE", exception.getMessage());
     }
 
     @ExceptionHandler(PaymentNotFoundException.class)
