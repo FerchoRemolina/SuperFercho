@@ -18,9 +18,12 @@ public final class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtAccessTokenService jwtAccessTokenService;
+    private final SecurityProblemDetailResponses problemResponses;
 
-    public JwtAuthenticationFilter(JwtAccessTokenService jwtAccessTokenService) {
+    JwtAuthenticationFilter(
+            JwtAccessTokenService jwtAccessTokenService, SecurityProblemDetailResponses problemResponses) {
         this.jwtAccessTokenService = jwtAccessTokenService;
+        this.problemResponses = problemResponses;
     }
 
     @Override
@@ -32,7 +35,7 @@ public final class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = header.substring(BEARER_PREFIX.length()).trim();
             var principal = jwtAccessTokenService.parse(token);
             if (principal.isEmpty()) {
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                problemResponses.writeUnauthenticated(response);
                 return;
             }
             AuthenticatedUserPrincipal user = principal.get();

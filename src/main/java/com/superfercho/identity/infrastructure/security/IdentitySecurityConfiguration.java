@@ -1,11 +1,13 @@
 package com.superfercho.identity.infrastructure.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.superfercho.identity.application.port.CurrentUserProvider;
 import com.superfercho.identity.application.port.PasswordHasher;
 import java.time.Clock;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -40,19 +42,73 @@ public class IdentitySecurityConfiguration {
 
     @Bean
     SecurityFilterChain securityFilterChain(
-            HttpSecurity http, JwtAccessTokenService jwtAccessTokenService) throws Exception {
+            HttpSecurity http,
+            JwtAccessTokenService jwtAccessTokenService,
+            ObjectMapper objectMapper)
+            throws Exception {
+        SecurityProblemDetailResponses problemResponses = new SecurityProblemDetailResponses(objectMapper);
         JwtAuthenticationFilter jwtAuthenticationFilter =
-                new JwtAuthenticationFilter(jwtAccessTokenService);
+                new JwtAuthenticationFilter(jwtAccessTokenService, problemResponses);
         http.csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(new ProblemDetailAuthenticationEntryPoint(problemResponses))
+                        .accessDeniedHandler(new ProblemDetailAccessDeniedHandler(problemResponses)))
                 .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/login")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/customers")
+                        .permitAll()
                         .requestMatchers("/error")
                         .permitAll()
+                        .requestMatchers(CatalogGetRequestMatcher.adminView())
+                        .hasRole("ADMIN")
+                        .requestMatchers(CatalogGetRequestMatcher.publicView())
+                        .permitAll()
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/categories",
+                                "/api/v1/categories/{categoryId}/activate",
+                                "/api/v1/categories/{categoryId}/deactivate")
+                        .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/categories/{categoryId}")
+                        .hasRole("ADMIN")
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/products",
+                                "/api/v1/products/{productId}/activate",
+                                "/api/v1/products/{productId}/deactivate",
+                                "/api/v1/products/{productId}/price")
+                        .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/products/{productId}")
+                        .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/orders/{orderId}/status")
+                        .hasRole("ADMIN")
+                        .requestMatchers(
+                                "/api/v1/customers/{userId}/addresses",
+                                "/api/v1/customers/{userId}/addresses/**")
+                        .hasRole("CUSTOMER")
+                        .requestMatchers(
+                                "/api/v1/customers/{customerId}/cart",
+                                "/api/v1/customers/{customerId}/cart/**")
+                        .hasRole("CUSTOMER")
+                        .requestMatchers(
+                                "/api/v1/customers/{customerId}/shopping-lists",
+                                "/api/v1/customers/{customerId}/shopping-lists/**")
+                        .hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/orders")
+                        .hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/orders")
+                        .hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/orders/{orderId}")
+                        .hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/orders/{orderId}/cancel")
+                        .hasRole("CUSTOMER")
                         .anyRequest()
-                        .permitAll())
+                        .denyAll())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
