@@ -13,7 +13,6 @@ import com.superfercho.platform.money.Money;
 import com.superfercho.shopping.application.dto.cart.CartItemResponse;
 import com.superfercho.shopping.application.dto.cart.CartResponse;
 import com.superfercho.shopping.application.dto.cart.ClearCartCommand;
-import com.superfercho.shopping.application.dto.cart.GetCartQuery;
 import com.superfercho.shopping.application.exception.CartNotFoundException;
 import com.superfercho.shopping.application.port.in.ClearCartUseCase;
 import com.superfercho.shopping.application.port.in.GetCartUseCase;
@@ -25,7 +24,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -57,18 +55,16 @@ class ShoppingCartAdapterTest {
 
     @Test
     void shouldDelegateGetActiveCartToGetCartUseCase() {
-        when(getCartUseCase.execute(any(GetCartQuery.class))).thenReturn(cartWithItems());
+        when(getCartUseCase.execute()).thenReturn(cartWithItems());
 
         adapter.getActiveCart(CUSTOMER_ID);
 
-        ArgumentCaptor<GetCartQuery> query = ArgumentCaptor.forClass(GetCartQuery.class);
-        verify(getCartUseCase).execute(query.capture());
-        assertEquals(CUSTOMER_ID, query.getValue().customerId());
+        verify(getCartUseCase).execute();
     }
 
     @Test
     void shouldMapCartResponseToCartSnapshot() {
-        when(getCartUseCase.execute(any(GetCartQuery.class))).thenReturn(cartWithItems());
+        when(getCartUseCase.execute()).thenReturn(cartWithItems());
 
         CartSnapshot snapshot = adapter.getActiveCart(CUSTOMER_ID);
 
@@ -84,7 +80,7 @@ class ShoppingCartAdapterTest {
 
     @Test
     void shouldMapEmptyCartWithoutInventingItems() {
-        when(getCartUseCase.execute(any(GetCartQuery.class))).thenReturn(emptyCart());
+        when(getCartUseCase.execute()).thenReturn(emptyCart());
 
         CartSnapshot snapshot = adapter.getActiveCart(CUSTOMER_ID);
 
@@ -98,9 +94,7 @@ class ShoppingCartAdapterTest {
 
         adapter.clearCart(CUSTOMER_ID);
 
-        ArgumentCaptor<ClearCartCommand> command = ArgumentCaptor.forClass(ClearCartCommand.class);
-        verify(clearCartUseCase).execute(command.capture());
-        assertEquals(CUSTOMER_ID, command.getValue().customerId());
+        verify(clearCartUseCase).execute(new ClearCartCommand());
     }
 
     @Test

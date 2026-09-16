@@ -9,17 +9,18 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.superfercho.identity.application.exception.UnauthenticatedUserException;
 import com.superfercho.platform.money.Money;
 import com.superfercho.shopping.application.dto.ProductCatalogInfo;
 import com.superfercho.shopping.application.dto.cart.AddProductToCartCommand;
 import com.superfercho.shopping.application.dto.cart.CartResponse;
 import com.superfercho.shopping.application.dto.cart.ChangeCartItemQuantityCommand;
 import com.superfercho.shopping.application.dto.cart.ClearCartCommand;
-import com.superfercho.shopping.application.dto.cart.GetCartQuery;
 import com.superfercho.shopping.application.dto.cart.RemoveProductFromCartCommand;
 import com.superfercho.shopping.application.exception.CartNotFoundException;
 import com.superfercho.shopping.application.exception.DuplicateCustomerCartException;
 import com.superfercho.shopping.application.exception.ProductNotFoundException;
+import com.superfercho.shopping.application.port.CurrentUserProvider;
 import com.superfercho.shopping.application.port.out.CartRepositoryPort;
 import com.superfercho.shopping.application.port.out.ClockPort;
 import com.superfercho.shopping.application.port.out.ProductCatalogPort;
@@ -54,6 +55,9 @@ class CartApplicationServiceTest {
     private static final Money BREAD_PRICE = Money.cop(new BigDecimal("3.00"));
 
     @Mock
+    private CurrentUserProvider currentUserProvider;
+
+    @Mock
     private CartRepositoryPort cartRepository;
 
     @Mock
@@ -66,15 +70,18 @@ class CartApplicationServiceTest {
 
     @BeforeEach
     void setUp() {
-        cartService = new CartApplicationService(cartRepository, productCatalogPort, clockPort);
+        cartService = new CartApplicationService(currentUserProvider, cartRepository, productCatalogPort, clockPort);
     }
 
     @Test
-    void shouldGetExistingCart() {
+    void shouldGetExistingCartForCurrentUserFromProvider() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cartWithMilk()));
 
-        CartResponse response = cartService.execute(new GetCartQuery(CUSTOMER_ID));
+        CartResponse response = cartService.execute();
 
+        verify(currentUserProvider).getCurrentUserId();
+        verify(cartRepository).findByCustomerId(CUSTOMER_ID);
         assertEquals(CART_ID, response.id());
         assertEquals(CUSTOMER_ID, response.customerId());
         assertEquals(CartStatus.ACTIVE, response.status());
@@ -85,11 +92,12 @@ class CartApplicationServiceTest {
 
     @Test
     void shouldCreateCartWhenMissingOnGet() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.empty());
         when(clockPort.currentTime()).thenReturn(NOW);
         when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        CartResponse response = cartService.execute(new GetCartQuery(CUSTOMER_ID));
+        CartResponse response = cartService.execute();
 
         assertEquals(CUSTOMER_ID, response.customerId());
         assertEquals(CartStatus.ACTIVE, response.status());
@@ -101,13 +109,14 @@ class CartApplicationServiceTest {
 
     @Test
     void shouldReturnWinnerCartWhenCreateLosesRaceOnGet() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(cartRepository.findByCustomerId(CUSTOMER_ID))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(emptyCart()));
         when(clockPort.currentTime()).thenReturn(NOW);
         when(cartRepository.save(any(Cart.class))).thenThrow(new DuplicateCustomerCartException());
 
-        CartResponse response = cartService.execute(new GetCartQuery(CUSTOMER_ID));
+        CartResponse response = cartService.execute();
 
         assertEquals(CART_ID, response.id());
         assertEquals(CUSTOMER_ID, response.customerId());
@@ -118,25 +127,27 @@ class CartApplicationServiceTest {
 
     @Test
     void shouldPropagateDuplicateCustomerCartWhenWinnerCartIsMissingOnGet() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.empty());
         when(clockPort.currentTime()).thenReturn(NOW);
         when(cartRepository.save(any(Cart.class))).thenThrow(new DuplicateCustomerCartException());
 
-        assertThrows(
-                DuplicateCustomerCartException.class, () -> cartService.execute(new GetCartQuery(CUSTOMER_ID)));
+        assertThrows(DuplicateCustomerCartException.class, cartService::execute);
         verify(cartRepository, times(2)).findByCustomerId(CUSTOMER_ID);
     }
 
     @Test
-    void shouldAddNewProductToExistingCart() {
+    void shouldAddNewProductToExistingCartUsingCurrentUserFromProvider() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(emptyCart()));
         when(clockPort.currentTime()).thenReturn(NOW);
         when(productCatalogPort.getProduct(MILK_ID)).thenReturn(Optional.of(new ProductCatalogInfo(MILK_ID, MILK_PRICE)));
         when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        CartResponse response =
-                cartService.execute(new AddProductToCartCommand(CUSTOMER_ID, MILK_ID, 2));
+        CartResponse response = cartService.execute(new AddProductToCartCommand(MILK_ID, 2));
 
+        verify(currentUserProvider).getCurrentUserId();
+        verify(cartRepository).findByCustomerId(CUSTOMER_ID);
         assertEquals(1, response.items().size());
         assertEquals(MILK_ID, response.items().get(0).productId());
         assertEquals(2, response.items().get(0).quantity());
@@ -148,14 +159,14 @@ class CartApplicationServiceTest {
 
     @Test
     void shouldIncrementQuantityWhenProductAlreadyInCart() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cartWithMilk()));
         when(clockPort.currentTime()).thenReturn(NOW);
         when(productCatalogPort.getProduct(MILK_ID))
                 .thenReturn(Optional.of(new ProductCatalogInfo(MILK_ID, Money.cop(new BigDecimal("99.00")))));
         when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        CartResponse response =
-                cartService.execute(new AddProductToCartCommand(CUSTOMER_ID, MILK_ID, 3));
+        CartResponse response = cartService.execute(new AddProductToCartCommand(MILK_ID, 3));
 
         assertEquals(1, response.items().size());
         assertEquals(ITEM_ID, response.items().get(0).id());
@@ -168,14 +179,15 @@ class CartApplicationServiceTest {
 
     @Test
     void shouldAddProductCreatingCartWhenMissing() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.empty());
         when(clockPort.currentTime()).thenReturn(NOW);
         when(productCatalogPort.getProduct(MILK_ID)).thenReturn(Optional.of(new ProductCatalogInfo(MILK_ID, MILK_PRICE)));
         when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        CartResponse response =
-                cartService.execute(new AddProductToCartCommand(CUSTOMER_ID, MILK_ID, 1));
+        CartResponse response = cartService.execute(new AddProductToCartCommand(MILK_ID, 1));
 
+        assertEquals(CUSTOMER_ID, response.customerId());
         assertEquals(1, response.items().size());
         assertEquals(MILK_ID, response.items().get(0).productId());
         verify(cartRepository).save(any(Cart.class));
@@ -183,6 +195,7 @@ class CartApplicationServiceTest {
 
     @Test
     void shouldReapplyAddProductWhenInitialCartCreateLosesRace() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(cartRepository.findByCustomerId(CUSTOMER_ID))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(emptyCart()));
@@ -192,8 +205,7 @@ class CartApplicationServiceTest {
                 .thenThrow(new DuplicateCustomerCartException())
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        CartResponse response =
-                cartService.execute(new AddProductToCartCommand(CUSTOMER_ID, MILK_ID, 2));
+        CartResponse response = cartService.execute(new AddProductToCartCommand(MILK_ID, 2));
 
         assertEquals(CART_ID, response.id());
         assertEquals(1, response.items().size());
@@ -213,12 +225,12 @@ class CartApplicationServiceTest {
 
     @Test
     void shouldChangeCartItemQuantity() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cartWithMilk()));
         when(clockPort.currentTime()).thenReturn(NOW);
         when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        CartResponse response =
-                cartService.execute(new ChangeCartItemQuantityCommand(CUSTOMER_ID, MILK_ID, 4));
+        CartResponse response = cartService.execute(new ChangeCartItemQuantityCommand(MILK_ID, 4));
 
         assertEquals(4, response.items().get(0).quantity());
         assertEquals(NOW, response.updatedAt());
@@ -230,11 +242,12 @@ class CartApplicationServiceTest {
     void shouldRemoveProductFromCart() {
         Cart cart = emptyCart().addProduct(ITEM_ID, MILK_ID, 1, MILK_PRICE, CREATED_AT)
                 .addProduct(UUID.fromString("99999999-9999-9999-9999-000000000002"), BREAD_ID, 1, BREAD_PRICE, CREATED_AT);
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cart));
         when(clockPort.currentTime()).thenReturn(NOW);
         when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        CartResponse response = cartService.execute(new RemoveProductFromCartCommand(CUSTOMER_ID, MILK_ID));
+        CartResponse response = cartService.execute(new RemoveProductFromCartCommand(MILK_ID));
 
         assertEquals(1, response.items().size());
         assertEquals(BREAD_ID, response.items().get(0).productId());
@@ -243,11 +256,12 @@ class CartApplicationServiceTest {
 
     @Test
     void shouldClearCart() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cartWithMilk()));
         when(clockPort.currentTime()).thenReturn(NOW);
         when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        CartResponse response = cartService.execute(new ClearCartCommand(CUSTOMER_ID));
+        CartResponse response = cartService.execute(new ClearCartCommand());
 
         assertTrue(response.items().isEmpty());
         assertEquals(CART_ID, response.id());
@@ -257,43 +271,66 @@ class CartApplicationServiceTest {
 
     @Test
     void shouldRejectChangeQuantityWhenCartDoesNotExist() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.empty());
 
         assertThrows(
-                CartNotFoundException.class,
-                () -> cartService.execute(new ChangeCartItemQuantityCommand(CUSTOMER_ID, MILK_ID, 1)));
+                CartNotFoundException.class, () -> cartService.execute(new ChangeCartItemQuantityCommand(MILK_ID, 1)));
         verify(cartRepository, never()).save(any());
     }
 
     @Test
     void shouldRejectAddWhenProductDoesNotExist() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(productCatalogPort.getProduct(MILK_ID)).thenReturn(Optional.empty());
 
-        assertThrows(
-                ProductNotFoundException.class,
-                () -> cartService.execute(new AddProductToCartCommand(CUSTOMER_ID, MILK_ID, 1)));
+        assertThrows(ProductNotFoundException.class, () -> cartService.execute(new AddProductToCartCommand(MILK_ID, 1)));
         verify(cartRepository, never()).save(any());
     }
 
     @Test
     void shouldPropagateDomainExceptionWhenQuantityIsInvalid() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cartWithMilk()));
         when(clockPort.currentTime()).thenReturn(NOW);
 
         assertThrows(
-                InvalidCartItemException.class,
-                () -> cartService.execute(new ChangeCartItemQuantityCommand(CUSTOMER_ID, MILK_ID, 0)));
+                InvalidCartItemException.class, () -> cartService.execute(new ChangeCartItemQuantityCommand(MILK_ID, 0)));
         verify(cartRepository, never()).save(any());
     }
 
     @Test
     void shouldPropagateDomainExceptionWhenRemovingMissingProduct() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(emptyCart()));
         when(clockPort.currentTime()).thenReturn(NOW);
 
+        assertThrows(InvalidCartException.class, () -> cartService.execute(new RemoveProductFromCartCommand(MILK_ID)));
+        verify(cartRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldPropagateUnauthenticatedUserWhenGettingCart() {
+        when(currentUserProvider.getCurrentUserId()).thenThrow(new UnauthenticatedUserException());
+
+        assertThrows(UnauthenticatedUserException.class, cartService::execute);
+        verify(cartRepository, never()).findByCustomerId(any());
+    }
+
+    @Test
+    void shouldPropagateUnauthenticatedUserWhenAddingProductToCart() {
+        when(currentUserProvider.getCurrentUserId()).thenThrow(new UnauthenticatedUserException());
+
         assertThrows(
-                InvalidCartException.class,
-                () -> cartService.execute(new RemoveProductFromCartCommand(CUSTOMER_ID, MILK_ID)));
+                UnauthenticatedUserException.class, () -> cartService.execute(new AddProductToCartCommand(MILK_ID, 1)));
+        verify(cartRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldPropagateUnauthenticatedUserWhenClearingCart() {
+        when(currentUserProvider.getCurrentUserId()).thenThrow(new UnauthenticatedUserException());
+
+        assertThrows(UnauthenticatedUserException.class, () -> cartService.execute(new ClearCartCommand()));
         verify(cartRepository, never()).save(any());
     }
 

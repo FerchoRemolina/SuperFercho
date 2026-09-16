@@ -1,5 +1,6 @@
 package com.superfercho.shopping.infrastructure.configuration;
 
+import com.superfercho.shopping.application.port.CurrentUserProvider;
 import com.superfercho.shopping.application.port.out.CartRepositoryPort;
 import com.superfercho.shopping.application.port.out.ClockPort;
 import com.superfercho.shopping.application.port.out.ProductCatalogPort;
@@ -23,15 +24,20 @@ public class ShoppingUseCaseConfiguration {
 
     @Bean
     CartApplicationService cartApplicationService(
-            CartRepositoryPort cartRepository, ProductCatalogPort productCatalogPort, ClockPort clockPort) {
-        return new CartApplicationService(cartRepository, productCatalogPort, clockPort);
+            CurrentUserProvider currentUserProvider,
+            CartRepositoryPort cartRepository,
+            ProductCatalogPort productCatalogPort,
+            ClockPort clockPort) {
+        return new CartApplicationService(currentUserProvider, cartRepository, productCatalogPort, clockPort);
     }
 
     @Bean
     ShoppingListApplicationService shoppingListApplicationService(
+            CurrentUserProvider currentUserProvider,
             ShoppingListRepositoryPort shoppingListRepository,
             ProductCatalogPort productCatalogPort,
             ClockPort clockPort) {
-        return new ShoppingListApplicationService(shoppingListRepository, productCatalogPort, clockPort);
+        return new ShoppingListApplicationService(
+                currentUserProvider, shoppingListRepository, productCatalogPort, clockPort);
     }
 }

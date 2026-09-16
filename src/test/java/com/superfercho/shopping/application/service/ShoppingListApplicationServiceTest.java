@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.superfercho.identity.application.exception.UnauthenticatedUserException;
 import com.superfercho.platform.money.Money;
 import com.superfercho.shopping.application.dto.ProductCatalogInfo;
 import com.superfercho.shopping.application.dto.shoppinglist.AddProductToShoppingListCommand;
@@ -15,12 +16,12 @@ import com.superfercho.shopping.application.dto.shoppinglist.ChangeShoppingListI
 import com.superfercho.shopping.application.dto.shoppinglist.ClearShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.CreateShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.GetShoppingListQuery;
-import com.superfercho.shopping.application.dto.shoppinglist.ListShoppingListsQuery;
 import com.superfercho.shopping.application.dto.shoppinglist.RemoveProductFromShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.RenameShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.ShoppingListResponse;
 import com.superfercho.shopping.application.exception.ProductNotFoundException;
 import com.superfercho.shopping.application.exception.ShoppingListNotFoundException;
+import com.superfercho.shopping.application.port.CurrentUserProvider;
 import com.superfercho.shopping.application.port.out.ClockPort;
 import com.superfercho.shopping.application.port.out.ProductCatalogPort;
 import com.superfercho.shopping.application.port.out.ShoppingListRepositoryPort;
@@ -54,6 +55,9 @@ class ShoppingListApplicationServiceTest {
     private static final Money MILK_PRICE = Money.cop(new BigDecimal("10.50"));
 
     @Mock
+    private CurrentUserProvider currentUserProvider;
+
+    @Mock
     private ShoppingListRepositoryPort shoppingListRepository;
 
     @Mock
@@ -66,19 +70,20 @@ class ShoppingListApplicationServiceTest {
 
     @BeforeEach
     void setUp() {
-        shoppingListService =
-                new ShoppingListApplicationService(shoppingListRepository, productCatalogPort, clockPort);
+        shoppingListService = new ShoppingListApplicationService(
+                currentUserProvider, shoppingListRepository, productCatalogPort, clockPort);
     }
 
     @Test
-    void shouldCreateShoppingList() {
+    void shouldCreateShoppingListForCurrentUserFromProvider() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(clockPort.currentTime()).thenReturn(NOW);
         when(shoppingListRepository.save(any(ShoppingList.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        ShoppingListResponse response =
-                shoppingListService.execute(new CreateShoppingListCommand(CUSTOMER_ID, "Mercado semanal"));
+        ShoppingListResponse response = shoppingListService.execute(new CreateShoppingListCommand("Mercado semanal"));
 
+        verify(currentUserProvider).getCurrentUserId();
         assertEquals(CUSTOMER_ID, response.customerId());
         assertEquals("Mercado semanal", response.name());
         assertTrue(response.items().isEmpty());
@@ -89,10 +94,10 @@ class ShoppingListApplicationServiceTest {
 
     @Test
     void shouldGetShoppingList() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(listWithMilk()));
 
-        ShoppingListResponse response =
-                shoppingListService.execute(new GetShoppingListQuery(CUSTOMER_ID, LIST_ID));
+        ShoppingListResponse response = shoppingListService.execute(new GetShoppingListQuery(LIST_ID));
 
         assertEquals(LIST_ID, response.id());
         assertEquals("Mercado semanal", response.name());
@@ -101,14 +106,16 @@ class ShoppingListApplicationServiceTest {
     }
 
     @Test
-    void shouldListShoppingListsForCustomer() {
+    void shouldListShoppingListsForCurrentUserFromProvider() {
         ShoppingList second = ShoppingList.create(
                 SECOND_LIST_ID, CUSTOMER_ID, "Fin de semana", List.of(), CREATED_AT, CREATED_AT);
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(shoppingListRepository.findAllByCustomerId(CUSTOMER_ID)).thenReturn(List.of(emptyList(), second));
 
-        List<ShoppingListResponse> response =
-                shoppingListService.execute(new ListShoppingListsQuery(CUSTOMER_ID));
+        List<ShoppingListResponse> response = shoppingListService.execute();
 
+        verify(currentUserProvider).getCurrentUserId();
+        verify(shoppingListRepository).findAllByCustomerId(CUSTOMER_ID);
         assertEquals(2, response.size());
         assertEquals(LIST_ID, response.get(0).id());
         assertEquals(SECOND_LIST_ID, response.get(1).id());
@@ -117,13 +124,14 @@ class ShoppingListApplicationServiceTest {
 
     @Test
     void shouldRenameShoppingList() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(emptyList()));
         when(clockPort.currentTime()).thenReturn(NOW);
         when(shoppingListRepository.save(any(ShoppingList.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         ShoppingListResponse response =
-                shoppingListService.execute(new RenameShoppingListCommand(CUSTOMER_ID, LIST_ID, "Fin de semana"));
+                shoppingListService.execute(new RenameShoppingListCommand(LIST_ID, "Fin de semana"));
 
         assertEquals("Fin de semana", response.name());
         assertEquals(NOW, response.updatedAt());
@@ -132,14 +140,15 @@ class ShoppingListApplicationServiceTest {
 
     @Test
     void shouldAddNewProductToShoppingList() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(emptyList()));
         when(clockPort.currentTime()).thenReturn(NOW);
         when(productCatalogPort.getProduct(MILK_ID)).thenReturn(Optional.of(new ProductCatalogInfo(MILK_ID, MILK_PRICE)));
         when(shoppingListRepository.save(any(ShoppingList.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        ShoppingListResponse response = shoppingListService.execute(
-                new AddProductToShoppingListCommand(CUSTOMER_ID, LIST_ID, MILK_ID, 2));
+        ShoppingListResponse response =
+                shoppingListService.execute(new AddProductToShoppingListCommand(LIST_ID, MILK_ID, 2));
 
         assertEquals(1, response.items().size());
         assertEquals(MILK_ID, response.items().get(0).productId());
@@ -151,14 +160,15 @@ class ShoppingListApplicationServiceTest {
 
     @Test
     void shouldIncrementQuantityWhenProductAlreadyInShoppingList() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(listWithMilk()));
         when(clockPort.currentTime()).thenReturn(NOW);
         when(productCatalogPort.getProduct(MILK_ID)).thenReturn(Optional.of(new ProductCatalogInfo(MILK_ID, MILK_PRICE)));
         when(shoppingListRepository.save(any(ShoppingList.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        ShoppingListResponse response = shoppingListService.execute(
-                new AddProductToShoppingListCommand(CUSTOMER_ID, LIST_ID, MILK_ID, 3));
+        ShoppingListResponse response =
+                shoppingListService.execute(new AddProductToShoppingListCommand(LIST_ID, MILK_ID, 3));
 
         assertEquals(1, response.items().size());
         assertEquals(ITEM_ID, response.items().get(0).id());
@@ -169,13 +179,14 @@ class ShoppingListApplicationServiceTest {
 
     @Test
     void shouldChangeShoppingListItemQuantity() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(listWithMilk()));
         when(clockPort.currentTime()).thenReturn(NOW);
         when(shoppingListRepository.save(any(ShoppingList.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        ShoppingListResponse response = shoppingListService.execute(
-                new ChangeShoppingListItemQuantityCommand(CUSTOMER_ID, LIST_ID, MILK_ID, 4));
+        ShoppingListResponse response =
+                shoppingListService.execute(new ChangeShoppingListItemQuantityCommand(LIST_ID, MILK_ID, 4));
 
         assertEquals(4, response.items().get(0).quantity());
         assertEquals(NOW, response.updatedAt());
@@ -188,13 +199,14 @@ class ShoppingListApplicationServiceTest {
         ShoppingList list = emptyList()
                 .addProduct(ITEM_ID, MILK_ID, 1, CREATED_AT)
                 .addProduct(UUID.fromString("99999999-9999-9999-9999-000000000002"), BREAD_ID, 1, CREATED_AT);
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(list));
         when(clockPort.currentTime()).thenReturn(NOW);
         when(shoppingListRepository.save(any(ShoppingList.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        ShoppingListResponse response = shoppingListService.execute(
-                new RemoveProductFromShoppingListCommand(CUSTOMER_ID, LIST_ID, MILK_ID));
+        ShoppingListResponse response =
+                shoppingListService.execute(new RemoveProductFromShoppingListCommand(LIST_ID, MILK_ID));
 
         assertEquals(1, response.items().size());
         assertEquals(BREAD_ID, response.items().get(0).productId());
@@ -203,13 +215,13 @@ class ShoppingListApplicationServiceTest {
 
     @Test
     void shouldClearShoppingList() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(listWithMilk()));
         when(clockPort.currentTime()).thenReturn(NOW);
         when(shoppingListRepository.save(any(ShoppingList.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        ShoppingListResponse response =
-                shoppingListService.execute(new ClearShoppingListCommand(CUSTOMER_ID, LIST_ID));
+        ShoppingListResponse response = shoppingListService.execute(new ClearShoppingListCommand(LIST_ID));
 
         assertTrue(response.items().isEmpty());
         assertEquals(LIST_ID, response.id());
@@ -219,67 +231,99 @@ class ShoppingListApplicationServiceTest {
 
     @Test
     void shouldRejectGetWhenShoppingListDoesNotExist() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.empty());
 
         assertThrows(
                 ShoppingListNotFoundException.class,
-                () -> shoppingListService.execute(new GetShoppingListQuery(CUSTOMER_ID, LIST_ID)));
+                () -> shoppingListService.execute(new GetShoppingListQuery(LIST_ID)));
         verify(shoppingListRepository, never()).save(any());
     }
 
     @Test
     void shouldRejectMutationWhenShoppingListDoesNotExist() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.empty());
 
         assertThrows(
                 ShoppingListNotFoundException.class,
-                () -> shoppingListService.execute(
-                        new RenameShoppingListCommand(CUSTOMER_ID, LIST_ID, "Otro")));
+                () -> shoppingListService.execute(new RenameShoppingListCommand(LIST_ID, "Otro")));
         verify(shoppingListRepository, never()).save(any());
     }
 
     @Test
     void shouldRejectWhenShoppingListBelongsToAnotherCustomer() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(OTHER_CUSTOMER_ID);
         when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(emptyList()));
 
         assertThrows(
                 ShoppingListNotFoundException.class,
-                () -> shoppingListService.execute(new GetShoppingListQuery(OTHER_CUSTOMER_ID, LIST_ID)));
+                () -> shoppingListService.execute(new GetShoppingListQuery(LIST_ID)));
+        verify(currentUserProvider).getCurrentUserId();
         verify(shoppingListRepository, never()).save(any());
     }
 
     @Test
     void shouldRejectAddWhenProductDoesNotExist() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(productCatalogPort.getProduct(MILK_ID)).thenReturn(Optional.empty());
 
         assertThrows(
                 ProductNotFoundException.class,
-                () -> shoppingListService.execute(
-                        new AddProductToShoppingListCommand(CUSTOMER_ID, LIST_ID, MILK_ID, 1)));
+                () -> shoppingListService.execute(new AddProductToShoppingListCommand(LIST_ID, MILK_ID, 1)));
         verify(shoppingListRepository, never()).save(any());
     }
 
     @Test
     void shouldPropagateDomainExceptionWhenQuantityIsInvalid() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(listWithMilk()));
         when(clockPort.currentTime()).thenReturn(NOW);
 
         assertThrows(
                 InvalidShoppingListItemException.class,
-                () -> shoppingListService.execute(
-                        new ChangeShoppingListItemQuantityCommand(CUSTOMER_ID, LIST_ID, MILK_ID, 0)));
+                () -> shoppingListService.execute(new ChangeShoppingListItemQuantityCommand(LIST_ID, MILK_ID, 0)));
         verify(shoppingListRepository, never()).save(any());
     }
 
     @Test
     void shouldPropagateDomainExceptionWhenNameIsBlank() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(emptyList()));
         when(clockPort.currentTime()).thenReturn(NOW);
 
         assertThrows(
                 InvalidShoppingListException.class,
-                () -> shoppingListService.execute(new RenameShoppingListCommand(CUSTOMER_ID, LIST_ID, "  ")));
+                () -> shoppingListService.execute(new RenameShoppingListCommand(LIST_ID, "  ")));
         verify(shoppingListRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldPropagateUnauthenticatedUserWhenCreatingShoppingList() {
+        when(currentUserProvider.getCurrentUserId()).thenThrow(new UnauthenticatedUserException());
+
+        assertThrows(
+                UnauthenticatedUserException.class,
+                () -> shoppingListService.execute(new CreateShoppingListCommand("Mercado semanal")));
+        verify(shoppingListRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldPropagateUnauthenticatedUserWhenListingShoppingLists() {
+        when(currentUserProvider.getCurrentUserId()).thenThrow(new UnauthenticatedUserException());
+
+        assertThrows(UnauthenticatedUserException.class, shoppingListService::execute);
+        verify(shoppingListRepository, never()).findAllByCustomerId(any());
+    }
+
+    @Test
+    void shouldPropagateUnauthenticatedUserWhenGettingShoppingList() {
+        when(currentUserProvider.getCurrentUserId()).thenThrow(new UnauthenticatedUserException());
+
+        assertThrows(
+                UnauthenticatedUserException.class,
+                () -> shoppingListService.execute(new GetShoppingListQuery(LIST_ID)));
+        verify(shoppingListRepository, never()).findById(any());
     }
 
     private ShoppingList emptyList() {

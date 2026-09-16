@@ -5,7 +5,6 @@ import com.superfercho.shopping.application.dto.shoppinglist.ChangeShoppingListI
 import com.superfercho.shopping.application.dto.shoppinglist.ClearShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.CreateShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.GetShoppingListQuery;
-import com.superfercho.shopping.application.dto.shoppinglist.ListShoppingListsQuery;
 import com.superfercho.shopping.application.dto.shoppinglist.RemoveProductFromShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.RenameShoppingListCommand;
 import com.superfercho.shopping.application.port.in.AddProductToShoppingListUseCase;
@@ -39,7 +38,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @RestController
 @Profile("!test")
-@RequestMapping("/api/v1/customers/{customerId}/shopping-lists")
+@RequestMapping("/api/v1/shopping-lists")
 public class ShoppingListController {
 
     private final CreateShoppingListUseCase createShoppingListUseCase;
@@ -71,10 +70,9 @@ public class ShoppingListController {
     }
 
     @PostMapping
-    public ResponseEntity<ShoppingListRestResponse> create(
-            @PathVariable UUID customerId, @RequestBody CreateShoppingListRequest request) {
+    public ResponseEntity<ShoppingListRestResponse> create(@RequestBody CreateShoppingListRequest request) {
         ShoppingListRestResponse body = ShoppingListRestResponse.from(
-                createShoppingListUseCase.execute(new CreateShoppingListCommand(customerId, request.name())));
+                createShoppingListUseCase.execute(new CreateShoppingListCommand(request.name())));
         return ResponseEntity.created(ServletUriComponentsBuilder.fromCurrentRequest()
                         .path("/{shoppingListId}")
                         .buildAndExpand(body.id())
@@ -83,59 +81,48 @@ public class ShoppingListController {
     }
 
     @GetMapping
-    public List<ShoppingListRestResponse> list(@PathVariable UUID customerId) {
-        return listShoppingListsUseCase.execute(new ListShoppingListsQuery(customerId)).stream()
-                .map(ShoppingListRestResponse::from)
-                .toList();
+    public List<ShoppingListRestResponse> list() {
+        return listShoppingListsUseCase.execute().stream().map(ShoppingListRestResponse::from).toList();
     }
 
     @GetMapping("/{shoppingListId}")
-    public ShoppingListRestResponse get(@PathVariable UUID customerId, @PathVariable UUID shoppingListId) {
-        return ShoppingListRestResponse.from(
-                getShoppingListUseCase.execute(new GetShoppingListQuery(customerId, shoppingListId)));
+    public ShoppingListRestResponse get(@PathVariable UUID shoppingListId) {
+        return ShoppingListRestResponse.from(getShoppingListUseCase.execute(new GetShoppingListQuery(shoppingListId)));
     }
 
     @PatchMapping("/{shoppingListId}")
     public ShoppingListRestResponse rename(
-            @PathVariable UUID customerId,
-            @PathVariable UUID shoppingListId,
-            @RequestBody RenameShoppingListRequest request) {
+            @PathVariable UUID shoppingListId, @RequestBody RenameShoppingListRequest request) {
         return ShoppingListRestResponse.from(renameShoppingListUseCase.execute(
-                new RenameShoppingListCommand(customerId, shoppingListId, request.name())));
+                new RenameShoppingListCommand(shoppingListId, request.name())));
     }
 
     @PostMapping("/{shoppingListId}/items")
     public ShoppingListRestResponse addItem(
-            @PathVariable UUID customerId,
-            @PathVariable UUID shoppingListId,
-            @RequestBody AddItemRequest request) {
+            @PathVariable UUID shoppingListId, @RequestBody AddItemRequest request) {
         return ShoppingListRestResponse.from(addProductToShoppingListUseCase.execute(
-                new AddProductToShoppingListCommand(
-                        customerId, shoppingListId, request.productId(), request.quantity())));
+                new AddProductToShoppingListCommand(shoppingListId, request.productId(), request.quantity())));
     }
 
     @PatchMapping("/{shoppingListId}/items/{productId}")
     public ShoppingListRestResponse changeQuantity(
-            @PathVariable UUID customerId,
             @PathVariable UUID shoppingListId,
             @PathVariable UUID productId,
             @RequestBody ChangeItemQuantityRequest request) {
         return ShoppingListRestResponse.from(changeShoppingListItemQuantityUseCase.execute(
-                new ChangeShoppingListItemQuantityCommand(
-                        customerId, shoppingListId, productId, request.quantity())));
+                new ChangeShoppingListItemQuantityCommand(shoppingListId, productId, request.quantity())));
     }
 
     @DeleteMapping("/{shoppingListId}/items/{productId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void removeItem(
-            @PathVariable UUID customerId, @PathVariable UUID shoppingListId, @PathVariable UUID productId) {
+    public void removeItem(@PathVariable UUID shoppingListId, @PathVariable UUID productId) {
         removeProductFromShoppingListUseCase.execute(
-                new RemoveProductFromShoppingListCommand(customerId, shoppingListId, productId));
+                new RemoveProductFromShoppingListCommand(shoppingListId, productId));
     }
 
     @DeleteMapping("/{shoppingListId}/items")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void clear(@PathVariable UUID customerId, @PathVariable UUID shoppingListId) {
-        clearShoppingListUseCase.execute(new ClearShoppingListCommand(customerId, shoppingListId));
+    public void clear(@PathVariable UUID shoppingListId) {
+        clearShoppingListUseCase.execute(new ClearShoppingListCommand(shoppingListId));
     }
 }

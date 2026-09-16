@@ -208,6 +208,28 @@ class HttpAuthorizationSecurityTest {
     }
 
     @Test
+    void shouldRejectShoppingCustomerRoutesWithoutJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/cart")).andExpect(unauthenticated());
+        mockMvc.perform(get("/api/v1/shopping-lists")).andExpect(unauthenticated());
+    }
+
+    @Test
+    void shouldAllowShoppingCustomerRoutesWithCustomerJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/cart").header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(notBlockedBySecurity());
+        mockMvc.perform(get("/api/v1/shopping-lists").header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(notBlockedBySecurity());
+    }
+
+    @Test
+    void shouldRejectShoppingCustomerRoutesWithAdminJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/cart").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(accessDenied());
+        mockMvc.perform(get("/api/v1/shopping-lists").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(accessDenied());
+    }
+
+    @Test
     void shouldRejectAdminRouteWithCustomerJwt() throws Exception {
         mockMvc.perform(post("/api/v1/categories")
                         .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER))

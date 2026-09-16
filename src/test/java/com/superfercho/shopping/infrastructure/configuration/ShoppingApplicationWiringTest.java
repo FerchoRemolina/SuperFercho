@@ -3,6 +3,7 @@ package com.superfercho.shopping.infrastructure.configuration;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.superfercho.platform.time.ClockConfiguration;
+import com.superfercho.shopping.application.port.CurrentUserProvider;
 import com.superfercho.shopping.application.port.out.CartRepositoryPort;
 import com.superfercho.shopping.application.port.out.ClockPort;
 import com.superfercho.shopping.application.port.out.ProductCatalogPort;
@@ -25,6 +26,11 @@ class ShoppingApplicationWiringTest {
 
     @Configuration
     static class ShoppingTestPorts {
+
+        @Bean
+        CurrentUserProvider currentUserProvider() {
+            return Mockito.mock(CurrentUserProvider.class);
+        }
 
         @Bean
         CartRepositoryPort cartRepositoryPort() {

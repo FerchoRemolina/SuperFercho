@@ -89,13 +89,9 @@ public class IdentitySecurityConfiguration {
                         .hasRole("ADMIN")
                         .requestMatchers("/api/v1/addresses", "/api/v1/addresses/**")
                         .hasRole("CUSTOMER")
-                        .requestMatchers(
-                                "/api/v1/customers/{customerId}/cart",
-                                "/api/v1/customers/{customerId}/cart/**")
+                        .requestMatchers("/api/v1/cart", "/api/v1/cart/**")
                         .hasRole("CUSTOMER")
-                        .requestMatchers(
-                                "/api/v1/customers/{customerId}/shopping-lists",
-                                "/api/v1/customers/{customerId}/shopping-lists/**")
+                        .requestMatchers("/api/v1/shopping-lists", "/api/v1/shopping-lists/**")
                         .hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.POST, "/api/v1/orders")
                         .hasRole("CUSTOMER")

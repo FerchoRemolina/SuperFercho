@@ -6,7 +6,6 @@ import com.superfercho.orders.application.port.ShoppingCartPort;
 import com.superfercho.shopping.application.dto.cart.CartItemResponse;
 import com.superfercho.shopping.application.dto.cart.CartResponse;
 import com.superfercho.shopping.application.dto.cart.ClearCartCommand;
-import com.superfercho.shopping.application.dto.cart.GetCartQuery;
 import com.superfercho.shopping.application.port.in.ClearCartUseCase;
 import com.superfercho.shopping.application.port.in.GetCartUseCase;
 import java.util.UUID;
@@ -27,12 +26,12 @@ public class ShoppingCartAdapter implements ShoppingCartPort {
 
     @Override
     public CartSnapshot getActiveCart(UUID customerId) {
-        return toSnapshot(getCartUseCase.execute(new GetCartQuery(customerId)));
+        return toSnapshot(getCartUseCase.execute());
     }
 
     @Override
     public void clearCart(UUID customerId) {
-        clearCartUseCase.execute(new ClearCartCommand(customerId));
+        clearCartUseCase.execute(new ClearCartCommand());
     }
 
     private static CartSnapshot toSnapshot(CartResponse cart) {

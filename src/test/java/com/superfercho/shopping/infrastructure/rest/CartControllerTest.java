@@ -5,8 +5,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -17,7 +17,6 @@ import com.superfercho.shopping.application.dto.cart.CartItemResponse;
 import com.superfercho.shopping.application.dto.cart.CartResponse;
 import com.superfercho.shopping.application.dto.cart.ChangeCartItemQuantityCommand;
 import com.superfercho.shopping.application.dto.cart.ClearCartCommand;
-import com.superfercho.shopping.application.dto.cart.GetCartQuery;
 import com.superfercho.shopping.application.dto.cart.RemoveProductFromCartCommand;
 import com.superfercho.shopping.application.exception.CartNotFoundException;
 import com.superfercho.shopping.application.exception.ProductNotFoundException;
@@ -73,9 +72,9 @@ class CartControllerTest {
 
     @Test
     void shouldGetCart() throws Exception {
-        when(getCartUseCase.execute(new GetCartQuery(CUSTOMER_ID))).thenReturn(cartWithItem(2));
+        when(getCartUseCase.execute()).thenReturn(cartWithItem(2));
 
-        mockMvc.perform(get("/api/v1/customers/{customerId}/cart", CUSTOMER_ID))
+        mockMvc.perform(get("/api/v1/cart"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(CART_ID.toString()))
                 .andExpect(jsonPath("$.customerId").value(CUSTOMER_ID.toString()))
@@ -86,13 +85,15 @@ class CartControllerTest {
                 .andExpect(jsonPath("$.items[0].priceAtAddition.currency").value("COP"))
                 .andExpect(jsonPath("$.createdAt").value(CREATED_AT.toString()))
                 .andExpect(jsonPath("$.updatedAt").value(UPDATED_AT.toString()));
+
+        verify(getCartUseCase).execute();
     }
 
     @Test
     void shouldAddProductToCart() throws Exception {
         when(addProductToCartUseCase.execute(any())).thenReturn(cartWithItem(2));
 
-        mockMvc.perform(post("/api/v1/customers/{customerId}/cart/items", CUSTOMER_ID)
+        mockMvc.perform(post("/api/v1/cart/items")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"productId":"%s","quantity":2}
@@ -100,15 +101,14 @@ class CartControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].quantity").value(2));
 
-        verify(addProductToCartUseCase)
-                .execute(new AddProductToCartCommand(CUSTOMER_ID, PRODUCT_ID, 2));
+        verify(addProductToCartUseCase).execute(new AddProductToCartCommand(PRODUCT_ID, 2));
     }
 
     @Test
     void shouldChangeCartItemQuantity() throws Exception {
         when(changeCartItemQuantityUseCase.execute(any())).thenReturn(cartWithItem(3));
 
-        mockMvc.perform(patch("/api/v1/customers/{customerId}/cart/items/{productId}", CUSTOMER_ID, PRODUCT_ID)
+        mockMvc.perform(put("/api/v1/cart/items/{productId}", PRODUCT_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"quantity":3}
@@ -116,33 +116,30 @@ class CartControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].quantity").value(3));
 
-        verify(changeCartItemQuantityUseCase)
-                .execute(new ChangeCartItemQuantityCommand(CUSTOMER_ID, PRODUCT_ID, 3));
+        verify(changeCartItemQuantityUseCase).execute(new ChangeCartItemQuantityCommand(PRODUCT_ID, 3));
     }
 
     @Test
     void shouldRemoveProductFromCart() throws Exception {
         when(removeProductFromCartUseCase.execute(any())).thenReturn(emptyCart());
 
-        mockMvc.perform(delete("/api/v1/customers/{customerId}/cart/items/{productId}", CUSTOMER_ID, PRODUCT_ID))
-                .andExpect(status().isNoContent());
+        mockMvc.perform(delete("/api/v1/cart/items/{productId}", PRODUCT_ID)).andExpect(status().isNoContent());
 
-        verify(removeProductFromCartUseCase).execute(new RemoveProductFromCartCommand(CUSTOMER_ID, PRODUCT_ID));
+        verify(removeProductFromCartUseCase).execute(new RemoveProductFromCartCommand(PRODUCT_ID));
     }
 
     @Test
     void shouldClearCart() throws Exception {
         when(clearCartUseCase.execute(any())).thenReturn(emptyCart());
 
-        mockMvc.perform(delete("/api/v1/customers/{customerId}/cart/items", CUSTOMER_ID))
-                .andExpect(status().isNoContent());
+        mockMvc.perform(delete("/api/v1/cart")).andExpect(status().isNoContent());
 
-        verify(clearCartUseCase).execute(new ClearCartCommand(CUSTOMER_ID));
+        verify(clearCartUseCase).execute(new ClearCartCommand());
     }
 
     @Test
     void shouldRejectInvalidQuantity() throws Exception {
-        mockMvc.perform(post("/api/v1/customers/{customerId}/cart/items", CUSTOMER_ID)
+        mockMvc.perform(post("/api/v1/cart/items")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"productId":"%s","quantity":0}
@@ -154,7 +151,7 @@ class CartControllerTest {
     void shouldMapCartNotFoundTo404() throws Exception {
         when(changeCartItemQuantityUseCase.execute(any())).thenThrow(new CartNotFoundException(CUSTOMER_ID));
 
-        mockMvc.perform(patch("/api/v1/customers/{customerId}/cart/items/{productId}", CUSTOMER_ID, PRODUCT_ID)
+        mockMvc.perform(put("/api/v1/cart/items/{productId}", PRODUCT_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"quantity":3}
@@ -167,7 +164,7 @@ class CartControllerTest {
     void shouldMapProductNotFoundTo404() throws Exception {
         when(addProductToCartUseCase.execute(any())).thenThrow(new ProductNotFoundException(PRODUCT_ID));
 
-        mockMvc.perform(post("/api/v1/customers/{customerId}/cart/items", CUSTOMER_ID)
+        mockMvc.perform(post("/api/v1/cart/items")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"productId":"%s","quantity":2}

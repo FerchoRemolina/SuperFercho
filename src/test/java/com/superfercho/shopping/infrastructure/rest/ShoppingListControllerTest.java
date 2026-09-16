@@ -17,7 +17,6 @@ import com.superfercho.shopping.application.dto.shoppinglist.ChangeShoppingListI
 import com.superfercho.shopping.application.dto.shoppinglist.ClearShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.CreateShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.GetShoppingListQuery;
-import com.superfercho.shopping.application.dto.shoppinglist.ListShoppingListsQuery;
 import com.superfercho.shopping.application.dto.shoppinglist.RemoveProductFromShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.RenameShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.ShoppingListItemResponse;
@@ -35,6 +34,7 @@ import com.superfercho.shopping.application.port.in.RenameShoppingListUseCase;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -87,38 +87,36 @@ class ShoppingListControllerTest {
     void shouldCreateShoppingList() throws Exception {
         when(createShoppingListUseCase.execute(any())).thenReturn(emptyList("Weekly groceries"));
 
-        mockMvc.perform(post("/api/v1/customers/{customerId}/shopping-lists", CUSTOMER_ID)
+        mockMvc.perform(post("/api/v1/shopping-lists")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"Weekly groceries"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(header().string(
-                        "Location",
-                        "http://localhost/api/v1/customers/%s/shopping-lists/%s".formatted(CUSTOMER_ID, LIST_ID)))
+                .andExpect(header().string("Location", Matchers.endsWith("/api/v1/shopping-lists/" + LIST_ID)))
                 .andExpect(jsonPath("$.id").value(LIST_ID.toString()))
                 .andExpect(jsonPath("$.name").value("Weekly groceries"));
 
-        verify(createShoppingListUseCase).execute(new CreateShoppingListCommand(CUSTOMER_ID, "Weekly groceries"));
+        verify(createShoppingListUseCase).execute(new CreateShoppingListCommand("Weekly groceries"));
     }
 
     @Test
     void shouldListShoppingLists() throws Exception {
-        when(listShoppingListsUseCase.execute(new ListShoppingListsQuery(CUSTOMER_ID)))
-                .thenReturn(List.of(emptyList("Weekly groceries")));
+        when(listShoppingListsUseCase.execute()).thenReturn(List.of(emptyList("Weekly groceries")));
 
-        mockMvc.perform(get("/api/v1/customers/{customerId}/shopping-lists", CUSTOMER_ID))
+        mockMvc.perform(get("/api/v1/shopping-lists"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(LIST_ID.toString()))
                 .andExpect(jsonPath("$[0].name").value("Weekly groceries"));
+
+        verify(listShoppingListsUseCase).execute();
     }
 
     @Test
     void shouldGetShoppingList() throws Exception {
-        when(getShoppingListUseCase.execute(new GetShoppingListQuery(CUSTOMER_ID, LIST_ID)))
-                .thenReturn(listWithItem(3));
+        when(getShoppingListUseCase.execute(new GetShoppingListQuery(LIST_ID))).thenReturn(listWithItem(3));
 
-        mockMvc.perform(get("/api/v1/customers/{customerId}/shopping-lists/{shoppingListId}", CUSTOMER_ID, LIST_ID))
+        mockMvc.perform(get("/api/v1/shopping-lists/{shoppingListId}", LIST_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(LIST_ID.toString()))
                 .andExpect(jsonPath("$.customerId").value(CUSTOMER_ID.toString()))
@@ -126,13 +124,15 @@ class ShoppingListControllerTest {
                 .andExpect(jsonPath("$.items[0].quantity").value(3))
                 .andExpect(jsonPath("$.createdAt").value(CREATED_AT.toString()))
                 .andExpect(jsonPath("$.updatedAt").value(UPDATED_AT.toString()));
+
+        verify(getShoppingListUseCase).execute(new GetShoppingListQuery(LIST_ID));
     }
 
     @Test
     void shouldRenameShoppingList() throws Exception {
         when(renameShoppingListUseCase.execute(any())).thenReturn(emptyList("Biweekly groceries"));
 
-        mockMvc.perform(patch("/api/v1/customers/{customerId}/shopping-lists/{shoppingListId}", CUSTOMER_ID, LIST_ID)
+        mockMvc.perform(patch("/api/v1/shopping-lists/{shoppingListId}", LIST_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"Biweekly groceries"}
@@ -140,18 +140,14 @@ class ShoppingListControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Biweekly groceries"));
 
-        verify(renameShoppingListUseCase)
-                .execute(new RenameShoppingListCommand(CUSTOMER_ID, LIST_ID, "Biweekly groceries"));
+        verify(renameShoppingListUseCase).execute(new RenameShoppingListCommand(LIST_ID, "Biweekly groceries"));
     }
 
     @Test
     void shouldAddProductToShoppingList() throws Exception {
         when(addProductToShoppingListUseCase.execute(any())).thenReturn(listWithItem(2));
 
-        mockMvc.perform(post(
-                                "/api/v1/customers/{customerId}/shopping-lists/{shoppingListId}/items",
-                                CUSTOMER_ID,
-                                LIST_ID)
+        mockMvc.perform(post("/api/v1/shopping-lists/{shoppingListId}/items", LIST_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"productId":"%s","quantity":2}
@@ -160,18 +156,14 @@ class ShoppingListControllerTest {
                 .andExpect(jsonPath("$.items[0].quantity").value(2));
 
         verify(addProductToShoppingListUseCase)
-                .execute(new AddProductToShoppingListCommand(CUSTOMER_ID, LIST_ID, PRODUCT_ID, 2));
+                .execute(new AddProductToShoppingListCommand(LIST_ID, PRODUCT_ID, 2));
     }
 
     @Test
     void shouldChangeShoppingListItemQuantity() throws Exception {
         when(changeShoppingListItemQuantityUseCase.execute(any())).thenReturn(listWithItem(4));
 
-        mockMvc.perform(patch(
-                                "/api/v1/customers/{customerId}/shopping-lists/{shoppingListId}/items/{productId}",
-                                CUSTOMER_ID,
-                                LIST_ID,
-                                PRODUCT_ID)
+        mockMvc.perform(patch("/api/v1/shopping-lists/{shoppingListId}/items/{productId}", LIST_ID, PRODUCT_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"quantity":4}
@@ -180,42 +172,35 @@ class ShoppingListControllerTest {
                 .andExpect(jsonPath("$.items[0].quantity").value(4));
 
         verify(changeShoppingListItemQuantityUseCase)
-                .execute(new ChangeShoppingListItemQuantityCommand(CUSTOMER_ID, LIST_ID, PRODUCT_ID, 4));
+                .execute(new ChangeShoppingListItemQuantityCommand(LIST_ID, PRODUCT_ID, 4));
     }
 
     @Test
     void shouldRemoveProductFromShoppingList() throws Exception {
         when(removeProductFromShoppingListUseCase.execute(any())).thenReturn(emptyList("Weekly groceries"));
 
-        mockMvc.perform(delete(
-                        "/api/v1/customers/{customerId}/shopping-lists/{shoppingListId}/items/{productId}",
-                        CUSTOMER_ID,
-                        LIST_ID,
-                        PRODUCT_ID))
+        mockMvc.perform(delete("/api/v1/shopping-lists/{shoppingListId}/items/{productId}", LIST_ID, PRODUCT_ID))
                 .andExpect(status().isNoContent());
 
         verify(removeProductFromShoppingListUseCase)
-                .execute(new RemoveProductFromShoppingListCommand(CUSTOMER_ID, LIST_ID, PRODUCT_ID));
+                .execute(new RemoveProductFromShoppingListCommand(LIST_ID, PRODUCT_ID));
     }
 
     @Test
     void shouldClearShoppingList() throws Exception {
         when(clearShoppingListUseCase.execute(any())).thenReturn(emptyList("Weekly groceries"));
 
-        mockMvc.perform(delete(
-                        "/api/v1/customers/{customerId}/shopping-lists/{shoppingListId}/items",
-                        CUSTOMER_ID,
-                        LIST_ID))
+        mockMvc.perform(delete("/api/v1/shopping-lists/{shoppingListId}/items", LIST_ID))
                 .andExpect(status().isNoContent());
 
-        verify(clearShoppingListUseCase).execute(new ClearShoppingListCommand(CUSTOMER_ID, LIST_ID));
+        verify(clearShoppingListUseCase).execute(new ClearShoppingListCommand(LIST_ID));
     }
 
     @Test
     void shouldMapShoppingListNotFoundTo404() throws Exception {
         when(getShoppingListUseCase.execute(any())).thenThrow(new ShoppingListNotFoundException(LIST_ID));
 
-        mockMvc.perform(get("/api/v1/customers/{customerId}/shopping-lists/{shoppingListId}", CUSTOMER_ID, LIST_ID))
+        mockMvc.perform(get("/api/v1/shopping-lists/{shoppingListId}", LIST_ID))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("SHOPPING_LIST_NOT_FOUND"));
     }
@@ -224,10 +209,7 @@ class ShoppingListControllerTest {
     void shouldMapProductNotFoundTo404() throws Exception {
         when(addProductToShoppingListUseCase.execute(any())).thenThrow(new ProductNotFoundException(PRODUCT_ID));
 
-        mockMvc.perform(post(
-                                "/api/v1/customers/{customerId}/shopping-lists/{shoppingListId}/items",
-                                CUSTOMER_ID,
-                                LIST_ID)
+        mockMvc.perform(post("/api/v1/shopping-lists/{shoppingListId}/items", LIST_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"productId":"%s","quantity":2}
@@ -238,7 +220,7 @@ class ShoppingListControllerTest {
 
     @Test
     void shouldRejectBlankName() throws Exception {
-        mockMvc.perform(post("/api/v1/customers/{customerId}/shopping-lists", CUSTOMER_ID)
+        mockMvc.perform(post("/api/v1/shopping-lists")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"  "}

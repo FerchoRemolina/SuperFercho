@@ -6,11 +6,11 @@ import com.superfercho.shopping.application.dto.cart.AddProductToCartCommand;
 import com.superfercho.shopping.application.dto.cart.CartResponse;
 import com.superfercho.shopping.application.dto.cart.ChangeCartItemQuantityCommand;
 import com.superfercho.shopping.application.dto.cart.ClearCartCommand;
-import com.superfercho.shopping.application.dto.cart.GetCartQuery;
 import com.superfercho.shopping.application.dto.cart.RemoveProductFromCartCommand;
 import com.superfercho.shopping.application.exception.CartNotFoundException;
 import com.superfercho.shopping.application.exception.DuplicateCustomerCartException;
 import com.superfercho.shopping.application.exception.ProductNotFoundException;
+import com.superfercho.shopping.application.port.CurrentUserProvider;
 import com.superfercho.shopping.application.port.in.AddProductToCartUseCase;
 import com.superfercho.shopping.application.port.in.ChangeCartItemQuantityUseCase;
 import com.superfercho.shopping.application.port.in.ClearCartUseCase;
@@ -32,36 +32,43 @@ public final class CartApplicationService
                 RemoveProductFromCartUseCase,
                 ClearCartUseCase {
 
+    private final CurrentUserProvider currentUserProvider;
     private final CartRepositoryPort cartRepository;
     private final ProductCatalogPort productCatalogPort;
     private final ClockPort clockPort;
 
     public CartApplicationService(
-            CartRepositoryPort cartRepository, ProductCatalogPort productCatalogPort, ClockPort clockPort) {
+            CurrentUserProvider currentUserProvider,
+            CartRepositoryPort cartRepository,
+            ProductCatalogPort productCatalogPort,
+            ClockPort clockPort) {
+        this.currentUserProvider = currentUserProvider;
         this.cartRepository = cartRepository;
         this.productCatalogPort = productCatalogPort;
         this.clockPort = clockPort;
     }
 
     @Override
-    public CartResponse execute(GetCartQuery query) {
-        return CartResponse.from(getOrCreateCart(query.customerId()));
+    public CartResponse execute() {
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
+        return CartResponse.from(getOrCreateCart(currentUserId));
     }
 
     @Override
     public CartResponse execute(AddProductToCartCommand command) {
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
         Instant now = clockPort.currentTime();
         Money price = requireProduct(command.productId()).currentPrice();
         Cart cart = cartRepository
-                .findByCustomerId(command.customerId())
-                .orElseGet(() -> newCart(command.customerId(), now));
+                .findByCustomerId(currentUserId)
+                .orElseGet(() -> newCart(currentUserId, now));
         Cart updated =
                 cart.addProduct(UUID.randomUUID(), command.productId(), command.quantity(), price, now);
         try {
             return CartResponse.from(cartRepository.save(updated));
         } catch (DuplicateCustomerCartException exception) {
             Cart winner = cartRepository
-                    .findByCustomerId(command.customerId())
+                    .findByCustomerId(currentUserId)
                     .orElseThrow(() -> exception);
             Cart retried =
                     winner.addProduct(UUID.randomUUID(), command.productId(), command.quantity(), price, now);
@@ -71,22 +78,25 @@ public final class CartApplicationService
 
     @Override
     public CartResponse execute(ChangeCartItemQuantityCommand command) {
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
         Instant now = clockPort.currentTime();
-        Cart updated = requireCart(command.customerId()).changeQuantity(command.productId(), command.quantity(), now);
+        Cart updated = requireCart(currentUserId).changeQuantity(command.productId(), command.quantity(), now);
         return CartResponse.from(cartRepository.save(updated));
     }
 
     @Override
     public CartResponse execute(RemoveProductFromCartCommand command) {
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
         Instant now = clockPort.currentTime();
-        Cart updated = requireCart(command.customerId()).removeProduct(command.productId(), now);
+        Cart updated = requireCart(currentUserId).removeProduct(command.productId(), now);
         return CartResponse.from(cartRepository.save(updated));
     }
 
     @Override
     public CartResponse execute(ClearCartCommand command) {
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
         Instant now = clockPort.currentTime();
-        Cart updated = requireCart(command.customerId()).clear(now);
+        Cart updated = requireCart(currentUserId).clear(now);
         return CartResponse.from(cartRepository.save(updated));
     }
 
