@@ -4,6 +4,7 @@ import com.superfercho.identity.application.dto.AddAddressCommand;
 import com.superfercho.identity.application.dto.AddressResult;
 import com.superfercho.identity.application.exception.UserNotFoundException;
 import com.superfercho.identity.application.port.AddressRepository;
+import com.superfercho.identity.application.port.CurrentUserProvider;
 import com.superfercho.identity.application.port.UserRepository;
 import com.superfercho.identity.domain.model.Address;
 import com.superfercho.identity.domain.model.AddressStatus;
@@ -13,21 +14,25 @@ import java.util.UUID;
 
 public class AddAddressUseCase {
 
+    private final CurrentUserProvider currentUserProvider;
     private final UserRepository userRepository;
     private final AddressRepository addressRepository;
     private final Clock clock;
 
     public AddAddressUseCase(
-            UserRepository userRepository, AddressRepository addressRepository, Clock clock) {
+            CurrentUserProvider currentUserProvider,
+            UserRepository userRepository,
+            AddressRepository addressRepository,
+            Clock clock) {
+        this.currentUserProvider = currentUserProvider;
         this.userRepository = userRepository;
         this.addressRepository = addressRepository;
         this.clock = clock;
     }
 
     public AddressResult execute(AddAddressCommand command) {
-        userRepository
-                .findById(command.userId())
-                .orElseThrow(() -> new UserNotFoundException(command.userId()));
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
+        userRepository.findById(currentUserId).orElseThrow(() -> new UserNotFoundException(currentUserId));
 
         Instant now = clock.instant();
         Address address = Address.create(
@@ -45,10 +50,10 @@ public class AddAddressUseCase {
                 now);
 
         if (address.isDefault()) {
-            clearCurrentDefault(command.userId(), now);
+            clearCurrentDefault(currentUserId, now);
         }
 
-        return AddressResult.from(addressRepository.save(command.userId(), address));
+        return AddressResult.from(addressRepository.save(currentUserId, address));
     }
 
     private void clearCurrentDefault(UUID userId, Instant now) {

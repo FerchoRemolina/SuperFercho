@@ -8,6 +8,7 @@ import com.superfercho.identity.application.exception.InactiveAddressException;
 import com.superfercho.identity.application.exception.InactiveUserException;
 import com.superfercho.identity.application.exception.InvalidCredentialsException;
 import com.superfercho.identity.application.exception.InvalidRegistrationException;
+import com.superfercho.identity.application.exception.UnauthenticatedUserException;
 import com.superfercho.identity.application.exception.UserAlreadyExistsException;
 import com.superfercho.identity.application.exception.UserNotFoundException;
 import com.superfercho.identity.domain.exception.InvalidAddressException;
@@ -24,6 +25,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Profile("!test")
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class IdentityExceptionHandler {
+
+    @ExceptionHandler(UnauthenticatedUserException.class)
+    ProblemDetail handleUnauthenticated(UnauthenticatedUserException exception) {
+        return problem(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", exception.getMessage());
+    }
 
     @ExceptionHandler(InvalidCredentialsException.class)
     ProblemDetail handleInvalidCredentials(InvalidCredentialsException exception) {

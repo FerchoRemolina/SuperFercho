@@ -3,7 +3,6 @@ package com.superfercho.identity.application.dto;
 import java.util.UUID;
 
 public record UpdateAddressCommand(
-        UUID userId,
         UUID addressId,
         String label,
         String recipientName,

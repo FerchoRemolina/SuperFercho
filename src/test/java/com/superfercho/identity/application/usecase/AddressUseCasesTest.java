@@ -5,19 +5,23 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.superfercho.identity.application.dto.AddAddressCommand;
 import com.superfercho.identity.application.dto.AddressResult;
 import com.superfercho.identity.application.dto.DeactivateAddressCommand;
-import com.superfercho.identity.application.dto.ListAddressesCommand;
 import com.superfercho.identity.application.dto.SetDefaultAddressCommand;
 import com.superfercho.identity.application.dto.UpdateAddressCommand;
 import com.superfercho.identity.application.exception.AddressNotFoundException;
 import com.superfercho.identity.application.exception.AddressOwnershipException;
 import com.superfercho.identity.application.exception.InactiveAddressException;
+import com.superfercho.identity.application.exception.UnauthenticatedUserException;
 import com.superfercho.identity.application.exception.UserNotFoundException;
 import com.superfercho.identity.application.fakes.InMemoryAddressRepository;
 import com.superfercho.identity.application.fakes.InMemoryUserRepository;
+import com.superfercho.identity.application.port.CurrentUserProvider;
 import com.superfercho.identity.domain.model.Address;
 import com.superfercho.identity.domain.model.AddressStatus;
 import com.superfercho.identity.domain.model.Role;
@@ -30,13 +34,20 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+@ExtendWith(MockitoExtension.class)
 class AddressUseCasesTest {
 
     private static final Instant CREATED_AT = Instant.parse("2026-01-15T12:00:00Z");
     private static final Instant UPDATED_AT = Instant.parse("2026-01-15T12:30:00Z");
     private static final UUID USER_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     private static final UUID OTHER_USER_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+
+    @Mock
+    private CurrentUserProvider currentUserProvider;
 
     private InMemoryUserRepository users;
     private InMemoryAddressRepository addresses;
@@ -52,18 +63,22 @@ class AddressUseCasesTest {
         addresses = new InMemoryAddressRepository();
         users.save(user(USER_ID, "owner@example.com", "1001"));
         users.save(user(OTHER_USER_ID, "other@example.com", "2002"));
-        addAddress = new AddAddressUseCase(users, addresses, Clock.fixed(CREATED_AT, ZoneOffset.UTC));
-        listAddresses = new ListAddressesUseCase(users, addresses);
+        addAddress = new AddAddressUseCase(
+                currentUserProvider, users, addresses, Clock.fixed(CREATED_AT, ZoneOffset.UTC));
+        listAddresses = new ListAddressesUseCase(currentUserProvider, users, addresses);
         Clock later = Clock.fixed(UPDATED_AT, ZoneOffset.UTC);
-        updateAddress = new UpdateAddressUseCase(addresses, later);
-        deactivateAddress = new DeactivateAddressUseCase(addresses, later);
-        setDefaultAddress = new SetDefaultAddressUseCase(addresses, later);
+        updateAddress = new UpdateAddressUseCase(currentUserProvider, addresses, later);
+        deactivateAddress = new DeactivateAddressUseCase(currentUserProvider, addresses, later);
+        setDefaultAddress = new SetDefaultAddressUseCase(currentUserProvider, addresses, later);
     }
 
     @Test
-    void shouldAddAddressSuccessfully() {
-        AddressResult result = addAddress.execute(addCommand(USER_ID, "Casa", false));
+    void shouldAddAddressForCurrentUserFromProvider() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
 
+        AddressResult result = addAddress.execute(addCommand("Casa", false));
+
+        verify(currentUserProvider).getCurrentUserId();
         assertEquals("Casa", result.label());
         assertEquals("Ada Lovelace", result.recipientName());
         assertEquals("Calle 1 # 2-3", result.addressLine());
@@ -77,18 +92,19 @@ class AddressUseCasesTest {
     }
 
     @Test
-    void shouldRejectAddAddressWhenUserDoesNotExist() {
+    void shouldRejectAddAddressWhenCurrentUserDoesNotExist() {
         UUID missingUserId = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        when(currentUserProvider.getCurrentUserId()).thenReturn(missingUserId);
 
-        assertThrows(
-                UserNotFoundException.class, () -> addAddress.execute(addCommand(missingUserId, "Casa", false)));
+        assertThrows(UserNotFoundException.class, () -> addAddress.execute(addCommand("Casa", false)));
     }
 
     @Test
     void shouldClearPreviousDefaultWhenAddingAnotherDefaultAddress() {
-        AddressResult first = addAddress.execute(addCommand(USER_ID, "Casa", true));
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        AddressResult first = addAddress.execute(addCommand("Casa", true));
 
-        AddressResult second = addAddress.execute(addCommand(USER_ID, "Oficina", true));
+        AddressResult second = addAddress.execute(addCommand("Oficina", true));
 
         assertTrue(second.isDefault());
         assertFalse(addresses.findById(first.id()).orElseThrow().isDefault());
@@ -97,12 +113,14 @@ class AddressUseCasesTest {
     }
 
     @Test
-    void shouldListAddressesBelongingToUser() {
-        AddressResult first = addAddress.execute(addCommand(USER_ID, "Casa", true));
-        AddressResult second = addAddress.execute(addCommand(USER_ID, "Oficina", false));
+    void shouldListAddressesForCurrentUserFromProvider() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        AddressResult first = addAddress.execute(addCommand("Casa", true));
+        AddressResult second = addAddress.execute(addCommand("Oficina", false));
 
-        List<AddressResult> result = listAddresses.execute(new ListAddressesCommand(USER_ID));
+        List<AddressResult> result = listAddresses.execute();
 
+        verify(currentUserProvider, atLeastOnce()).getCurrentUserId();
         assertEquals(2, result.size());
         assertEquals(first.id(), result.get(0).id());
         assertEquals(second.id(), result.get(1).id());
@@ -111,27 +129,31 @@ class AddressUseCasesTest {
     }
 
     @Test
-    void shouldReturnEmptyListWhenUserHasNoAddresses() {
-        List<AddressResult> result = listAddresses.execute(new ListAddressesCommand(USER_ID));
+    void shouldReturnEmptyListWhenCurrentUserHasNoAddresses() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+
+        List<AddressResult> result = listAddresses.execute();
 
         assertTrue(result.isEmpty());
     }
 
     @Test
-    void shouldRejectListAddressesWhenUserDoesNotExist() {
+    void shouldRejectListAddressesWhenCurrentUserDoesNotExist() {
         UUID missingUserId = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        when(currentUserProvider.getCurrentUserId()).thenReturn(missingUserId);
 
-        assertThrows(
-                UserNotFoundException.class,
-                () -> listAddresses.execute(new ListAddressesCommand(missingUserId)));
+        assertThrows(UserNotFoundException.class, listAddresses::execute);
     }
 
     @Test
     void shouldNotIncludeAddressesBelongingToAnotherUser() {
-        AddressResult own = addAddress.execute(addCommand(USER_ID, "Casa", false));
-        addAddress.execute(addCommand(OTHER_USER_ID, "Otro", true));
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        AddressResult own = addAddress.execute(addCommand("Casa", false));
+        when(currentUserProvider.getCurrentUserId()).thenReturn(OTHER_USER_ID);
+        addAddress.execute(addCommand("Otro", true));
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
 
-        List<AddressResult> result = listAddresses.execute(new ListAddressesCommand(USER_ID));
+        List<AddressResult> result = listAddresses.execute();
 
         assertEquals(1, result.size());
         assertEquals(own.id(), result.get(0).id());
@@ -139,11 +161,13 @@ class AddressUseCasesTest {
     }
 
     @Test
-    void shouldUpdateAddressSuccessfully() {
-        AddressResult created = addAddress.execute(addCommand(USER_ID, "Casa", true));
+    void shouldUpdateAddressUsingCurrentUserFromProvider() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        AddressResult created = addAddress.execute(addCommand("Casa", true));
 
-        AddressResult updated = updateAddress.execute(updateCommand(USER_ID, created.id(), "Oficina"));
+        AddressResult updated = updateAddress.execute(updateCommand(created.id(), "Oficina"));
 
+        verify(currentUserProvider, atLeastOnce()).getCurrentUserId();
         assertEquals(created.id(), updated.id());
         assertEquals("Oficina", updated.label());
         assertEquals("Ada Lovelace", updated.recipientName());
@@ -155,30 +179,35 @@ class AddressUseCasesTest {
 
     @Test
     void shouldRejectAddressUpdateWhenAddressBelongsToAnotherUser() {
-        AddressResult created = addAddress.execute(addCommand(USER_ID, "Casa", false));
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        AddressResult created = addAddress.execute(addCommand("Casa", false));
+        when(currentUserProvider.getCurrentUserId()).thenReturn(OTHER_USER_ID);
 
         assertThrows(
                 AddressOwnershipException.class,
-                () -> updateAddress.execute(updateCommand(OTHER_USER_ID, created.id(), "Oficina")));
+                () -> updateAddress.execute(updateCommand(created.id(), "Oficina")));
     }
 
     @Test
     void shouldRejectAddressUpdateWhenAddressIsInactive() {
-        AddressResult created = addAddress.execute(addCommand(USER_ID, "Casa", false));
-        deactivateAddress.execute(new DeactivateAddressCommand(USER_ID, created.id()));
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        AddressResult created = addAddress.execute(addCommand("Casa", false));
+        deactivateAddress.execute(new DeactivateAddressCommand(created.id()));
 
         assertThrows(
                 InactiveAddressException.class,
-                () -> updateAddress.execute(updateCommand(USER_ID, created.id(), "Oficina")));
+                () -> updateAddress.execute(updateCommand(created.id(), "Oficina")));
     }
 
     @Test
     void shouldDeactivateAddressAndClearDefaultFlag() {
-        AddressResult created = addAddress.execute(addCommand(USER_ID, "Casa", true));
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        AddressResult created = addAddress.execute(addCommand("Casa", true));
 
         AddressResult deactivated =
-                deactivateAddress.execute(new DeactivateAddressCommand(USER_ID, created.id()));
+                deactivateAddress.execute(new DeactivateAddressCommand(created.id()));
 
+        verify(currentUserProvider, atLeastOnce()).getCurrentUserId();
         assertEquals(AddressStatus.INACTIVE, deactivated.status());
         assertFalse(deactivated.isDefault());
         assertEquals(created.id(), deactivated.id());
@@ -187,49 +216,55 @@ class AddressUseCasesTest {
 
     @Test
     void shouldRejectDeactivateWhenAddressBelongsToAnotherUser() {
-        AddressResult created = addAddress.execute(addCommand(USER_ID, "Casa", false));
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        AddressResult created = addAddress.execute(addCommand("Casa", false));
+        when(currentUserProvider.getCurrentUserId()).thenReturn(OTHER_USER_ID);
 
         assertThrows(
                 AddressOwnershipException.class,
-                () -> deactivateAddress.execute(new DeactivateAddressCommand(OTHER_USER_ID, created.id())));
+                () -> deactivateAddress.execute(new DeactivateAddressCommand(created.id())));
         assertEquals(AddressStatus.ACTIVE, addresses.findById(created.id()).orElseThrow().status());
     }
 
     @Test
     void shouldRejectDeactivateWhenAddressDoesNotExist() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
         UUID missingAddressId = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
 
         assertThrows(
                 AddressNotFoundException.class,
-                () -> deactivateAddress.execute(new DeactivateAddressCommand(USER_ID, missingAddressId)));
+                () -> deactivateAddress.execute(new DeactivateAddressCommand(missingAddressId)));
     }
 
     @Test
     void shouldRejectUpdateWhenAddressDoesNotExist() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
         UUID missingAddressId = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
 
         assertThrows(
                 AddressNotFoundException.class,
-                () -> updateAddress.execute(updateCommand(USER_ID, missingAddressId, "Oficina")));
+                () -> updateAddress.execute(updateCommand(missingAddressId, "Oficina")));
     }
 
     @Test
     void shouldRejectSetDefaultWhenAddressDoesNotExist() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
         UUID missingAddressId = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
 
         assertThrows(
                 AddressNotFoundException.class,
-                () -> setDefaultAddress.execute(new SetDefaultAddressCommand(USER_ID, missingAddressId)));
+                () -> setDefaultAddress.execute(new SetDefaultAddressCommand(missingAddressId)));
     }
 
     @Test
-    void shouldSetDefaultAddress() {
-        AddressResult first = addAddress.execute(addCommand(USER_ID, "Casa", true));
-        AddressResult second = addAddress.execute(addCommand(USER_ID, "Oficina", false));
+    void shouldSetDefaultAddressUsingCurrentUserFromProvider() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        AddressResult first = addAddress.execute(addCommand("Casa", true));
+        AddressResult second = addAddress.execute(addCommand("Oficina", false));
 
-        AddressResult result =
-                setDefaultAddress.execute(new SetDefaultAddressCommand(USER_ID, second.id()));
+        AddressResult result = setDefaultAddress.execute(new SetDefaultAddressCommand(second.id()));
 
+        verify(currentUserProvider, atLeastOnce()).getCurrentUserId();
         assertTrue(result.isDefault());
         assertEquals(second.id(), result.id());
         Address previous = addresses.findById(first.id()).orElseThrow();
@@ -239,36 +274,82 @@ class AddressUseCasesTest {
 
     @Test
     void shouldRejectSetDefaultWhenAddressBelongsToAnotherUser() {
-        AddressResult created = addAddress.execute(addCommand(USER_ID, "Casa", false));
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        AddressResult created = addAddress.execute(addCommand("Casa", false));
+        when(currentUserProvider.getCurrentUserId()).thenReturn(OTHER_USER_ID);
 
         assertThrows(
                 AddressOwnershipException.class,
-                () -> setDefaultAddress.execute(new SetDefaultAddressCommand(OTHER_USER_ID, created.id())));
+                () -> setDefaultAddress.execute(new SetDefaultAddressCommand(created.id())));
     }
 
     @Test
     void shouldRejectSetDefaultWhenAddressIsInactive() {
-        AddressResult created = addAddress.execute(addCommand(USER_ID, "Casa", false));
-        deactivateAddress.execute(new DeactivateAddressCommand(USER_ID, created.id()));
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        AddressResult created = addAddress.execute(addCommand("Casa", false));
+        deactivateAddress.execute(new DeactivateAddressCommand(created.id()));
 
         assertThrows(
                 InactiveAddressException.class,
-                () -> setDefaultAddress.execute(new SetDefaultAddressCommand(USER_ID, created.id())));
+                () -> setDefaultAddress.execute(new SetDefaultAddressCommand(created.id())));
     }
 
     @Test
     void shouldNotChangeOwnershipWhenUpdatingAddress() {
-        AddressResult created = addAddress.execute(addCommand(USER_ID, "Casa", false));
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        AddressResult created = addAddress.execute(addCommand("Casa", false));
 
-        updateAddress.execute(updateCommand(USER_ID, created.id(), "Oficina"));
+        updateAddress.execute(updateCommand(created.id(), "Oficina"));
 
         assertNotEquals(OTHER_USER_ID, addresses.findOwnedById(created.id()).orElseThrow().userId());
         assertEquals(USER_ID, addresses.findOwnedById(created.id()).orElseThrow().userId());
     }
 
-    private static AddAddressCommand addCommand(UUID userId, String label, boolean isDefault) {
+    @Test
+    void shouldPropagateUnauthenticatedUserWhenAddingAddress() {
+        when(currentUserProvider.getCurrentUserId()).thenThrow(new UnauthenticatedUserException());
+
+        assertThrows(UnauthenticatedUserException.class, () -> addAddress.execute(addCommand("Casa", false)));
+    }
+
+    @Test
+    void shouldPropagateUnauthenticatedUserWhenListingAddresses() {
+        when(currentUserProvider.getCurrentUserId()).thenThrow(new UnauthenticatedUserException());
+
+        assertThrows(UnauthenticatedUserException.class, listAddresses::execute);
+    }
+
+    @Test
+    void shouldPropagateUnauthenticatedUserWhenUpdatingAddress() {
+        UUID addressId = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
+        when(currentUserProvider.getCurrentUserId()).thenThrow(new UnauthenticatedUserException());
+
+        assertThrows(
+                UnauthenticatedUserException.class, () -> updateAddress.execute(updateCommand(addressId, "Oficina")));
+    }
+
+    @Test
+    void shouldPropagateUnauthenticatedUserWhenDeactivatingAddress() {
+        UUID addressId = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
+        when(currentUserProvider.getCurrentUserId()).thenThrow(new UnauthenticatedUserException());
+
+        assertThrows(
+                UnauthenticatedUserException.class,
+                () -> deactivateAddress.execute(new DeactivateAddressCommand(addressId)));
+    }
+
+    @Test
+    void shouldPropagateUnauthenticatedUserWhenSettingDefaultAddress() {
+        UUID addressId = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
+        when(currentUserProvider.getCurrentUserId()).thenThrow(new UnauthenticatedUserException());
+
+        assertThrows(
+                UnauthenticatedUserException.class,
+                () -> setDefaultAddress.execute(new SetDefaultAddressCommand(addressId)));
+    }
+
+    private static AddAddressCommand addCommand(String label, boolean isDefault) {
         return new AddAddressCommand(
-                userId,
                 label,
                 "Ada Lovelace",
                 "Calle 1 # 2-3",
@@ -279,9 +360,8 @@ class AddressUseCasesTest {
                 isDefault);
     }
 
-    private static UpdateAddressCommand updateCommand(UUID userId, UUID addressId, String label) {
+    private static UpdateAddressCommand updateCommand(UUID addressId, String label) {
         return new UpdateAddressCommand(
-                userId,
                 addressId,
                 label,
                 "Ada Lovelace",

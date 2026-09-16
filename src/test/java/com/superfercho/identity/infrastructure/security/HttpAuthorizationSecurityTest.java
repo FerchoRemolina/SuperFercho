@@ -145,7 +145,7 @@ class HttpAuthorizationSecurityTest {
         when(authenticateUserUseCase.execute(any()))
                 .thenReturn(new AuthenticationResult(USER_ID, Role.CUSTOMER, "token", NOW));
         when(registerCustomerUseCase.execute(any())).thenReturn(registeredCustomer());
-        when(listAddressesUseCase.execute(any())).thenReturn(List.of());
+        when(listAddressesUseCase.execute()).thenReturn(List.of());
         when(listCategoriesUseCase.execute(any())).thenReturn(List.of());
         when(createCategoryUseCase.execute(any())).thenReturn(categoryResult());
         when(updateOrderStatusUseCase.execute(any())).thenReturn(orderResult());
@@ -192,15 +192,19 @@ class HttpAuthorizationSecurityTest {
 
     @Test
     void shouldRejectCustomerRouteWithoutJwt() throws Exception {
-        mockMvc.perform(get("/api/v1/customers/{userId}/addresses", USER_ID))
-                .andExpect(unauthenticated());
+        mockMvc.perform(get("/api/v1/addresses")).andExpect(unauthenticated());
     }
 
     @Test
     void shouldAllowCustomerRouteWithCustomerJwt() throws Exception {
-        mockMvc.perform(get("/api/v1/customers/{userId}/addresses", USER_ID)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+        mockMvc.perform(get("/api/v1/addresses").header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
                 .andExpect(notBlockedBySecurity());
+    }
+
+    @Test
+    void shouldRejectCustomerRouteWithAdminJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/addresses").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(accessDenied());
     }
 
     @Test
@@ -282,8 +286,7 @@ class HttpAuthorizationSecurityTest {
 
     @Test
     void shouldRejectInvalidBearerToken() throws Exception {
-        mockMvc.perform(get("/api/v1/customers/{userId}/addresses", USER_ID)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer not-a-jwt"))
+        mockMvc.perform(get("/api/v1/addresses").header(HttpHeaders.AUTHORIZATION, "Bearer not-a-jwt"))
                 .andExpect(unauthenticated());
     }
 

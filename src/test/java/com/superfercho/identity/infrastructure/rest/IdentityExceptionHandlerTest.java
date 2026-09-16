@@ -10,6 +10,7 @@ import com.superfercho.identity.application.exception.InactiveAddressException;
 import com.superfercho.identity.application.exception.InactiveUserException;
 import com.superfercho.identity.application.exception.InvalidCredentialsException;
 import com.superfercho.identity.application.exception.InvalidRegistrationException;
+import com.superfercho.identity.application.exception.UnauthenticatedUserException;
 import com.superfercho.identity.application.exception.UserAlreadyExistsException;
 import com.superfercho.identity.application.exception.UserNotFoundException;
 import com.superfercho.identity.domain.exception.InvalidAddressException;
@@ -25,6 +26,14 @@ class IdentityExceptionHandlerTest {
     private static final UUID ADDRESS_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
 
     private final IdentityExceptionHandler handler = new IdentityExceptionHandler();
+
+    @Test
+    void shouldMapUnauthenticatedTo401() {
+        assertProblem(
+                handler.handleUnauthenticated(new UnauthenticatedUserException()),
+                HttpStatus.UNAUTHORIZED,
+                "UNAUTHENTICATED");
+    }
 
     @Test
     void shouldMapInvalidCredentialsTo401() {

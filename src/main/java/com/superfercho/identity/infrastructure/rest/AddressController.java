@@ -2,7 +2,6 @@ package com.superfercho.identity.infrastructure.rest;
 
 import com.superfercho.identity.application.dto.AddAddressCommand;
 import com.superfercho.identity.application.dto.DeactivateAddressCommand;
-import com.superfercho.identity.application.dto.ListAddressesCommand;
 import com.superfercho.identity.application.dto.SetDefaultAddressCommand;
 import com.superfercho.identity.application.dto.UpdateAddressCommand;
 import com.superfercho.identity.application.usecase.AddAddressUseCase;
@@ -29,7 +28,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @RestController
 @Profile("!test")
-@RequestMapping("/api/v1/customers/{userId}/addresses")
+@RequestMapping("/api/v1/addresses")
 public class AddressController {
 
     private final AddAddressUseCase addAddressUseCase;
@@ -52,10 +51,8 @@ public class AddressController {
     }
 
     @PostMapping
-    public ResponseEntity<AddressRestResponse> add(
-            @PathVariable UUID userId, @RequestBody AddAddressRequest request) {
+    public ResponseEntity<AddressRestResponse> add(@RequestBody AddAddressRequest request) {
         AddressRestResponse body = AddressRestResponse.from(addAddressUseCase.execute(new AddAddressCommand(
-                userId,
                 request.label(),
                 request.recipientName(),
                 request.addressLine(),
@@ -72,19 +69,14 @@ public class AddressController {
     }
 
     @GetMapping
-    public List<AddressRestResponse> list(@PathVariable UUID userId) {
-        return listAddressesUseCase.execute(new ListAddressesCommand(userId)).stream()
-                .map(AddressRestResponse::from)
-                .toList();
+    public List<AddressRestResponse> list() {
+        return listAddressesUseCase.execute().stream().map(AddressRestResponse::from).toList();
     }
 
     @PutMapping("/{addressId}")
     public AddressRestResponse update(
-            @PathVariable UUID userId,
-            @PathVariable UUID addressId,
-            @RequestBody UpdateAddressRequest request) {
+            @PathVariable UUID addressId, @RequestBody UpdateAddressRequest request) {
         return AddressRestResponse.from(updateAddressUseCase.execute(new UpdateAddressCommand(
-                userId,
                 addressId,
                 request.label(),
                 request.recipientName(),
@@ -96,14 +88,14 @@ public class AddressController {
     }
 
     @DeleteMapping("/{addressId}")
-    public AddressRestResponse deactivate(@PathVariable UUID userId, @PathVariable UUID addressId) {
+    public AddressRestResponse deactivate(@PathVariable UUID addressId) {
         return AddressRestResponse.from(
-                deactivateAddressUseCase.execute(new DeactivateAddressCommand(userId, addressId)));
+                deactivateAddressUseCase.execute(new DeactivateAddressCommand(addressId)));
     }
 
     @PostMapping("/{addressId}/default")
-    public AddressRestResponse setDefault(@PathVariable UUID userId, @PathVariable UUID addressId) {
+    public AddressRestResponse setDefault(@PathVariable UUID addressId) {
         return AddressRestResponse.from(
-                setDefaultAddressUseCase.execute(new SetDefaultAddressCommand(userId, addressId)));
+                setDefaultAddressUseCase.execute(new SetDefaultAddressCommand(addressId)));
     }
 }

@@ -5,6 +5,7 @@ import com.superfercho.identity.application.dto.AddressResult;
 import com.superfercho.identity.application.dto.SetDefaultAddressCommand;
 import com.superfercho.identity.application.port.AccessTokenIssuer;
 import com.superfercho.identity.application.port.AddressRepository;
+import com.superfercho.identity.application.port.CurrentUserProvider;
 import com.superfercho.identity.application.port.PasswordHasher;
 import com.superfercho.identity.application.port.UserRepository;
 import com.superfercho.identity.application.usecase.AddAddressUseCase;
@@ -41,12 +42,13 @@ public class IdentityUseCaseConfiguration {
 
     @Bean
     AddAddressUseCase addAddressUseCase(
+            CurrentUserProvider currentUserProvider,
             UserRepository userRepository,
             AddressRepository addressRepository,
             Clock clock,
             PlatformTransactionManager transactionManager) {
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
-        return new AddAddressUseCase(userRepository, addressRepository, clock) {
+        return new AddAddressUseCase(currentUserProvider, userRepository, addressRepository, clock) {
             @Override
             public AddressResult execute(AddAddressCommand command) {
                 return transaction.execute(status -> super.execute(command));
@@ -56,28 +58,32 @@ public class IdentityUseCaseConfiguration {
 
     @Bean
     ListAddressesUseCase listAddressesUseCase(
-            UserRepository userRepository, AddressRepository addressRepository) {
-        return new ListAddressesUseCase(userRepository, addressRepository);
+            CurrentUserProvider currentUserProvider,
+            UserRepository userRepository,
+            AddressRepository addressRepository) {
+        return new ListAddressesUseCase(currentUserProvider, userRepository, addressRepository);
     }
 
     @Bean
-    UpdateAddressUseCase updateAddressUseCase(AddressRepository addressRepository, Clock clock) {
-        return new UpdateAddressUseCase(addressRepository, clock);
+    UpdateAddressUseCase updateAddressUseCase(
+            CurrentUserProvider currentUserProvider, AddressRepository addressRepository, Clock clock) {
+        return new UpdateAddressUseCase(currentUserProvider, addressRepository, clock);
     }
 
     @Bean
     DeactivateAddressUseCase deactivateAddressUseCase(
-            AddressRepository addressRepository, Clock clock) {
-        return new DeactivateAddressUseCase(addressRepository, clock);
+            CurrentUserProvider currentUserProvider, AddressRepository addressRepository, Clock clock) {
+        return new DeactivateAddressUseCase(currentUserProvider, addressRepository, clock);
     }
 
     @Bean
     SetDefaultAddressUseCase setDefaultAddressUseCase(
+            CurrentUserProvider currentUserProvider,
             AddressRepository addressRepository,
             Clock clock,
             PlatformTransactionManager transactionManager) {
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
-        return new SetDefaultAddressUseCase(addressRepository, clock) {
+        return new SetDefaultAddressUseCase(currentUserProvider, addressRepository, clock) {
             @Override
             public AddressResult execute(SetDefaultAddressCommand command) {
                 return transaction.execute(status -> super.execute(command));

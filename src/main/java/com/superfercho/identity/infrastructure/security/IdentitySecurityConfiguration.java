@@ -87,9 +87,7 @@ public class IdentitySecurityConfiguration {
                         .hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/orders/{orderId}/status")
                         .hasRole("ADMIN")
-                        .requestMatchers(
-                                "/api/v1/customers/{userId}/addresses",
-                                "/api/v1/customers/{userId}/addresses/**")
+                        .requestMatchers("/api/v1/addresses", "/api/v1/addresses/**")
                         .hasRole("CUSTOMER")
                         .requestMatchers(
                                 "/api/v1/customers/{customerId}/cart",

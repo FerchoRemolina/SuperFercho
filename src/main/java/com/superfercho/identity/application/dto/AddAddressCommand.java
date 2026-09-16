@@ -1,9 +1,6 @@
 package com.superfercho.identity.application.dto;
 
-import java.util.UUID;
-
 public record AddAddressCommand(
-        UUID userId,
         String label,
         String recipientName,
         String addressLine,
