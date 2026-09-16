@@ -79,6 +79,7 @@ class HttpAuthorizationSecurityTest {
     private static final UUID USER_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     private static final UUID ORDER_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
     private static final UUID CATEGORY_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
+    private static final UUID PAYMENT_ID = UUID.fromString("55555555-5555-5555-5555-555555555555");
 
     @Autowired
     private MockMvc mockMvc;
@@ -310,6 +311,41 @@ class HttpAuthorizationSecurityTest {
     void shouldRejectInvalidBearerToken() throws Exception {
         mockMvc.perform(get("/api/v1/addresses").header(HttpHeaders.AUTHORIZATION, "Bearer not-a-jwt"))
                 .andExpect(unauthenticated());
+    }
+
+    @Test
+    void shouldRejectAdminPaymentGetWithoutJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/payments/{paymentId}", PAYMENT_ID)).andExpect(unauthenticated());
+    }
+
+    @Test
+    void shouldRejectAdminPaymentGetWithCustomerJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/payments/{paymentId}", PAYMENT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(accessDenied());
+    }
+
+    @Test
+    void shouldAllowAdminPaymentGetWithAdminJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/payments/{paymentId}", PAYMENT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(notBlockedBySecurity());
+    }
+
+    @Test
+    void shouldRejectInvalidBearerTokenOnAdminPaymentGet() throws Exception {
+        mockMvc.perform(get("/api/v1/payments/{paymentId}", PAYMENT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer not-a-jwt"))
+                .andExpect(unauthenticated());
+    }
+
+    @Test
+    void shouldDenyUndefinedPaymentRoutes() throws Exception {
+        mockMvc.perform(get("/api/v1/payments").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(accessDenied());
+        mockMvc.perform(post("/api/v1/payments/{paymentId}/refund", PAYMENT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(accessDenied());
     }
 
     private String bearer(Role role) {
