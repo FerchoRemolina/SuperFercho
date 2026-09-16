@@ -1,0 +1,40 @@
+---
+description: Arquitectura Modular Monolith y Hexagonal de SuperFercho
+alwaysApply: true
+---
+
+# Arquitectura global
+
+SuperFercho es un Modular Monolith. Cada módulo funcional sigue Hexagonal Architecture (Ports & Adapters). No convertir el proyecto en microservicios salvo decisión explícita. No diluir los límites de módulo hasta un Big Ball of Mud.
+
+## Capas por módulo
+
+- **Domain:** modelo, invariantes y excepciones de negocio. Sin Spring, JPA, REST ni infraestructura.
+- **Application:** casos de uso, DTOs/commands/responses y ports. Sin adapters concretos.
+- **Infrastructure:** persistencia, integración, clock/security y `@Configuration` de beans.
+- **REST:** adaptador de entrada. Sin lógica de negocio.
+
+Mantener esta separación. No mover responsabilidades entre capas por conveniencia.
+
+## Límites entre módulos
+
+- Las dependencias entre módulos pasan por contratos explícitos (ports/DTOs del consumidor).
+- No introducir dependencias directas entre módulos sin razón arquitectónica clara.
+- Los IDs que cruzan módulos son UUID escalares. No crear FKs entre esquemas de módulos distintos.
+- Respetar las decisiones ya implementadas (Checkout transaccional, PaymentPort propio de Orders, Payments interno, etc.).
+
+## Cambios arquitectónicos
+
+- Antes de refactorizar una decisión existente: analizar impacto y pedir autorización explícita.
+- No hacer refactors arquitectónicos dentro de una tarea funcional si no fueron solicitados.
+- No cambiar contratos, nombres de módulos ni el orden de capas por iniciativa propia.
+
+## Orden de implementación
+
+1. Domain
+2. Application
+3. Persistence
+4. Integration
+5. REST
+6. Tests / auditoría
+7. Commit (solo si se pidió)

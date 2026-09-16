@@ -1,0 +1,47 @@
+---
+description: Disciplina Git, convención de commits e identidad del repositorio
+alwaysApply: true
+---
+
+# Flujo Git
+
+Identidad esperada del repositorio (no alterar `git config` salvo que se pida):
+
+- `user.name`: FerchoRemolina
+- `user.email`: luisfernandorg67@gmail.com
+
+Los commits usan esa identidad. Un commit = un cambio real y coherente.
+
+## Convención
+
+```
+type(scope): description
+```
+
+Ejemplos válidos:
+
+- `feat(payments): implement payment domain`
+- `feat(orders): implement rest api`
+- `fix(shopping): handle concurrent cart creation`
+- `test(persistence): fix jdbc fixtures and test isolation`
+
+## Antes de commit
+
+- `git status` y `git diff`
+- `git diff --check`
+- tests del cambio; suite completa al cerrar una fase
+- confirmar que no hay archivos ajenos al alcance
+
+No incluir: credenciales, secrets, tokens, temporales, artefactos (`target/`), ni archivos que no pertenezcan al cambio.
+
+## Push e historial
+
+- No hacer commit ni push salvo petición explícita.
+- Push solo después de revisar el commit y con working tree limpio.
+- No reescribir historial ni usar `--force` / `--force-with-lease` sin autorización explícita.
+
+## Autoría de commits
+
+- No agregar trailers `Co-authored-by`.
+- No atribuir commits a herramientas o asistentes.
+- No añadir autores extra. Un solo autor: la identidad Git configurada (FerchoRemolina).

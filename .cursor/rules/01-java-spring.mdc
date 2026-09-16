@@ -1,0 +1,32 @@
+---
+description: Convenciones Java 21, Spring Boot 3 y JPA de SuperFercho
+alwaysApply: true
+---
+
+# Java y Spring
+
+- Java 21, Spring Boot 3, Maven.
+- No cambiar versiones de Java, Spring Boot ni dependencias sin autorización explícita.
+- No agregar frameworks, Lombok, MapStruct ni librerías nuevas por iniciativa propia.
+- Inyección por constructor. No usar field injection.
+- No generar código innecesario.
+
+## Capas
+
+- Domain sin anotaciones de Spring, JPA ni REST.
+- Application sin acoplamiento innecesario a Spring. Los casos de uso tienen una responsabilidad clara.
+- Los ports viven en Application cuando son contratos de entrada/salida. Los adapters los implementan en Infrastructure.
+- JPA permanece en Infrastructure/Persistence. Entidad JPA distinta del modelo de dominio cuando ya es así en el módulo.
+- Configuración de beans en `infrastructure/configuration` cuando el módulo ya usa wiring explícito. No introducir `@Service` solo por conveniencia si los use cases se registran como `@Bean`.
+- No introducir `@Transactional` de forma arbitraria. Las transacciones van en el punto que el proyecto ya definió (wrappers de Infrastructure, no Domain).
+
+## Persistencia consolidada
+
+- `ddl-auto: none`. `open-in-view: false`. Hibernate timezone UTC.
+- Flyway para migraciones. PostgreSQL. No reescribir migraciones aplicadas sin autorización.
+- UUID asignado por el dominio. No usar `@GeneratedValue` cuando el agregado genera el id.
+- No usar `Persistable`/`isNew` salvo decisión explícita.
+- Entidades JPA mutables si la persistencia lo exige. Constructor protegido sin argumentos. Getters; sin setters públicos innecesarios.
+- Money: `amount` + `currency` (COP). No persistir Money como un único string.
+- Adapters de persistencia: `saveAndFlush` cuando el módulo ya lo usa.
+- No meter dependencias de infraestructura en Domain.

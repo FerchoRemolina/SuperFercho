@@ -1,0 +1,28 @@
+---
+description: Convenciones para integraciones de IA, RAG y MCP
+alwaysApply: true
+---
+
+# IA, RAG y MCP
+
+Estas capacidades, si existen, se mantienen desacopladas del núcleo de negocio. No incorporar RAG, MCP, embeddings, vector stores ni proveedores de IA solo porque estén disponibles. Solo con requisito funcional explícito.
+
+## Límites
+
+- Domain no depende de SDKs ni APIs de IA.
+- Integraciones externas: port en Application, adapter en Infrastructure, proveedor fuera.
+- Las APIs externas se ocultan detrás de interfaces. Los adapters son reemplazables.
+- Una funcionalidad de IA no muta entidades de dominio: pasa por casos de uso.
+- Un fallo del proveedor no debe romper el núcleo transaccional (checkout, pagos, inventario) si el flujo de negocio no depende de esa llamada.
+
+## Seguridad y resiliencia
+
+- No poner API keys ni secretos en el código. Usar entorno o configuración segura.
+- Timeouts, manejo de errores y degradación controlada cuando corresponda.
+
+## Orden si se implementa
+
+1. Domain (solo conceptos de negocio, sin SDK)
+2. Application Port
+3. Infrastructure Adapter
+4. Proveedor externo

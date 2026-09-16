@@ -1,0 +1,35 @@
+---
+description: Estrategia de tests unitarios, integración y Testcontainers
+alwaysApply: true
+---
+
+# Testing
+
+Todo comportamiento relevante debe tener tests apropiados. No reducir cobertura ni cambiar expectations para obtener BUILD SUCCESS.
+
+## Qué probar y cómo
+
+- Domain y Application: tests unitarios.
+- Adapters y persistencia: tests de integración.
+- Comportamiento real de PostgreSQL: Testcontainers. No sustituir esa prueba por mocks para que “pase”.
+- CHECK, UNIQUE y FK se validan con INSERT real contra PostgreSQL cuando ese es el objetivo del test.
+- Concurrencia: hilos/procesos reales si el objetivo es concurrencia. Mocks no demuestran locks ni UNIQUE.
+
+## Aislamiento
+
+- Tests independientes y reproducibles. No depender del orden de ejecución.
+- Aislar datos (UUID de cliente propios, etc.) cuando la consulta o el UNIQUE lo requieran.
+- No usar TRUNCATE global como arreglo automático de contaminación.
+- No dejar filas inválidas de fixtures JDBC que rompan tests posteriores; limpiar solo lo que el propio test insertó.
+
+## Si un test falla
+
+1. Reproducir.
+2. Identificar la causa raíz.
+3. Clasificar: producción, test, fixture/aislamiento o infraestructura.
+4. Corregir únicamente la capa responsable. No tocar producción para un problema de test.
+5. Ejecutar primero las pruebas afectadas.
+6. Ejecutar la suite completa al cerrar la fase.
+7. Revisar el diff (`git diff --check`).
+
+No modificar expectations para ocultar errores. No detenerse en el primer verde parcial: cerrar con la suite completa.
