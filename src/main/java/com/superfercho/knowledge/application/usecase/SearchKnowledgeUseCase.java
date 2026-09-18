@@ -4,6 +4,7 @@ import com.superfercho.knowledge.application.dto.EmbeddingVector;
 import com.superfercho.knowledge.application.dto.KnowledgeSearchHit;
 import com.superfercho.knowledge.application.dto.KnowledgeSearchResult;
 import com.superfercho.knowledge.application.dto.SearchKnowledgeCommand;
+import com.superfercho.knowledge.application.exception.InvalidSearchRequestException;
 import com.superfercho.knowledge.application.exception.KnowledgeProcessingException;
 import com.superfercho.knowledge.application.port.EmbeddingPort;
 import com.superfercho.knowledge.application.port.KnowledgeVectorStorePort;
@@ -26,7 +27,7 @@ public final class SearchKnowledgeUseCase {
             return new KnowledgeSearchResult(List.of());
         }
         if (command.limit() <= 0 || command.limit() > MAX_LIMIT) {
-            throw new KnowledgeProcessingException("limit must be between 1 and " + MAX_LIMIT);
+            throw new InvalidSearchRequestException("limit must be between 1 and " + MAX_LIMIT);
         }
         List<EmbeddingVector> embeddings = embedQuery(command.query());
         if (embeddings.size() != 1) {

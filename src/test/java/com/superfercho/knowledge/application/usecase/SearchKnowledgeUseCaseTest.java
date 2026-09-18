@@ -8,7 +8,7 @@ import com.superfercho.knowledge.application.dto.EmbeddingVector;
 import com.superfercho.knowledge.application.dto.KnowledgeSearchHit;
 import com.superfercho.knowledge.application.dto.KnowledgeSearchResult;
 import com.superfercho.knowledge.application.dto.SearchKnowledgeCommand;
-import com.superfercho.knowledge.application.exception.KnowledgeProcessingException;
+import com.superfercho.knowledge.application.exception.InvalidSearchRequestException;
 import com.superfercho.knowledge.application.fakes.FakeEmbeddingPort;
 import com.superfercho.knowledge.application.fakes.FakeKnowledgeVectorStore;
 import com.superfercho.knowledge.application.fakes.InMemoryKnowledgeDocumentRepository;
@@ -68,13 +68,13 @@ class SearchKnowledgeUseCaseTest {
     @Test
     void shouldRejectInvalidLimit() {
         assertThrows(
-                KnowledgeProcessingException.class,
+                InvalidSearchRequestException.class,
                 () -> searchKnowledge.execute(new SearchKnowledgeCommand("frutas", 0)));
         assertThrows(
-                KnowledgeProcessingException.class,
+                InvalidSearchRequestException.class,
                 () -> searchKnowledge.execute(new SearchKnowledgeCommand("frutas", -1)));
         assertThrows(
-                KnowledgeProcessingException.class,
+                InvalidSearchRequestException.class,
                 () -> searchKnowledge.execute(new SearchKnowledgeCommand("frutas", 21)));
         assertTrue(embeddings.calls().isEmpty());
         assertTrue(vectorStore.searches().isEmpty());
