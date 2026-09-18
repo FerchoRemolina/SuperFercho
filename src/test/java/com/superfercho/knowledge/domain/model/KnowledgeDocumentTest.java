@@ -310,7 +310,7 @@ class KnowledgeDocumentTest {
 
     @Test
     void shouldRejectReconstituteReceivedWithChunks() {
-        KnowledgeChunk chunk = KnowledgeChunk.create(ChunkId.generate(), new ChunkPosition(0), text("uno"));
+        KnowledgeChunkSnapshot chunk = snapshot(ChunkId.generate(), 0, "uno", false);
 
         assertThrows(
                 InvalidDocumentException.class,
@@ -328,8 +328,7 @@ class KnowledgeDocumentTest {
 
     @Test
     void shouldRejectReconstituteChunkedWhenEveryChunkIsEmbedded() {
-        KnowledgeChunk chunk =
-                KnowledgeChunk.reconstitute(ChunkId.generate(), new ChunkPosition(0), text("uno"), true);
+        KnowledgeChunkSnapshot chunk = snapshot(ChunkId.generate(), 0, "uno", true);
 
         assertThrows(
                 InvalidDocumentException.class,
@@ -339,8 +338,7 @@ class KnowledgeDocumentTest {
 
     @Test
     void shouldRejectReconstituteReadyWhenAChunkIsNotEmbedded() {
-        KnowledgeChunk chunk =
-                KnowledgeChunk.create(ChunkId.generate(), new ChunkPosition(0), text("uno"));
+        KnowledgeChunkSnapshot chunk = snapshot(ChunkId.generate(), 0, "uno", false);
 
         assertThrows(
                 InvalidDocumentException.class,
@@ -358,8 +356,8 @@ class KnowledgeDocumentTest {
 
     @Test
     void shouldRejectNonContiguousChunkPositions() {
-        KnowledgeChunk first = KnowledgeChunk.create(ChunkId.generate(), new ChunkPosition(0), text("uno"));
-        KnowledgeChunk third = KnowledgeChunk.create(ChunkId.generate(), new ChunkPosition(2), text("tres"));
+        KnowledgeChunkSnapshot first = snapshot(ChunkId.generate(), 0, "uno", false);
+        KnowledgeChunkSnapshot third = snapshot(ChunkId.generate(), 2, "tres", false);
 
         assertThrows(
                 InvalidDocumentException.class,
@@ -376,8 +374,8 @@ class KnowledgeDocumentTest {
 
     @Test
     void shouldRejectDuplicateChunkPositions() {
-        KnowledgeChunk first = KnowledgeChunk.create(ChunkId.generate(), new ChunkPosition(0), text("uno"));
-        KnowledgeChunk duplicate = KnowledgeChunk.create(ChunkId.generate(), new ChunkPosition(0), text("otro"));
+        KnowledgeChunkSnapshot first = snapshot(ChunkId.generate(), 0, "uno", false);
+        KnowledgeChunkSnapshot duplicate = snapshot(ChunkId.generate(), 0, "otro", false);
 
         assertThrows(
                 InvalidDocumentException.class,
@@ -390,6 +388,137 @@ class KnowledgeDocumentTest {
                         List.of(first, duplicate),
                         CREATED_AT,
                         LATER));
+    }
+
+    @Test
+    void shouldReconstituteReceivedDocumentWithoutChunks() {
+        DocumentId id = DocumentId.generate();
+
+        KnowledgeDocument document = KnowledgeDocument.reconstitute(
+                id, TITLE, SOURCE, CONTENT, DocumentStatus.RECEIVED, List.of(), CREATED_AT, LATER);
+
+        assertEquals(id, document.id());
+        assertEquals(TITLE, document.title());
+        assertEquals(SOURCE, document.source());
+        assertEquals(CONTENT, document.content());
+        assertEquals(DocumentStatus.RECEIVED, document.status());
+        assertTrue(document.chunks().isEmpty());
+        assertEquals(CREATED_AT, document.createdAt());
+        assertEquals(LATER, document.updatedAt());
+    }
+
+    @Test
+    void shouldReconstituteMultipleChunksPreservingPersistedIdentity() {
+        ChunkId firstId = ChunkId.generate();
+        ChunkId secondId = ChunkId.generate();
+
+        KnowledgeDocument document = KnowledgeDocument.reconstitute(
+                DocumentId.generate(),
+                TITLE,
+                SOURCE,
+                CONTENT,
+                DocumentStatus.CHUNKED,
+                List.of(snapshot(firstId, 0, "uno", true), snapshot(secondId, 1, "dos", false)),
+                CREATED_AT,
+                LATER);
+
+        assertEquals(DocumentStatus.CHUNKED, document.status());
+        assertEquals(2, document.chunks().size());
+        assertEquals(firstId, document.chunks().get(0).id());
+        assertEquals(secondId, document.chunks().get(1).id());
+        assertEquals(0, document.chunks().get(0).position().value());
+        assertEquals(1, document.chunks().get(1).position().value());
+        assertEquals("uno", document.chunks().get(0).text().value());
+        assertEquals("dos", document.chunks().get(1).text().value());
+        assertTrue(document.chunks().get(0).embedded());
+        assertFalse(document.chunks().get(1).embedded());
+        assertEquals(CREATED_AT, document.createdAt());
+        assertEquals(LATER, document.updatedAt());
+        assertNotEquals(firstId, document.chunks().get(1).id());
+    }
+
+    @Test
+    void shouldReconstituteReadyDocument() {
+        ChunkId chunkId = ChunkId.generate();
+
+        KnowledgeDocument document = KnowledgeDocument.reconstitute(
+                DocumentId.generate(),
+                TITLE,
+                SOURCE,
+                CONTENT,
+                DocumentStatus.READY,
+                List.of(snapshot(chunkId, 0, "uno", true)),
+                CREATED_AT,
+                LATER);
+
+        assertEquals(DocumentStatus.READY, document.status());
+        assertEquals(chunkId, document.chunks().get(0).id());
+        assertTrue(document.chunks().get(0).embedded());
+        assertTrue(document.searchable());
+        assertEquals(CREATED_AT, document.createdAt());
+        assertEquals(LATER, document.updatedAt());
+    }
+
+    @Test
+    void shouldReconstituteFailedDocument() {
+        ChunkId chunkId = ChunkId.generate();
+
+        KnowledgeDocument document = KnowledgeDocument.reconstitute(
+                DocumentId.generate(),
+                TITLE,
+                SOURCE,
+                CONTENT,
+                DocumentStatus.FAILED,
+                List.of(snapshot(chunkId, 0, "uno", false)),
+                CREATED_AT,
+                LATER);
+
+        assertEquals(DocumentStatus.FAILED, document.status());
+        assertEquals(chunkId, document.chunks().get(0).id());
+        assertFalse(document.chunks().get(0).embedded());
+        assertFalse(document.searchable());
+        assertEquals(CREATED_AT, document.createdAt());
+        assertEquals(LATER, document.updatedAt());
+    }
+
+    @Test
+    void shouldReconstituteInactiveDocument() {
+        ChunkId chunkId = ChunkId.generate();
+
+        KnowledgeDocument document = KnowledgeDocument.reconstitute(
+                DocumentId.generate(),
+                TITLE,
+                SOURCE,
+                CONTENT,
+                DocumentStatus.INACTIVE,
+                List.of(snapshot(chunkId, 0, "uno", true)),
+                CREATED_AT,
+                LATER);
+
+        assertEquals(DocumentStatus.INACTIVE, document.status());
+        assertEquals(chunkId, document.chunks().get(0).id());
+        assertTrue(document.chunks().get(0).embedded());
+        assertFalse(document.searchable());
+        assertEquals(CREATED_AT, document.createdAt());
+        assertEquals(LATER, document.updatedAt());
+    }
+
+    @Test
+    void shouldNotGenerateNewChunkIdsWhenReconstituting() {
+        ChunkId persistedId = new ChunkId(UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
+
+        KnowledgeDocument document = KnowledgeDocument.reconstitute(
+                DocumentId.generate(),
+                TITLE,
+                SOURCE,
+                CONTENT,
+                DocumentStatus.CHUNKED,
+                List.of(snapshot(persistedId, 0, "uno", false)),
+                CREATED_AT,
+                LATER);
+
+        assertEquals(persistedId, document.chunks().get(0).id());
+        assertEquals(UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), document.chunks().get(0).id().value());
     }
 
     @Test
@@ -431,5 +560,9 @@ class KnowledgeDocumentTest {
 
     private static ChunkText text(String value) {
         return new ChunkText(value);
+    }
+
+    private static KnowledgeChunkSnapshot snapshot(ChunkId id, int position, String value, boolean embedded) {
+        return new KnowledgeChunkSnapshot(id, new ChunkPosition(position), text(value), embedded);
     }
 }

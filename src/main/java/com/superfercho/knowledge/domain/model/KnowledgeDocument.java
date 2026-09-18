@@ -56,10 +56,10 @@ public final class KnowledgeDocument {
             DocumentSource source,
             DocumentContent content,
             DocumentStatus status,
-            List<KnowledgeChunk> chunks,
+            List<KnowledgeChunkSnapshot> chunks,
             Instant createdAt,
             Instant updatedAt) {
-        return of(id, title, source, content, status, chunks, createdAt, updatedAt);
+        return of(id, title, source, content, status, toChunks(chunks), createdAt, updatedAt);
     }
 
     public KnowledgeDocument replaceContent(DocumentContent content, Instant currentTime) {
@@ -206,6 +206,20 @@ public final class KnowledgeDocument {
         List<KnowledgeChunk> copy = copyChunks(chunks);
         validateChunksForStatus(status, copy);
         return new KnowledgeDocument(id, title, source, content, status, copy, createdAt, updatedAt);
+    }
+
+    private static List<KnowledgeChunk> toChunks(List<KnowledgeChunkSnapshot> snapshots) {
+        if (snapshots == null) {
+            throw new InvalidDocumentException("chunks cannot be null");
+        }
+        List<KnowledgeChunk> chunks = new ArrayList<>();
+        for (KnowledgeChunkSnapshot snapshot : snapshots) {
+            requireNonNull(snapshot, "chunk");
+            chunks.add(
+                    KnowledgeChunk.reconstitute(
+                            snapshot.id(), snapshot.position(), snapshot.text(), snapshot.embedded()));
+        }
+        return chunks;
     }
 
     private static List<KnowledgeChunk> copyChunks(List<KnowledgeChunk> chunks) {
