@@ -28,3 +28,8 @@ superfercho:
     jwt:
       secret: ${SUPERFERCHO_JWT_SECRET}
       expiration: 15m
+  knowledge:
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      embeddings-url: ${SUPERFERCHO_OPENAI_EMBEDDINGS_URL:https://api.openai.com/v1/embeddings}
+      model: text-embedding-3-small
