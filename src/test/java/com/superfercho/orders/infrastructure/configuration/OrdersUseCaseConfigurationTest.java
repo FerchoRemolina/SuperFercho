@@ -11,9 +11,9 @@ import com.superfercho.orders.application.port.OrderRepository;
 import com.superfercho.orders.application.port.PaymentPort;
 import com.superfercho.orders.application.port.ProductCatalogPort;
 import com.superfercho.orders.application.port.ShoppingCartPort;
+import com.superfercho.orders.application.port.in.CancelOrderUseCase;
+import com.superfercho.orders.application.port.in.CheckoutUseCase;
 import com.superfercho.orders.application.usecase.AutoConfirmPendingOrdersUseCase;
-import com.superfercho.orders.application.usecase.CancelOrderUseCase;
-import com.superfercho.orders.application.usecase.CheckoutUseCase;
 import com.superfercho.orders.application.usecase.GetOrderUseCase;
 import com.superfercho.orders.application.usecase.ListOrdersUseCase;
 import com.superfercho.orders.application.usecase.UpdateOrderStatusUseCase;
@@ -120,11 +120,17 @@ class OrdersUseCaseConfigurationTest {
         assertThat(clock.getZone()).isEqualTo(ZoneOffset.UTC);
         assertThat(transactionalCheckoutUseCase).isNotNull();
         assertThat(transactionalCancelOrderUseCase).isNotNull();
+        assertThat(applicationContext.getBean(CheckoutUseCase.class)).isSameAs(transactionalCheckoutUseCase);
+        assertThat(applicationContext.getBean(CancelOrderUseCase.class)).isSameAs(transactionalCancelOrderUseCase);
         assertThat(getOrderUseCase).isNotNull();
         assertThat(listOrdersUseCase).isNotNull();
         assertThat(updateOrderStatusUseCase).isNotNull();
         assertThat(autoConfirmPendingOrdersUseCase).isNotNull();
-        assertThat(applicationContext.getBeanNamesForType(CheckoutUseCase.class)).isEmpty();
-        assertThat(applicationContext.getBeanNamesForType(CancelOrderUseCase.class)).isEmpty();
+        assertThat(applicationContext.getBeanNamesForType(
+                        com.superfercho.orders.application.usecase.CheckoutUseCase.class))
+                .isEmpty();
+        assertThat(applicationContext.getBeanNamesForType(
+                        com.superfercho.orders.application.usecase.CancelOrderUseCase.class))
+                .isEmpty();
     }
 }

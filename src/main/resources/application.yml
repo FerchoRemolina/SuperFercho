@@ -33,3 +33,10 @@ superfercho:
       api-key: ${OPENAI_API_KEY:}
       embeddings-url: ${SUPERFERCHO_OPENAI_EMBEDDINGS_URL:https://api.openai.com/v1/embeddings}
       model: text-embedding-3-small
+  assistant:
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      chat-url: ${SUPERFERCHO_OPENAI_CHAT_URL:https://api.openai.com/v1/chat/completions}
+      model: ${SUPERFERCHO_OPENAI_CHAT_MODEL:gpt-4o-mini}
+      connect-timeout: ${SUPERFERCHO_OPENAI_CHAT_CONNECT_TIMEOUT:5s}
+      read-timeout: ${SUPERFERCHO_OPENAI_CHAT_READ_TIMEOUT:60s}

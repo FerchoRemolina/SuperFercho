@@ -1,5 +1,6 @@
 package com.superfercho.orders.infrastructure.configuration;
 
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -41,6 +42,11 @@ class TransactionalCancelOrderUseCaseTest {
     void setUp() {
         wrapper = new TransactionalCancelOrderUseCase(cancelOrderUseCase, transactionTemplate);
         result = mock(OrderResult.class);
+    }
+
+    @Test
+    void shouldImplementApplicationCancelOrderContract() {
+        assertInstanceOf(com.superfercho.orders.application.port.in.CancelOrderUseCase.class, wrapper);
     }
 
     @Test

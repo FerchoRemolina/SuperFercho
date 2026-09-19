@@ -17,18 +17,23 @@ import com.superfercho.shopping.application.dto.cart.CartResponse;
 import com.superfercho.shopping.application.dto.cart.ChangeCartItemQuantityCommand;
 import com.superfercho.shopping.application.dto.cart.ClearCartCommand;
 import com.superfercho.shopping.application.dto.cart.RemoveProductFromCartCommand;
+import com.superfercho.shopping.application.dto.shoppinglist.AddShoppingListToCartCommand;
 import com.superfercho.shopping.application.exception.CartNotFoundException;
 import com.superfercho.shopping.application.exception.DuplicateCustomerCartException;
 import com.superfercho.shopping.application.exception.ProductNotFoundException;
+import com.superfercho.shopping.application.exception.ShoppingListNotFoundException;
 import com.superfercho.shopping.application.port.CurrentUserProvider;
 import com.superfercho.shopping.application.port.out.CartRepositoryPort;
 import com.superfercho.shopping.application.port.out.ClockPort;
 import com.superfercho.shopping.application.port.out.ProductCatalogPort;
+import com.superfercho.shopping.application.port.out.ShoppingListRepositoryPort;
 import com.superfercho.shopping.domain.exception.InvalidCartException;
 import com.superfercho.shopping.domain.exception.InvalidCartItemException;
 import com.superfercho.shopping.domain.model.Cart;
 import com.superfercho.shopping.domain.model.CartItem;
 import com.superfercho.shopping.domain.model.CartStatus;
+import com.superfercho.shopping.domain.model.ShoppingList;
+import com.superfercho.shopping.domain.model.ShoppingListItem;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -48,6 +53,8 @@ class CartApplicationServiceTest {
     private static final Instant NOW = Instant.parse("2026-04-01T10:05:00Z");
     private static final UUID CUSTOMER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID CART_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private static final UUID LIST_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+    private static final UUID OTHER_CUSTOMER_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final UUID MILK_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
     private static final UUID BREAD_ID = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
     private static final UUID ITEM_ID = UUID.fromString("99999999-9999-9999-9999-000000000001");
@@ -61,6 +68,9 @@ class CartApplicationServiceTest {
     private CartRepositoryPort cartRepository;
 
     @Mock
+    private ShoppingListRepositoryPort shoppingListRepository;
+
+    @Mock
     private ProductCatalogPort productCatalogPort;
 
     @Mock
@@ -70,7 +80,8 @@ class CartApplicationServiceTest {
 
     @BeforeEach
     void setUp() {
-        cartService = new CartApplicationService(currentUserProvider, cartRepository, productCatalogPort, clockPort);
+        cartService = new CartApplicationService(
+                currentUserProvider, cartRepository, shoppingListRepository, productCatalogPort, clockPort);
     }
 
     @Test
@@ -224,6 +235,183 @@ class CartApplicationServiceTest {
     }
 
     @Test
+    void shouldAddShoppingListProductsToCartUsingCurrentUserFromProvider() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(listWithMilkAndBread()));
+        when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(emptyCart()));
+        when(clockPort.currentTime()).thenReturn(NOW);
+        when(productCatalogPort.getProduct(MILK_ID)).thenReturn(Optional.of(new ProductCatalogInfo(MILK_ID, MILK_PRICE)));
+        when(productCatalogPort.getProduct(BREAD_ID))
+                .thenReturn(Optional.of(new ProductCatalogInfo(BREAD_ID, BREAD_PRICE)));
+        when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CartResponse response = cartService.execute(new AddShoppingListToCartCommand(LIST_ID));
+
+        verify(currentUserProvider).getCurrentUserId();
+        assertEquals(CART_ID, response.id());
+        assertEquals(2, response.items().size());
+        assertEquals(MILK_ID, response.items().get(0).productId());
+        assertEquals(2, response.items().get(0).quantity());
+        assertEquals(MILK_PRICE, response.items().get(0).priceAtAddition());
+        assertEquals(BREAD_ID, response.items().get(1).productId());
+        assertEquals(1, response.items().get(1).quantity());
+        assertEquals(BREAD_PRICE, response.items().get(1).priceAtAddition());
+        assertEquals(NOW, response.updatedAt());
+        verify(productCatalogPort).getProduct(MILK_ID);
+        verify(productCatalogPort).getProduct(BREAD_ID);
+        verify(cartRepository).save(any(Cart.class));
+    }
+
+    @Test
+    void shouldMergeShoppingListQuantitiesIntoExistingCartAndKeepOriginalPrice() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(listWithMilkAndBread()));
+        when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cartWithMilk()));
+        when(clockPort.currentTime()).thenReturn(NOW);
+        when(productCatalogPort.getProduct(MILK_ID))
+                .thenReturn(Optional.of(new ProductCatalogInfo(MILK_ID, Money.cop(new BigDecimal("99.00")))));
+        when(productCatalogPort.getProduct(BREAD_ID))
+                .thenReturn(Optional.of(new ProductCatalogInfo(BREAD_ID, BREAD_PRICE)));
+        when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CartResponse response = cartService.execute(new AddShoppingListToCartCommand(LIST_ID));
+
+        assertEquals(2, response.items().size());
+        assertEquals(ITEM_ID, response.items().get(0).id());
+        assertEquals(MILK_ID, response.items().get(0).productId());
+        assertEquals(4, response.items().get(0).quantity());
+        assertEquals(MILK_PRICE, response.items().get(0).priceAtAddition());
+        assertEquals(BREAD_ID, response.items().get(1).productId());
+        assertEquals(1, response.items().get(1).quantity());
+        assertEquals(BREAD_PRICE, response.items().get(1).priceAtAddition());
+    }
+
+    @Test
+    void shouldAddShoppingListCreatingCartWhenMissing() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(listWithMilk()));
+        when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.empty());
+        when(clockPort.currentTime()).thenReturn(NOW);
+        when(productCatalogPort.getProduct(MILK_ID)).thenReturn(Optional.of(new ProductCatalogInfo(MILK_ID, MILK_PRICE)));
+        when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CartResponse response = cartService.execute(new AddShoppingListToCartCommand(LIST_ID));
+
+        assertEquals(CUSTOMER_ID, response.customerId());
+        assertEquals(1, response.items().size());
+        assertEquals(MILK_ID, response.items().get(0).productId());
+        assertEquals(2, response.items().get(0).quantity());
+        verify(cartRepository).save(any(Cart.class));
+    }
+
+    @Test
+    void shouldReturnCurrentCartWhenShoppingListIsEmpty() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(emptyList()));
+        when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cartWithMilk()));
+
+        CartResponse response = cartService.execute(new AddShoppingListToCartCommand(LIST_ID));
+
+        assertEquals(CART_ID, response.id());
+        assertEquals(1, response.items().size());
+        assertEquals(MILK_ID, response.items().get(0).productId());
+        verify(productCatalogPort, never()).getProduct(any());
+        verify(cartRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldCreateCartWhenAddingEmptyShoppingListAndCartIsMissing() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(emptyList()));
+        when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.empty());
+        when(clockPort.currentTime()).thenReturn(NOW);
+        when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CartResponse response = cartService.execute(new AddShoppingListToCartCommand(LIST_ID));
+
+        assertEquals(CUSTOMER_ID, response.customerId());
+        assertTrue(response.items().isEmpty());
+        verify(productCatalogPort, never()).getProduct(any());
+        verify(cartRepository).save(any(Cart.class));
+    }
+
+    @Test
+    void shouldReapplyShoppingListProductsWhenInitialCartCreateLosesRace() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(listWithMilkAndBread()));
+        when(cartRepository.findByCustomerId(CUSTOMER_ID))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(emptyCart()));
+        when(clockPort.currentTime()).thenReturn(NOW);
+        when(productCatalogPort.getProduct(MILK_ID)).thenReturn(Optional.of(new ProductCatalogInfo(MILK_ID, MILK_PRICE)));
+        when(productCatalogPort.getProduct(BREAD_ID))
+                .thenReturn(Optional.of(new ProductCatalogInfo(BREAD_ID, BREAD_PRICE)));
+        when(cartRepository.save(any(Cart.class)))
+                .thenThrow(new DuplicateCustomerCartException())
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        CartResponse response = cartService.execute(new AddShoppingListToCartCommand(LIST_ID));
+
+        assertEquals(CART_ID, response.id());
+        assertEquals(2, response.items().size());
+        assertEquals(MILK_ID, response.items().get(0).productId());
+        assertEquals(2, response.items().get(0).quantity());
+        assertEquals(BREAD_ID, response.items().get(1).productId());
+        assertEquals(1, response.items().get(1).quantity());
+
+        ArgumentCaptor<Cart> savedCarts = ArgumentCaptor.forClass(Cart.class);
+        verify(cartRepository, times(2)).save(savedCarts.capture());
+        Cart retriedSave = savedCarts.getAllValues().get(1);
+        assertEquals(CART_ID, retriedSave.id());
+        assertEquals(2, retriedSave.items().size());
+    }
+
+    @Test
+    void shouldRejectAddShoppingListWhenListDoesNotExist() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.empty());
+
+        assertThrows(
+                ShoppingListNotFoundException.class, () -> cartService.execute(new AddShoppingListToCartCommand(LIST_ID)));
+        verify(cartRepository, never()).save(any());
+        verify(productCatalogPort, never()).getProduct(any());
+    }
+
+    @Test
+    void shouldRejectAddShoppingListWhenListBelongsToAnotherCustomer() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(OTHER_CUSTOMER_ID);
+        when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(emptyList()));
+
+        assertThrows(
+                ShoppingListNotFoundException.class, () -> cartService.execute(new AddShoppingListToCartCommand(LIST_ID)));
+        verify(cartRepository, never()).save(any());
+        verify(productCatalogPort, never()).getProduct(any());
+    }
+
+    @Test
+    void shouldRejectAddShoppingListWhenAProductDoesNotExist() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(listWithMilkAndBread()));
+        when(productCatalogPort.getProduct(MILK_ID)).thenReturn(Optional.of(new ProductCatalogInfo(MILK_ID, MILK_PRICE)));
+        when(productCatalogPort.getProduct(BREAD_ID)).thenReturn(Optional.empty());
+
+        assertThrows(
+                ProductNotFoundException.class, () -> cartService.execute(new AddShoppingListToCartCommand(LIST_ID)));
+        verify(cartRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldPropagateUnauthenticatedUserWhenAddingShoppingListToCart() {
+        when(currentUserProvider.getCurrentUserId()).thenThrow(new UnauthenticatedUserException());
+
+        assertThrows(
+                UnauthenticatedUserException.class,
+                () -> cartService.execute(new AddShoppingListToCartCommand(LIST_ID)));
+        verify(shoppingListRepository, never()).findById(any());
+        verify(cartRepository, never()).save(any());
+    }
+
+    @Test
     void shouldChangeCartItemQuantity() {
         when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cartWithMilk()));
@@ -344,6 +532,33 @@ class CartApplicationServiceTest {
                 CUSTOMER_ID,
                 CartStatus.ACTIVE,
                 List.of(CartItem.create(ITEM_ID, MILK_ID, 2, MILK_PRICE, CREATED_AT, CREATED_AT)),
+                CREATED_AT,
+                CREATED_AT);
+    }
+
+    private ShoppingList emptyList() {
+        return ShoppingList.create(LIST_ID, CUSTOMER_ID, "Mercado semanal", List.of(), CREATED_AT, CREATED_AT);
+    }
+
+    private ShoppingList listWithMilk() {
+        return ShoppingList.create(
+                LIST_ID,
+                CUSTOMER_ID,
+                "Mercado semanal",
+                List.of(ShoppingListItem.create(ITEM_ID, MILK_ID, 2, CREATED_AT)),
+                CREATED_AT,
+                CREATED_AT);
+    }
+
+    private ShoppingList listWithMilkAndBread() {
+        return ShoppingList.create(
+                LIST_ID,
+                CUSTOMER_ID,
+                "Mercado semanal",
+                List.of(
+                        ShoppingListItem.create(ITEM_ID, MILK_ID, 2, CREATED_AT),
+                        ShoppingListItem.create(
+                                UUID.fromString("99999999-9999-9999-9999-000000000002"), BREAD_ID, 1, CREATED_AT)),
                 CREATED_AT,
                 CREATED_AT);
     }

@@ -1,5 +1,6 @@
 package com.superfercho.orders.infrastructure.configuration;
 
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -53,6 +54,11 @@ class TransactionalCheckoutUseCaseTest {
     @BeforeEach
     void setUp() {
         wrapper = new TransactionalCheckoutUseCase(checkoutUseCase, transactionTemplate);
+    }
+
+    @Test
+    void shouldImplementApplicationCheckoutContract() {
+        assertInstanceOf(com.superfercho.orders.application.port.in.CheckoutUseCase.class, wrapper);
     }
 
     @Test

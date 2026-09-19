@@ -26,9 +26,11 @@ public class ShoppingUseCaseConfiguration {
     CartApplicationService cartApplicationService(
             CurrentUserProvider currentUserProvider,
             CartRepositoryPort cartRepository,
+            ShoppingListRepositoryPort shoppingListRepository,
             ProductCatalogPort productCatalogPort,
             ClockPort clockPort) {
-        return new CartApplicationService(currentUserProvider, cartRepository, productCatalogPort, clockPort);
+        return new CartApplicationService(
+                currentUserProvider, cartRepository, shoppingListRepository, productCatalogPort, clockPort);
     }
 
     @Bean
