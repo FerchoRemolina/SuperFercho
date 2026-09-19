@@ -5,7 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 import com.superfercho.catalog.application.dto.ProductPriceInfo;
+import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.application.port.ProductRepository;
+import com.superfercho.catalog.domain.model.Category;
+import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.domain.model.Product;
 import com.superfercho.catalog.domain.model.ProductStatus;
 import com.superfercho.platform.money.Money;
@@ -13,6 +16,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -29,11 +33,21 @@ class FindProductPriceUseCaseTest {
     @Mock
     private ProductRepository productRepository;
 
-    @Test
-    void shouldReturnProductIdAndCurrentPrice() {
-        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product()));
+    @Mock
+    private CategoryRepository categoryRepository;
 
-        Optional<ProductPriceInfo> result = new FindProductPriceUseCase(productRepository).findById(PRODUCT_ID);
+    private FindProductPriceUseCase findProductPrice;
+
+    @BeforeEach
+    void setUp() {
+        findProductPrice = new FindProductPriceUseCase(productRepository, categoryRepository);
+    }
+
+    @Test
+    void shouldReturnProductWhenProductAndCategoryAreActive() {
+        givenProduct(ProductStatus.ACTIVE, CategoryStatus.ACTIVE);
+
+        Optional<ProductPriceInfo> result = findProductPrice.findById(PRODUCT_ID);
 
         assertTrue(result.isPresent());
         assertEquals(PRODUCT_ID, result.get().productId());
@@ -44,22 +58,39 @@ class FindProductPriceUseCaseTest {
     void shouldReturnEmptyWhenProductDoesNotExist() {
         when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.empty());
 
-        Optional<ProductPriceInfo> result = new FindProductPriceUseCase(productRepository).findById(PRODUCT_ID);
+        Optional<ProductPriceInfo> result = findProductPrice.findById(PRODUCT_ID);
 
         assertTrue(result.isEmpty());
     }
 
     @Test
-    void shouldReturnEmptyWhenProductIsInactive() {
-        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product(ProductStatus.INACTIVE)));
+    void shouldReturnEmptyWhenProductIsInactiveAndCategoryIsActive() {
+        givenProduct(ProductStatus.INACTIVE, CategoryStatus.ACTIVE);
 
-        Optional<ProductPriceInfo> result = new FindProductPriceUseCase(productRepository).findById(PRODUCT_ID);
-
-        assertTrue(result.isEmpty());
+        assertTrue(findProductPrice.findById(PRODUCT_ID).isEmpty());
     }
 
-    private static Product product() {
-        return product(ProductStatus.ACTIVE);
+    @Test
+    void shouldReturnEmptyWhenProductIsActiveAndCategoryIsInactive() {
+        givenProduct(ProductStatus.ACTIVE, CategoryStatus.INACTIVE);
+
+        assertTrue(findProductPrice.findById(PRODUCT_ID).isEmpty());
+    }
+
+    @Test
+    void shouldReturnEmptyWhenProductAndCategoryAreInactive() {
+        givenProduct(ProductStatus.INACTIVE, CategoryStatus.INACTIVE);
+
+        assertTrue(findProductPrice.findById(PRODUCT_ID).isEmpty());
+    }
+
+    private void givenProduct(ProductStatus productStatus, CategoryStatus categoryStatus) {
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product(productStatus)));
+        when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category(categoryStatus)));
+    }
+
+    private static Category category(CategoryStatus status) {
+        return Category.create(CATEGORY_ID, "Lácteos", null, status, CREATED_AT, CREATED_AT);
     }
 
     private static Product product(ProductStatus status) {

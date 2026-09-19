@@ -37,6 +37,24 @@ public class OrderPersistenceAdapter implements OrderRepository {
     }
 
     @Override
+    public Optional<Order> saveIfPending(Order order) {
+        if (order.status() != OrderStatus.CONFIRMED && order.status() != OrderStatus.CANCELLED) {
+            throw new IllegalArgumentException("saveIfPending requires CONFIRMED or CANCELLED, got " + order.status());
+        }
+        int updated = orderJpaRepository.updateStatusIfPending(
+                order.id(),
+                order.status(),
+                order.confirmedAt(),
+                order.cancelledAt(),
+                order.updatedAt(),
+                OrderStatus.PENDING);
+        if (updated == 0) {
+            return Optional.empty();
+        }
+        return findById(order.id());
+    }
+
+    @Override
     public Optional<Order> findById(UUID orderId) {
         return orderJpaRepository.findById(orderId).map(orderPersistenceMapper::toDomain);
     }

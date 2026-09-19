@@ -211,6 +211,21 @@ class TransactionalCheckoutUseCaseIntegrationTest {
     }
 
     @Test
+    void shouldRejectProductWithInactiveCategoryWithoutPersistingCheckoutSideEffects() {
+        Fixture fixture = prepareReadyCheckout(INITIAL_STOCK, PRICE, ProductStatus.ACTIVE);
+        deactivateCategoryOf(fixture.productId());
+        DatabaseSnapshot before = snapshot(fixture);
+
+        assertThatThrownBy(() -> transactionalCheckoutUseCase.execute(cardCommand(fixture)))
+                .isInstanceOf(ProductNotAvailableException.class);
+
+        assertNoCheckoutSideEffects(fixture, before);
+        assertThat(cartRepository.findByCustomerId(fixture.customerId()).orElseThrow().items()).hasSize(1);
+        assertThat(productRepository.findById(fixture.productId()).orElseThrow().status())
+                .isEqualTo(ProductStatus.ACTIVE);
+    }
+
+    @Test
     void shouldRejectInsufficientStockBeforeProcessingPayment() {
         Fixture fixture = prepareReadyCheckout(1, PRICE, ProductStatus.ACTIVE);
         DatabaseSnapshot before = snapshot(fixture);
@@ -491,6 +506,12 @@ class TransactionalCheckoutUseCaseIntegrationTest {
     private void saveEmptyCart(UUID customerId) {
         cartRepository.save(Cart.create(
                 UUID.randomUUID(), customerId, CartStatus.ACTIVE, List.of(), NOW, NOW));
+    }
+
+    private void deactivateCategoryOf(UUID productId) {
+        Product product = productRepository.findById(productId).orElseThrow();
+        Category category = categoryRepository.findById(product.categoryId()).orElseThrow();
+        categoryRepository.save(category.deactivate(NOW.plusSeconds(1)));
     }
 
     private static CheckoutCommand cardCommand(Fixture fixture) {

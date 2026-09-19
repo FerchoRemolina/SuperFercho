@@ -207,6 +207,45 @@ class OrderPersistenceAdapterTest {
                 .allMatch(order -> now.isAfter(order.createdAt().plus(Order.CUSTOMER_CANCELLATION_WINDOW)));
     }
 
+    @Test
+    void shouldConfirmPendingOrderOnlyWhileStillPending() {
+        Order pending = orderRepository.save(pendingOrder("ORD-P-PEND-1", CUSTOMER_ID, PAYMENT_ID));
+        Instant at = CONFIRMED_AT;
+
+        assertThat(orderRepository.saveIfPending(pending.confirm(at)))
+                .hasValueSatisfying(order -> {
+                    assertThat(order.status()).isEqualTo(OrderStatus.CONFIRMED);
+                    assertThat(order.confirmedAt()).isEqualTo(at);
+                    assertThat(order.cancelledAt()).isNull();
+                });
+        Instant withinWindow = Instant.parse("2026-03-01T10:10:00Z");
+        assertThat(orderRepository.saveIfPending(pending.cancel(withinWindow))).isEmpty();
+
+        Order loaded = orderRepository.findById(pending.id()).orElseThrow();
+        assertThat(loaded.status()).isEqualTo(OrderStatus.CONFIRMED);
+        assertThat(loaded.cancelledAt()).isNull();
+        assertThat(loaded.confirmedAt()).isEqualTo(at);
+    }
+
+    @Test
+    void shouldCancelPendingOrderOnlyWhileStillPending() {
+        Order pending = orderRepository.save(pendingOrder("ORD-P-PEND-2", CUSTOMER_ID, PAYMENT_ID));
+        Instant at = Instant.parse("2026-03-01T10:10:00Z");
+
+        assertThat(orderRepository.saveIfPending(pending.cancel(at)))
+                .hasValueSatisfying(order -> {
+                    assertThat(order.status()).isEqualTo(OrderStatus.CANCELLED);
+                    assertThat(order.cancelledAt()).isEqualTo(at);
+                    assertThat(order.confirmedAt()).isNull();
+                });
+        assertThat(orderRepository.saveIfPending(pending.confirm(CONFIRMED_AT))).isEmpty();
+
+        Order loaded = orderRepository.findById(pending.id()).orElseThrow();
+        assertThat(loaded.status()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(loaded.confirmedAt()).isNull();
+        assertThat(loaded.cancelledAt()).isEqualTo(at);
+    }
+
     private static Order pendingOrder(String orderNumber, UUID customerId, UUID paymentId) {
         return orderAt(orderNumber, customerId, CREATED_AT, paymentId, List.of(milk()));
     }

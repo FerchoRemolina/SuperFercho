@@ -142,8 +142,8 @@ and call the provider module through its application API
 
 | Consumer | Provider | Port / mechanism | Forbidden |
 |---|---|---|---|
-| Shopping → Catalog | Current ACTIVE price | Shopping `ProductCatalogPort` → Catalog `ProductQueryPort` (`FindProductPriceUseCase`) | Catalog JPA/repositories |
-| Orders → Catalog | Sale snapshot + availability | Orders `ProductCatalogPort` | Catalog JPA |
+| Shopping → Catalog | Current sellable price | Shopping `ProductCatalogPort` → Catalog `ProductQueryPort` (`FindProductPriceUseCase`) | Catalog JPA/repositories; `CategoryRepository` |
+| Orders → Catalog | Sale snapshot + availability | Orders `ProductCatalogPort` → Catalog `ProductRepository` (name/stock) and `ProductQueryPort` (sellable) | Catalog JPA; `CategoryRepository` |
 | Orders → Catalog | Atomic decrement / restore | Catalog `InventoryPort` (provider-owned) | Catalog JPA from Orders |
 | Orders → Shopping | Load / clear active cart | Orders `ShoppingCartPort` | Shopping persistence |
 | Orders → Identity | Load usable address | Orders `CustomerAddressPort` | Identity JPA |
@@ -153,7 +153,7 @@ and call the provider module through its application API
 
 Provider modules do not depend on their consumers. Catalog, Identity, Payments, and Knowledge do not depend on Orders, Shopping, or Assistant.
 
-No module uses another module’s JPA entities or Spring Data repositories. Adapter wiring is mixed: Shopping and Payments are consumed through application use cases; Orders’ catalog and address adapters currently call Catalog `ProductRepository` and Identity `AddressRepository` (application ports) and map those modules’ domain models into Orders DTOs. Assistant tools call use cases only.
+No module uses another module’s JPA entities or Spring Data repositories. Adapter wiring is mixed: Shopping and Payments are consumed through application use cases. Orders’ catalog adapter currently loads Catalog `Product` through Catalog `ProductRepository` (application port) for name and stock, and asks Catalog `ProductQueryPort` whether the product is sellable; it does not call `CategoryRepository`. Orders’ address adapter currently calls Identity `AddressRepository` (application port). Assistant tools call use cases only. Shopping does not call `CategoryRepository`.
 
 `InventoryPort` is owned by **Catalog**. Orders imports that application port and calls it from checkout and cancel.
 
@@ -216,8 +216,10 @@ Rules:
 
 - `price >= 0`, `stock >= 0`
 - `stock = 0` means unavailable
-- inactive products cannot be publicly purchased or publicly fetched (public GET → 404)
-- inactive categories cannot be used publicly
+- a product is commercially sellable only when `Product.status == ACTIVE` **and** `Category.status == ACTIVE`
+- Catalog owns that rule (`CatalogVisibility`). Public catalog reads (`GetProductUseCase`, `ListProductsUseCase`, `SearchProductsUseCase`) and `FindProductPriceUseCase` apply it
+- a product that is not sellable is not publicly visible (public GET → 404) and cannot be added to a cart or sold, even if `Product.status` is `ACTIVE`
+- inactive categories cannot be used publicly (`GetCategoryUseCase` / public list)
 - Catalog owns stock
 - historical rows are not physically deleted
 - activation/deactivation are explicit use cases (`Activate*` / `Deactivate*`), not HTTP DELETE
@@ -239,7 +241,7 @@ Public catalog reads default to `CatalogView.PUBLIC`. Admin listing uses `view=A
 - quantity > 0
 - stock is not reserved when adding to cart or lists
 - cart stored price (`price_at_addition`) is informational; Catalog current price is authoritative at checkout
-- adding a product requires an ACTIVE catalog product via `ProductQueryPort`; inactive/missing → not found
+- adding a product to cart or shopping list, and `AddShoppingListToCart`, require a sellable product via `ProductQueryPort`; missing, `INACTIVE` product, or `INACTIVE` category → not found
 - `AddShoppingListToCart` is an application/tool capability; there is no dedicated REST path
 
 ### 3.4 Orders
@@ -267,6 +269,14 @@ READY      → DELIVERED
 Customer cancellation: only while `PENDING` and within 15 minutes of `createdAt` (`Order.CUSTOMER_CANCELLATION_WINDOW`). Cancellation restores stock. If the linked payment is `APPROVED`, Payments records a refund via `refundedAt`; payment status stays `APPROVED`. COD payments remain `PENDING` and are not refunded.
 
 After 15 minutes, remaining `PENDING` orders are auto-confirmed (`PENDING → CONFIRMED`). Customers then cannot cancel.
+
+Leaving-`PENDING` writes (`PENDING → CANCELLED`, `PENDING → CONFIRMED`) use `OrderRepository.saveIfPending`. Persistence is a conditional update equivalent to:
+
+```text
+UPDATE ... SET status = :newStatus, ... WHERE id = :id AND status = 'PENDING'
+```
+
+Zero updated rows means another writer already left `PENDING`. Cancel then throws `InvalidOrderStateTransitionException` and does not restore stock or refund. Auto-confirm skips that order (no confirmation). Admin `PENDING → CONFIRMED` uses the same persist. Checkout insert and later admin transitions (`CONFIRMED → PREPARING → READY → DELIVERED`) still use `save` / `saveAndFlush`. There is no `version` column.
 
 `order_number` is assigned at creation (`ORD-` + fragment of the order UUID). Idempotency storage is application/infrastructure owned by Orders, not a domain aggregate.
 
@@ -350,7 +360,7 @@ There is no `GetCurrentUser` use case and no public admin-provisioning use case.
 - `CreateCategoryUseCase`, `UpdateCategoryUseCase`, `ActivateCategoryUseCase`, `DeactivateCategoryUseCase`, `ListCategoriesUseCase`, `GetCategoryUseCase`
 - `CreateProductUseCase`, `UpdateProductUseCase`, `ActivateProductUseCase`, `DeactivateProductUseCase`, `ChangeProductPriceUseCase`
 - `GetProductUseCase`, `ListProductsUseCase`, `SearchProductsUseCase`
-- `FindProductPriceUseCase` — implements `ProductQueryPort` (ACTIVE only)
+- `FindProductPriceUseCase` — implements `ProductQueryPort` (sellable: product `ACTIVE` and category `ACTIVE`)
 - `InventoryPort.decreaseStockAtomically` / `restoreStock`
 
 ### Shopping
@@ -402,8 +412,11 @@ No business use cases. No operational tools.
 
 - **Owner:** Catalog
 - **Implementation:** `FindProductPriceUseCase`
-- **Purpose:** Operational lookup of an ACTIVE product’s current COP price
-- **Output:** empty when missing or not `ACTIVE`
+- **Purpose:** Operational lookup of a commercially sellable product’s current COP price
+- **Sellable means:** `Product.status == ACTIVE` **and** `Category.status == ACTIVE`
+- **Output:** empty when the product does not exist, is not `ACTIVE`, or belongs to a category that is not `ACTIVE`
+
+Shopping and Orders consume this contract. They do not query `CategoryRepository`. Assistant does not reimplement the rule: catalog tools use public Catalog use cases; cart/list tools use Shopping use cases.
 
 ### Shopping `ProductCatalogPort`
 
@@ -414,10 +427,10 @@ No business use cases. No operational tools.
 ### Orders `ProductCatalogPort`
 
 - **Owner:** Orders
-- **Purpose:** Name, ACTIVE flag, stock availability, current price; availability check for checkout lines
-- **Adapter:** `orders.infrastructure.catalog.ProductCatalogAdapter` → Catalog `ProductRepository` (maps Catalog `Product` to Orders `ProductCatalogInfo`)
+- **Purpose:** Name, sellable flag, stock availability, current price; availability check for checkout lines
+- **Adapter:** `orders.infrastructure.catalog.ProductCatalogAdapter` → Catalog `ProductRepository` (maps Catalog `Product` to Orders `ProductCatalogInfo`) and Catalog `ProductQueryPort` (sellable → `active`)
 
-Not a duplicate of Shopping’s port. Different shape, different consumer. `checkAvailability` compares requested quantity to catalog stock. ACTIVE/saleability is enforced when building order items from `getProduct`.
+Not a duplicate of Shopping’s port. Different shape, different consumer. `checkAvailability` compares requested quantity to catalog stock and does not re-check category status. Sellability is enforced when building order items from `getProduct` (`active` is true only when `ProductQueryPort` returns a value).
 
 ### Catalog `InventoryPort`
 
@@ -572,6 +585,8 @@ UPDATE catalog.products
 
 Zero rows → insufficient stock. Restore uses `stock = stock + :quantity` without requiring `ACTIVE`.
 
+The decrement predicate is product `ACTIVE` and sufficient stock, not category status. Checkout rejects a non-sellable product (including an `INACTIVE` category) before this SQL runs.
+
 ### 6.4 V4 — Orders
 
 **`orders.orders`**
@@ -701,8 +716,8 @@ Transactions are started in Infrastructure wrappers via `TransactionTemplate`, n
 | Cart / shopping-list writes | One TX on shopping tables; catalog is read via port; no stock write |
 | **Checkout** | `TransactionalCheckoutUseCase` wraps `CheckoutUseCase.execute` in one local TX (idempotency, stock, payment, order, cart clear) |
 | `ProcessPaymentUseCase` | Joins the caller TX |
-| **Cancel** | `TransactionalCancelOrderUseCase` wraps cancel + stock restore + optional refund |
-| `AutoConfirmPendingOrdersUseCase` | One persist per eligible order inside the use case loop; scheduler does not wrap the batch |
+| **Cancel** | `TransactionalCancelOrderUseCase` wraps cancel. Stock restore and optional refund run only after `saveIfPending` succeeds |
+| `AutoConfirmPendingOrdersUseCase` | One `saveIfPending` per eligible order inside the use case loop; zero rows skipped; scheduler does not wrap the batch |
 
 Failed checkout rolls back completely.
 
@@ -732,7 +747,7 @@ The request item set (product ids and quantities) must match the active cart exa
 6. Load active cart. Empty → conflict.
 7. Load active owned address. Missing / not owned / inactive → not available.
 8. Match request lines to cart lines.
-9. Load each product via Orders `ProductCatalogPort`. Inactive/unavailable → not available.
+9. Load each product via Orders `ProductCatalogPort`. Not sellable (product `INACTIVE`, category `INACTIVE`) or unavailable stock → not available.
 10. `expectedUnitPrice` must equal Catalog current price. Mismatch → price-changed conflict. The new price is not charged silently.
 11. Availability check, then `InventoryPort.decreaseStockAtomically`. Concurrent checkouts cannot produce negative stock.
 12. `PaymentPort.processPayment` for the draft order id and total.
@@ -757,7 +772,7 @@ The request item set (product ids and quantities) must match the active cart exa
 | Address missing / not owned / inactive | none | 404 / conflict |
 | Empty cart | none | 409 |
 | Request items ≠ cart | none | 400 |
-| Inactive/unavailable product | none | 409 |
+| Not sellable / unavailable product | none | 409 |
 | Price changed | none | 409 |
 | Insufficient stock / concurrent oversell loser | none | 409 |
 | Unexpected error | rollback | 500 problem+json, no stack trace |
@@ -961,6 +976,8 @@ Never: Assistant or MCP → JPA / repository / SQL of another module.
 
 **Allowlisted tools:** `search_products`, `get_product`, `list_products`, `list_categories`, `get_cart`, `add_cart_item`, `change_cart_item_quantity`, `remove_cart_item`, `clear_cart`, shopping-list tools including `add_shopping_list_to_cart`, `list_orders`, `get_order`, `checkout`, `cancel_order`, `list_addresses`, `search_knowledge`.
 
+Catalog and shopping tools reuse existing Catalog public use cases and Shopping cart/list use cases. Assistant does not implement product sellability itself.
+
 **Confirmation required** before `checkout` and `cancel_order`. Pending tokens are stored in memory (`InMemoryPendingSensitiveActionStore`). The model cannot grant permission or skip confirmation.
 
 Conversations: `ConversationStore` / `InMemoryConversationStore`. Lost on process restart. No SQL schema.
@@ -978,8 +995,10 @@ Knowledge HTTP is ADMIN ingest/search. Assistant search is the same `SearchKnowl
 - Trigger: `orders.infrastructure.configuration.AutoConfirmPendingOrdersJob` with Spring `@Scheduled` (fixed delay 60s, profile `!test`).
 - The job only calls `AutoConfirmPendingOrdersUseCase`.
 - Use case uses injectable clock (UTC): confirm `PENDING` orders whose 15-minute window from `createdAt` has elapsed.
+- Persist with `saveIfPending` (conditional `UPDATE ... WHERE id = :id AND status = 'PENDING'`). If another writer already left `PENDING`, zero rows are updated and that order is skipped.
+- Cancel uses the same persist before restore stock / refund. The loser of the race does not confirm, restore stock, or refund.
 - Skip `CANCELLED` and already `CONFIRMED`. Domain `confirm` is a conditional transition.
-- Tests use a fixed clock. Cancel vs confirm race: one valid `PENDING` transition wins.
+- Tests use a fixed clock and PostgreSQL/Testcontainers for the concurrent cancel vs auto-confirm case.
 
 ---
 
@@ -1019,8 +1038,10 @@ No H2. Tests do not call real payment providers. LLM and embedding ports are fak
 - COD: payment `PENDING`; cancel does not set `refundedAt`
 - idempotency: same key+fingerprint replay; same key+different fingerprint conflict
 - auto-confirm after 15 minutes via fixed clock
-- public inactive product 404
-- inactive products cannot enter cart/list via `ProductQueryPort`
+- cancel vs auto-confirm race: conditional `PENDING` update; the loser does not restore stock or confirm; never `CONFIRMED` with stock restored by cancel
+- public non-sellable product 404 (inactive product or inactive category)
+- non-sellable products cannot enter cart/list via `ProductQueryPort` (inactive product or inactive category)
+- checkout rejects a product whose category is `INACTIVE` even if the product is `ACTIVE`
 - ownership: customer cannot read another user’s order/cart/address
 - ADMIN cannot be obtained via public register
 - Knowledge REST requires ADMIN
@@ -1081,7 +1102,7 @@ JDK `HttpClient` is used for OpenAI chat and embeddings (no extra HTTP client de
 - Catalog, stock ownership, public vs ADMIN view
 - Shopping cart and lists
 - Simulated payments (`SIMULATED_CARD`, `CASH_ON_DELIVERY`)
-- Checkout in one local TX, cancel + stock restore, auto-confirm
+- Checkout in one local TX, cancel + stock restore (only after a successful `PENDING` persist), auto-confirm via `saveIfPending`
 - Knowledge documents, chunking, embeddings, pgvector, ADMIN REST
 - Assistant chat, `LLMPort`, allowlisted tools, confirmation for checkout and cancel
 - Security `denyAll` default
@@ -1102,14 +1123,14 @@ JDK `HttpClient` is used for OpenAI chat and embeddings (no extra HTTP client de
 | Risk | Impact | Current mitigation / residual |
 |---|---|---|
 | Logical UUIDs without cross-schema FK | Orphan references if a module writes an invalid id | Consumer ports validate existence; no physical FK by design |
-| RAG treated as price/stock | Wrong commercial answers | Tools must call Catalog/Shopping/Orders; tests cover inactive products |
+| RAG treated as price/stock | Wrong commercial answers | Tools must call Catalog/Shopping/Orders; tests cover non-sellable products |
 | In-memory Assistant state | Conversations and confirmation tokens lost on restart | Documented limitation; not durable |
 | Simulated CARD never declines | No runtime declined-charge path | `ProcessPaymentUseCase` always `APPROVED` for CARD |
 | Local refund timestamp | No external money movement | `refundedAt` on `APPROVED` only |
 | JWT without refresh/revocation | Stolen token valid until expiry (~15 min) | Short TTL; no refresh subsystem |
 | MCP stub | No alternative driving adapter | Package is non-operational |
 
-Resolved in the current code and not listed as open architecture defects: non-atomic stock, checkout without a local transaction, Assistant impersonation via client user id, Knowledge HTTP left unsecured, INACTIVE products entering the cart through Catalog query.
+Resolved in the current code and not listed as open architecture defects: non-atomic stock, checkout without a local transaction, Assistant impersonation via client user id, Knowledge HTTP left unsecured, INACTIVE products entering the cart through Catalog query, `ACTIVE` products of an `INACTIVE` category reaching cart/checkout, lost update between cancel and auto-confirm of `PENDING` orders.
 
 ---
 
@@ -1120,6 +1141,8 @@ Compatible with the current code:
 - REST base `/api/v1` as documented in §10
 - Pagination `page=0`, `size=20`, max `100` on order listing
 - Public inactive product = 404
+- Public product of an inactive category = 404; not sellable
+- A product is commercially sellable only when `Product.status == ACTIVE` and `Category.status == ACTIVE` (Catalog-owned; `ProductQueryPort`)
 - RFC 7807 / `application/problem+json` with optional `code`
 - One `User` type, one role, no self-register ADMIN, ADMIN not a shopper
 - Address deactivate, not physical delete; snapshot on order
@@ -1131,6 +1154,7 @@ Compatible with the current code:
 - Explicit `expectedUnitPrice`; 409 on change
 - Idempotency-Key: fingerprint + materialized result; 24h retention
 - Adjacent-only order transitions; customer cancel `PENDING` + 15 minutes from `createdAt`
+- Leaving-`PENDING` persist is conditional (`saveIfPending` / `UPDATE ... WHERE status = 'PENDING'`); lost cancel does not restore stock or refund
 - JWT access 15 minutes; no refresh
 - PostgreSQL schemas per module except Assistant; logical cross-module UUIDs
 - Single Maven module

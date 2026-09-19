@@ -11,8 +11,11 @@ import static org.mockito.Mockito.when;
 import com.superfercho.assistant.application.tool.ToolNames;
 import com.superfercho.assistant.application.tool.ToolRegistry;
 import com.superfercho.assistant.application.tool.ToolResult;
+import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.application.port.ProductRepository;
 import com.superfercho.catalog.application.usecase.FindProductPriceUseCase;
+import com.superfercho.catalog.domain.model.Category;
+import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.domain.model.Product;
 import com.superfercho.catalog.domain.model.ProductStatus;
 import com.superfercho.platform.money.Money;
@@ -65,11 +68,15 @@ class InactiveProductAssistantShoppingToolsTest {
     @Mock
     private ProductRepository productRepository;
 
+    @Mock
+    private CategoryRepository categoryRepository;
+
     private ToolRegistry registry;
 
     @BeforeEach
     void setUp() {
-        ProductCatalogAdapter catalog = new ProductCatalogAdapter(new FindProductPriceUseCase(productRepository));
+        ProductCatalogAdapter catalog =
+                new ProductCatalogAdapter(new FindProductPriceUseCase(productRepository, categoryRepository));
         CartApplicationService cartService = new CartApplicationService(
                 currentUserProvider, cartRepository, shoppingListRepository, catalog, clockPort);
         ShoppingListApplicationService shoppingListService = new ShoppingListApplicationService(
@@ -78,11 +85,11 @@ class InactiveProductAssistantShoppingToolsTest {
     }
 
     @Test
-    void shouldAddActiveProductToCartThroughAssistantTool() {
+    void shouldAddActiveProductWithActiveCategoryToCartThroughAssistantTool() {
         when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(emptyCart()));
         when(clockPort.currentTime()).thenReturn(NOW);
-        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product(ProductStatus.ACTIVE)));
+        givenProduct(ProductStatus.ACTIVE, CategoryStatus.ACTIVE);
         when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ToolResult result = registry.execute(
@@ -95,7 +102,20 @@ class InactiveProductAssistantShoppingToolsTest {
     @Test
     void shouldNotAddInactiveProductToCartThroughAssistantTool() {
         when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
-        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product(ProductStatus.INACTIVE)));
+        givenProduct(ProductStatus.INACTIVE, CategoryStatus.ACTIVE);
+
+        ToolResult result = registry.execute(
+                ToolNames.ADD_CART_ITEM, Map.of("productId", PRODUCT_ID.toString(), "quantity", 1));
+
+        assertFalse(result.success());
+        assertEquals(new ProductNotFoundException(PRODUCT_ID).getMessage(), result.content());
+        verify(cartRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldNotAddProductWithInactiveCategoryToCartThroughAssistantTool() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        givenProduct(ProductStatus.ACTIVE, CategoryStatus.INACTIVE);
 
         ToolResult result = registry.execute(
                 ToolNames.ADD_CART_ITEM, Map.of("productId", PRODUCT_ID.toString(), "quantity", 1));
@@ -108,7 +128,7 @@ class InactiveProductAssistantShoppingToolsTest {
     @Test
     void shouldNotAddInactiveProductToShoppingListThroughAssistantTool() {
         when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
-        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product(ProductStatus.INACTIVE)));
+        givenProduct(ProductStatus.INACTIVE, CategoryStatus.ACTIVE);
 
         ToolResult result = registry.execute(
                 ToolNames.ADD_SHOPPING_LIST_ITEM,
@@ -125,8 +145,17 @@ class InactiveProductAssistantShoppingToolsTest {
         verify(shoppingListRepository, never()).save(any());
     }
 
+    private void givenProduct(ProductStatus productStatus, CategoryStatus categoryStatus) {
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product(productStatus)));
+        when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category(categoryStatus)));
+    }
+
     private Cart emptyCart() {
         return Cart.create(CART_ID, CUSTOMER_ID, CartStatus.ACTIVE, List.of(), CREATED_AT, CREATED_AT);
+    }
+
+    private static Category category(CategoryStatus status) {
+        return Category.create(CATEGORY_ID, "Lácteos", null, status, CREATED_AT, CREATED_AT);
     }
 
     private static Product product(ProductStatus status) {

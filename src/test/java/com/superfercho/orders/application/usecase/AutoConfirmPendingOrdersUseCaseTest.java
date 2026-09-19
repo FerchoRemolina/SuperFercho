@@ -19,6 +19,7 @@ import com.superfercho.platform.money.Money;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,14 +58,14 @@ class AutoConfirmPendingOrdersUseCaseTest {
                 UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), "ORD-RECENT", TOO_RECENT_CREATED_AT);
         when(orderRepository.findPendingOrdersEligibleForAutomaticConfirmation(NOW))
                 .thenReturn(List.of(eligible, tooRecent));
-        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderRepository.saveIfPending(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
 
         List<OrderResult> confirmed = autoConfirm.execute();
 
         assertEquals(1, confirmed.size());
         assertEquals(eligible.id(), confirmed.get(0).id());
         assertEquals(OrderStatus.CONFIRMED, confirmed.get(0).status());
-        verify(orderRepository, times(1)).save(any());
+        verify(orderRepository, times(1)).saveIfPending(any());
     }
 
     @Test
@@ -74,7 +75,20 @@ class AutoConfirmPendingOrdersUseCaseTest {
         List<OrderResult> confirmed = autoConfirm.execute();
 
         assertEquals(List.of(), confirmed);
-        verify(orderRepository, never()).save(any());
+        verify(orderRepository, never()).saveIfPending(any());
+    }
+
+    @Test
+    void shouldSkipOrderWhenPendingTransitionIsLost() {
+        Order eligible = pendingOrder(
+                UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), "ORD-ELIGIBLE", ELIGIBLE_CREATED_AT);
+        when(orderRepository.findPendingOrdersEligibleForAutomaticConfirmation(NOW)).thenReturn(List.of(eligible));
+        when(orderRepository.saveIfPending(any())).thenReturn(Optional.empty());
+
+        List<OrderResult> confirmed = autoConfirm.execute();
+
+        assertEquals(List.of(), confirmed);
+        verify(orderRepository).saveIfPending(any());
     }
 
     private static Order pendingOrder(UUID orderId, String orderNumber, Instant createdAt) {

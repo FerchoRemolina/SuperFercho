@@ -3,11 +3,16 @@ package com.superfercho.orders.infrastructure.catalog;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.superfercho.catalog.application.dto.StockQuantity;
+import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.application.port.ProductRepository;
+import com.superfercho.catalog.application.usecase.FindProductPriceUseCase;
+import com.superfercho.catalog.domain.model.Category;
+import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.domain.model.Product;
 import com.superfercho.catalog.domain.model.ProductStatus;
 import com.superfercho.orders.application.dto.AvailabilityResult;
@@ -36,16 +41,20 @@ class ProductCatalogAdapterTest {
     @Mock
     private ProductRepository productRepository;
 
+    @Mock
+    private CategoryRepository categoryRepository;
+
     private ProductCatalogAdapter adapter;
 
     @BeforeEach
     void setUp() {
-        adapter = new ProductCatalogAdapter(productRepository);
+        adapter = new ProductCatalogAdapter(
+                productRepository, new FindProductPriceUseCase(productRepository, categoryRepository));
     }
 
     @Test
-    void shouldMapExistingProduct() {
-        when(productRepository.findById(MILK_ID)).thenReturn(Optional.of(product(MILK_ID, ProductStatus.ACTIVE, 10)));
+    void shouldMapExistingSellableProduct() {
+        givenProduct(MILK_ID, ProductStatus.ACTIVE, CategoryStatus.ACTIVE, 10);
 
         Optional<ProductCatalogInfo> result = adapter.getProduct(MILK_ID);
 
@@ -56,7 +65,7 @@ class ProductCatalogAdapterTest {
         assertEquals(MILK_PRICE, info.currentPrice());
         assertTrue(info.available());
         assertTrue(info.active());
-        verify(productRepository).findById(MILK_ID);
+        verify(productRepository, atLeastOnce()).findById(MILK_ID);
     }
 
     @Test
@@ -68,8 +77,8 @@ class ProductCatalogAdapterTest {
     }
 
     @Test
-    void shouldMapInactiveProductWithoutHidingIt() {
-        when(productRepository.findById(MILK_ID)).thenReturn(Optional.of(product(MILK_ID, ProductStatus.INACTIVE, 10)));
+    void shouldMapInactiveProductAsNotSellableWithoutHidingIt() {
+        givenProduct(MILK_ID, ProductStatus.INACTIVE, CategoryStatus.ACTIVE, 10);
 
         ProductCatalogInfo info = adapter.getProduct(MILK_ID).orElseThrow();
 
@@ -78,8 +87,25 @@ class ProductCatalogAdapterTest {
     }
 
     @Test
-    void shouldMapZeroStockAsUnavailableWithoutChangingActive() {
-        when(productRepository.findById(MILK_ID)).thenReturn(Optional.of(product(MILK_ID, ProductStatus.ACTIVE, 0)));
+    void shouldMapActiveProductWithInactiveCategoryAsNotSellable() {
+        givenProduct(MILK_ID, ProductStatus.ACTIVE, CategoryStatus.INACTIVE, 10);
+
+        ProductCatalogInfo info = adapter.getProduct(MILK_ID).orElseThrow();
+
+        assertFalse(info.active());
+        assertTrue(info.available());
+    }
+
+    @Test
+    void shouldMapInactiveProductWithInactiveCategoryAsNotSellable() {
+        givenProduct(MILK_ID, ProductStatus.INACTIVE, CategoryStatus.INACTIVE, 10);
+
+        assertFalse(adapter.getProduct(MILK_ID).orElseThrow().active());
+    }
+
+    @Test
+    void shouldMapZeroStockAsUnavailableWithoutChangingSellable() {
+        givenProduct(MILK_ID, ProductStatus.ACTIVE, CategoryStatus.ACTIVE, 0);
 
         ProductCatalogInfo info = adapter.getProduct(MILK_ID).orElseThrow();
 
@@ -126,6 +152,15 @@ class ProductCatalogAdapterTest {
         AvailabilityResult result = adapter.checkAvailability(List.of(new StockQuantity(MILK_ID, 2)));
 
         assertTrue(result.allAvailable());
+    }
+
+    private void givenProduct(UUID productId, ProductStatus productStatus, CategoryStatus categoryStatus, int stock) {
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product(productId, productStatus, stock)));
+        when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category(categoryStatus)));
+    }
+
+    private static Category category(CategoryStatus status) {
+        return Category.create(CATEGORY_ID, "Lácteos", null, status, NOW, NOW);
     }
 
     private static Product product(UUID id, ProductStatus status, int stock) {

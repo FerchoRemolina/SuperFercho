@@ -18,6 +18,7 @@ import com.superfercho.orders.application.port.ClockProvider;
 import com.superfercho.orders.application.port.CurrentUserProvider;
 import com.superfercho.orders.application.port.OrderRepository;
 import com.superfercho.orders.application.port.PaymentPort;
+import com.superfercho.orders.domain.exception.InvalidOrderStateTransitionException;
 import com.superfercho.orders.domain.exception.OrderCancellationNotAllowedException;
 import com.superfercho.orders.domain.model.Order;
 import com.superfercho.orders.domain.model.OrderItem;
@@ -77,7 +78,7 @@ class CancelOrderUseCaseTest {
         Order order = pendingOrder(CUSTOMER_ID, PAYMENT_ID);
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
         when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
-        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderRepository.saveIfPending(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         when(paymentPort.getPayment(PAYMENT_ID))
                 .thenReturn(new PaymentResult(PAYMENT_ID, PaymentStatus.APPROVED, "sim-1"));
 
@@ -107,7 +108,7 @@ class CancelOrderUseCaseTest {
         assertThrows(
                 OrderCancellationNotAllowedException.class,
                 () -> cancelOrder.execute(new CancelOrderCommand(ORDER_ID)));
-        verify(orderRepository, never()).save(any());
+        verify(orderRepository, never()).saveIfPending(any());
         verify(inventoryPort, never()).restoreStock(any());
         verify(paymentPort, never()).refundPayment(any());
     }
@@ -116,7 +117,7 @@ class CancelOrderUseCaseTest {
     void shouldRestoreStockWhenCancellationSucceeds() {
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(pendingOrder(CUSTOMER_ID, PAYMENT_ID)));
         when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
-        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderRepository.saveIfPending(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         when(paymentPort.getPayment(PAYMENT_ID))
                 .thenReturn(new PaymentResult(PAYMENT_ID, PaymentStatus.APPROVED, "sim-1"));
 
@@ -129,7 +130,7 @@ class CancelOrderUseCaseTest {
     void shouldRefundApprovedSimulatedCardPayment() {
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(pendingOrder(CUSTOMER_ID, PAYMENT_ID)));
         when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
-        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderRepository.saveIfPending(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         when(paymentPort.getPayment(PAYMENT_ID))
                 .thenReturn(new PaymentResult(PAYMENT_ID, PaymentStatus.APPROVED, "sim-1"));
 
@@ -142,7 +143,7 @@ class CancelOrderUseCaseTest {
     void shouldNotRefundCashOnDelivery() {
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(pendingOrder(CUSTOMER_ID, PAYMENT_ID)));
         when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
-        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderRepository.saveIfPending(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         when(paymentPort.getPayment(PAYMENT_ID))
                 .thenReturn(new PaymentResult(PAYMENT_ID, PaymentStatus.PENDING, "cod-1"));
 
@@ -150,6 +151,20 @@ class CancelOrderUseCaseTest {
 
         verify(paymentPort, never()).refundPayment(any());
         verify(inventoryPort).restoreStock(List.of(new StockQuantity(PRODUCT_ID, 2)));
+    }
+
+    @Test
+    void shouldRejectCancellationWhenPendingTransitionIsLost() {
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(pendingOrder(CUSTOMER_ID, PAYMENT_ID)));
+        when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
+        when(orderRepository.saveIfPending(any())).thenReturn(Optional.empty());
+
+        assertThrows(
+                InvalidOrderStateTransitionException.class,
+                () -> cancelOrder.execute(new CancelOrderCommand(ORDER_ID)));
+        verify(inventoryPort, never()).restoreStock(any());
+        verify(paymentPort, never()).refundPayment(any());
+        verify(paymentPort, never()).getPayment(any());
     }
 
     private static Order pendingOrder(UUID customerId, UUID paymentId) {

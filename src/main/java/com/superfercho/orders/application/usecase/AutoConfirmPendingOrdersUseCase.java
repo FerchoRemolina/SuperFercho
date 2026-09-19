@@ -23,7 +23,9 @@ public final class AutoConfirmPendingOrdersUseCase {
         List<OrderResult> confirmed = new ArrayList<>();
         for (Order order : orderRepository.findPendingOrdersEligibleForAutomaticConfirmation(now)) {
             if (order.isEligibleForAutomaticConfirmation(now)) {
-                confirmed.add(OrderResult.from(orderRepository.save(order.confirm(now))));
+                orderRepository
+                        .saveIfPending(order.confirm(now))
+                        .ifPresent(saved -> confirmed.add(OrderResult.from(saved)));
             }
         }
         return List.copyOf(confirmed);

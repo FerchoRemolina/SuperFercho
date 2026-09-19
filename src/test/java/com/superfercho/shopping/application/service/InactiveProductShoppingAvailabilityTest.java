@@ -7,14 +7,18 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.application.port.ProductRepository;
 import com.superfercho.catalog.application.usecase.FindProductPriceUseCase;
+import com.superfercho.catalog.domain.model.Category;
+import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.domain.model.Product;
 import com.superfercho.catalog.domain.model.ProductStatus;
 import com.superfercho.platform.money.Money;
 import com.superfercho.shopping.application.dto.cart.AddProductToCartCommand;
 import com.superfercho.shopping.application.dto.cart.CartResponse;
 import com.superfercho.shopping.application.dto.shoppinglist.AddProductToShoppingListCommand;
+import com.superfercho.shopping.application.dto.shoppinglist.AddShoppingListToCartCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.ShoppingListResponse;
 import com.superfercho.shopping.application.exception.ProductNotFoundException;
 import com.superfercho.shopping.application.port.CurrentUserProvider;
@@ -24,6 +28,7 @@ import com.superfercho.shopping.application.port.out.ShoppingListRepositoryPort;
 import com.superfercho.shopping.domain.model.Cart;
 import com.superfercho.shopping.domain.model.CartStatus;
 import com.superfercho.shopping.domain.model.ShoppingList;
+import com.superfercho.shopping.domain.model.ShoppingListItem;
 import com.superfercho.shopping.infrastructure.catalog.ProductCatalogAdapter;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -63,12 +68,16 @@ class InactiveProductShoppingAvailabilityTest {
     @Mock
     private ProductRepository productRepository;
 
+    @Mock
+    private CategoryRepository categoryRepository;
+
     private CartApplicationService cartService;
     private ShoppingListApplicationService shoppingListService;
 
     @BeforeEach
     void setUp() {
-        ProductCatalogAdapter catalog = new ProductCatalogAdapter(new FindProductPriceUseCase(productRepository));
+        ProductCatalogAdapter catalog =
+                new ProductCatalogAdapter(new FindProductPriceUseCase(productRepository, categoryRepository));
         cartService = new CartApplicationService(
                 currentUserProvider, cartRepository, shoppingListRepository, catalog, clockPort);
         shoppingListService = new ShoppingListApplicationService(
@@ -76,11 +85,11 @@ class InactiveProductShoppingAvailabilityTest {
     }
 
     @Test
-    void shouldAddActiveProductToCart() {
+    void shouldAddActiveProductWithActiveCategoryToCart() {
         when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(emptyCart()));
         when(clockPort.currentTime()).thenReturn(NOW);
-        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product(ProductStatus.ACTIVE)));
+        givenProduct(ProductStatus.ACTIVE, CategoryStatus.ACTIVE);
         when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         CartResponse response = cartService.execute(new AddProductToCartCommand(PRODUCT_ID, 2));
@@ -95,7 +104,7 @@ class InactiveProductShoppingAvailabilityTest {
     @Test
     void shouldRejectInactiveProductWhenAddingToCart() {
         when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
-        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product(ProductStatus.INACTIVE)));
+        givenProduct(ProductStatus.INACTIVE, CategoryStatus.ACTIVE);
 
         assertThrows(
                 ProductNotFoundException.class, () -> cartService.execute(new AddProductToCartCommand(PRODUCT_ID, 1)));
@@ -103,11 +112,31 @@ class InactiveProductShoppingAvailabilityTest {
     }
 
     @Test
-    void shouldAddActiveProductToShoppingList() {
+    void shouldRejectActiveProductWithInactiveCategoryWhenAddingToCart() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        givenProduct(ProductStatus.ACTIVE, CategoryStatus.INACTIVE);
+
+        assertThrows(
+                ProductNotFoundException.class, () -> cartService.execute(new AddProductToCartCommand(PRODUCT_ID, 1)));
+        verify(cartRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectInactiveProductWithInactiveCategoryWhenAddingToCart() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        givenProduct(ProductStatus.INACTIVE, CategoryStatus.INACTIVE);
+
+        assertThrows(
+                ProductNotFoundException.class, () -> cartService.execute(new AddProductToCartCommand(PRODUCT_ID, 1)));
+        verify(cartRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldAddActiveProductWithActiveCategoryToShoppingList() {
         when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(emptyList()));
         when(clockPort.currentTime()).thenReturn(NOW);
-        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product(ProductStatus.ACTIVE)));
+        givenProduct(ProductStatus.ACTIVE, CategoryStatus.ACTIVE);
         when(shoppingListRepository.save(any(ShoppingList.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -122,12 +151,29 @@ class InactiveProductShoppingAvailabilityTest {
     @Test
     void shouldRejectInactiveProductWhenAddingToShoppingList() {
         when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
-        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product(ProductStatus.INACTIVE)));
+        givenProduct(ProductStatus.INACTIVE, CategoryStatus.ACTIVE);
 
         assertThrows(
                 ProductNotFoundException.class,
                 () -> shoppingListService.execute(new AddProductToShoppingListCommand(LIST_ID, PRODUCT_ID, 1)));
         verify(shoppingListRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectActiveProductWithInactiveCategoryWhenAddingShoppingListToCart() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(listWithProduct()));
+        givenProduct(ProductStatus.ACTIVE, CategoryStatus.INACTIVE);
+
+        assertThrows(
+                ProductNotFoundException.class,
+                () -> cartService.execute(new AddShoppingListToCartCommand(LIST_ID)));
+        verify(cartRepository, never()).save(any());
+    }
+
+    private void givenProduct(ProductStatus productStatus, CategoryStatus categoryStatus) {
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product(productStatus)));
+        when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category(categoryStatus)));
     }
 
     private Cart emptyCart() {
@@ -136,6 +182,20 @@ class InactiveProductShoppingAvailabilityTest {
 
     private ShoppingList emptyList() {
         return ShoppingList.create(LIST_ID, CUSTOMER_ID, "Mercado semanal", List.of(), CREATED_AT, CREATED_AT);
+    }
+
+    private ShoppingList listWithProduct() {
+        return ShoppingList.create(
+                LIST_ID,
+                CUSTOMER_ID,
+                "Mercado semanal",
+                List.of(ShoppingListItem.create(UUID.randomUUID(), PRODUCT_ID, 1, CREATED_AT)),
+                CREATED_AT,
+                CREATED_AT);
+    }
+
+    private static Category category(CategoryStatus status) {
+        return Category.create(CATEGORY_ID, "Lácteos", null, status, CREATED_AT, CREATED_AT);
     }
 
     private static Product product(ProductStatus status) {

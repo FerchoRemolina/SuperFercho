@@ -1,9 +1,9 @@
 package com.superfercho.orders.infrastructure.catalog;
 
 import com.superfercho.catalog.application.dto.StockQuantity;
+import com.superfercho.catalog.application.port.ProductQueryPort;
 import com.superfercho.catalog.application.port.ProductRepository;
 import com.superfercho.catalog.domain.model.Product;
-import com.superfercho.catalog.domain.model.ProductStatus;
 import com.superfercho.orders.application.dto.AvailabilityResult;
 import com.superfercho.orders.application.dto.ProductCatalogInfo;
 import com.superfercho.orders.application.port.ProductCatalogPort;
@@ -19,14 +19,16 @@ import org.springframework.stereotype.Component;
 public class ProductCatalogAdapter implements ProductCatalogPort {
 
     private final ProductRepository productRepository;
+    private final ProductQueryPort productQueryPort;
 
-    public ProductCatalogAdapter(ProductRepository productRepository) {
+    public ProductCatalogAdapter(ProductRepository productRepository, ProductQueryPort productQueryPort) {
         this.productRepository = productRepository;
+        this.productQueryPort = productQueryPort;
     }
 
     @Override
     public Optional<ProductCatalogInfo> getProduct(UUID productId) {
-        return productRepository.findById(productId).map(ProductCatalogAdapter::toInfo);
+        return productRepository.findById(productId).map(product -> toInfo(product, isSellable(product.id())));
     }
 
     @Override
@@ -44,12 +46,16 @@ public class ProductCatalogAdapter implements ProductCatalogPort {
         return AvailabilityResult.unavailable(unavailableProductIds);
     }
 
-    private static ProductCatalogInfo toInfo(Product product) {
+    private boolean isSellable(UUID productId) {
+        return productQueryPort.findById(productId).isPresent();
+    }
+
+    private static ProductCatalogInfo toInfo(Product product, boolean sellable) {
         return new ProductCatalogInfo(
                 product.id(),
                 product.name(),
                 product.price(),
                 product.stock() > 0,
-                product.status() == ProductStatus.ACTIVE);
+                sellable);
     }
 }

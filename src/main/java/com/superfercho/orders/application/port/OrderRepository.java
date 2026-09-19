@@ -12,6 +12,13 @@ public interface OrderRepository {
 
     Order save(Order order);
 
+    /**
+     * Persists a leaving-PENDING transition ({@code CONFIRMED} or {@code CANCELLED})
+     * only if the stored row is still {@code PENDING}. Empty means another writer
+     * already changed the status.
+     */
+    Optional<Order> saveIfPending(Order order);
+
     Optional<Order> findById(UUID orderId);
 
     PagedResult<Order> findByCustomerId(UUID customerId, PageRequest pageRequest);

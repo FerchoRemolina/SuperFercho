@@ -28,8 +28,8 @@ import org.springframework.context.annotation.Profile;
 public class CatalogUseCaseConfiguration {
 
     @Bean
-    ProductQueryPort productQueryPort(ProductRepository productRepository) {
-        return new FindProductPriceUseCase(productRepository);
+    ProductQueryPort productQueryPort(ProductRepository productRepository, CategoryRepository categoryRepository) {
+        return new FindProductPriceUseCase(productRepository, categoryRepository);
     }
 
     @Bean

@@ -84,6 +84,18 @@ class PublicCatalogVisibilityTest {
     }
 
     @Test
+    void shouldExcludeInactiveProductWithInactiveCategoryFromPublicGet() {
+        when(productRepository.findById(INACTIVE_PRODUCT_ID))
+                .thenReturn(Optional.of(product(INACTIVE_PRODUCT_ID, INACTIVE_CATEGORY_ID, ProductStatus.INACTIVE)));
+        when(categoryRepository.findById(INACTIVE_CATEGORY_ID))
+                .thenReturn(Optional.of(category(INACTIVE_CATEGORY_ID, CategoryStatus.INACTIVE)));
+
+        assertThrows(
+                ProductNotFoundException.class,
+                () -> getProduct.execute(new GetProductCommand(INACTIVE_PRODUCT_ID, CatalogView.PUBLIC)));
+    }
+
+    @Test
     void shouldReturnActiveProductWithActiveCategoryForPublicGet() {
         when(productRepository.findById(ACTIVE_PRODUCT_ID))
                 .thenReturn(Optional.of(product(ACTIVE_PRODUCT_ID, ACTIVE_CATEGORY_ID, ProductStatus.ACTIVE)));

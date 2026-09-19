@@ -3,6 +3,7 @@ package com.superfercho.orders.application.usecase;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -52,6 +53,7 @@ class UpdateOrderStatusUseCaseTest {
     void setUp() {
         updateOrderStatus = new UpdateOrderStatusUseCase(orderRepository, clockProvider);
         when(clockProvider.currentTime()).thenReturn(NOW);
+        lenient().when(orderRepository.saveIfPending(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         lenient().when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -101,6 +103,7 @@ class UpdateOrderStatusUseCaseTest {
         assertThrows(
                 InvalidOrderStateTransitionException.class,
                 () -> updateOrderStatus.execute(new UpdateOrderStatusCommand(ORDER_ID, OrderStatus.PREPARING)));
+        verify(orderRepository, never()).saveIfPending(any());
         verify(orderRepository, never()).save(any());
     }
 
@@ -111,6 +114,18 @@ class UpdateOrderStatusUseCaseTest {
         assertThrows(
                 InvalidOrderStatusUpdateException.class,
                 () -> updateOrderStatus.execute(new UpdateOrderStatusCommand(ORDER_ID, OrderStatus.CANCELLED)));
+        verify(orderRepository, never()).saveIfPending(any());
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectConfirmWhenPendingTransitionIsLost() {
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(pendingOrder()));
+        doReturn(Optional.empty()).when(orderRepository).saveIfPending(any());
+
+        assertThrows(
+                InvalidOrderStateTransitionException.class,
+                () -> updateOrderStatus.execute(new UpdateOrderStatusCommand(ORDER_ID, OrderStatus.CONFIRMED)));
         verify(orderRepository, never()).save(any());
     }
 

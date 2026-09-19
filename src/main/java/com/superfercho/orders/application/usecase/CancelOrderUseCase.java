@@ -9,7 +9,9 @@ import com.superfercho.orders.application.port.ClockProvider;
 import com.superfercho.orders.application.port.CurrentUserProvider;
 import com.superfercho.orders.application.port.OrderRepository;
 import com.superfercho.orders.application.port.PaymentPort;
+import com.superfercho.orders.domain.exception.InvalidOrderStateTransitionException;
 import com.superfercho.orders.domain.model.Order;
+import com.superfercho.orders.domain.model.OrderStatus;
 
 public final class CancelOrderUseCase {
 
@@ -36,7 +38,9 @@ public final class CancelOrderUseCase {
         Order order = OwnedOrderAccess.requireOwnedOrder(
                 orderRepository, currentUserProvider.getCurrentUserId(), command.orderId());
         Order cancelled = order.cancel(clockProvider.currentTime());
-        Order saved = orderRepository.save(cancelled);
+        Order saved = orderRepository
+                .saveIfPending(cancelled)
+                .orElseThrow(() -> new InvalidOrderStateTransitionException(OrderStatus.PENDING, OrderStatus.CANCELLED));
         inventoryPort.restoreStock(order.items().stream()
                 .map(item -> new StockQuantity(item.productId(), item.quantity()))
                 .toList());

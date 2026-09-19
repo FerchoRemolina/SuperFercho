@@ -6,6 +6,7 @@ import com.superfercho.orders.application.exception.InvalidOrderStatusUpdateExce
 import com.superfercho.orders.application.exception.OrderNotFoundException;
 import com.superfercho.orders.application.port.ClockProvider;
 import com.superfercho.orders.application.port.OrderRepository;
+import com.superfercho.orders.domain.exception.InvalidOrderStateTransitionException;
 import com.superfercho.orders.domain.model.Order;
 import com.superfercho.orders.domain.model.OrderStatus;
 import java.time.Instant;
@@ -26,6 +27,12 @@ public final class UpdateOrderStatusUseCase {
                 .orElseThrow(() -> new OrderNotFoundException(command.orderId()));
         Instant now = clockProvider.currentTime();
         Order updated = apply(order, command.status(), now);
+        if (updated.status() == OrderStatus.CONFIRMED) {
+            return OrderResult.from(orderRepository
+                    .saveIfPending(updated)
+                    .orElseThrow(
+                            () -> new InvalidOrderStateTransitionException(OrderStatus.PENDING, OrderStatus.CONFIRMED)));
+        }
         return OrderResult.from(orderRepository.save(updated));
     }
 

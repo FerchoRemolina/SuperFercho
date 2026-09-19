@@ -5,8 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 import com.superfercho.catalog.application.dto.ProductPriceInfo;
+import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.application.port.ProductRepository;
 import com.superfercho.catalog.application.usecase.FindProductPriceUseCase;
+import com.superfercho.catalog.domain.model.Category;
+import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.domain.model.Product;
 import com.superfercho.catalog.domain.model.ProductStatus;
 import com.superfercho.platform.money.Money;
@@ -31,6 +34,9 @@ class ProductCatalogAdapterTest {
     @Mock
     private ProductRepository productRepository;
 
+    @Mock
+    private CategoryRepository categoryRepository;
+
     @Test
     void shouldMapCatalogPriceToShoppingInfo() {
         ProductCatalogAdapter adapter = new ProductCatalogAdapter(
@@ -52,22 +58,40 @@ class ProductCatalogAdapterTest {
 
     @Test
     void shouldReturnEmptyWhenCatalogProductIsInactive() {
-        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product(ProductStatus.INACTIVE)));
-        ProductCatalogAdapter adapter = new ProductCatalogAdapter(new FindProductPriceUseCase(productRepository));
+        givenProduct(ProductStatus.INACTIVE, CategoryStatus.ACTIVE);
 
-        assertTrue(adapter.getProduct(PRODUCT_ID).isEmpty());
+        assertTrue(catalogAdapter().getProduct(PRODUCT_ID).isEmpty());
     }
 
     @Test
-    void shouldMapActiveProductFromCatalogQuery() {
-        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product(ProductStatus.ACTIVE)));
-        ProductCatalogAdapter adapter = new ProductCatalogAdapter(new FindProductPriceUseCase(productRepository));
+    void shouldReturnEmptyWhenCategoryIsInactive() {
+        givenProduct(ProductStatus.ACTIVE, CategoryStatus.INACTIVE);
 
-        Optional<ProductCatalogInfo> result = adapter.getProduct(PRODUCT_ID);
+        assertTrue(catalogAdapter().getProduct(PRODUCT_ID).isEmpty());
+    }
+
+    @Test
+    void shouldMapActiveProductWithActiveCategoryFromCatalogQuery() {
+        givenProduct(ProductStatus.ACTIVE, CategoryStatus.ACTIVE);
+
+        Optional<ProductCatalogInfo> result = catalogAdapter().getProduct(PRODUCT_ID);
 
         assertTrue(result.isPresent());
         assertEquals(PRODUCT_ID, result.get().productId());
         assertEquals(PRICE, result.get().currentPrice());
+    }
+
+    private ProductCatalogAdapter catalogAdapter() {
+        return new ProductCatalogAdapter(new FindProductPriceUseCase(productRepository, categoryRepository));
+    }
+
+    private void givenProduct(ProductStatus productStatus, CategoryStatus categoryStatus) {
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product(productStatus)));
+        when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category(categoryStatus)));
+    }
+
+    private static Category category(CategoryStatus status) {
+        return Category.create(CATEGORY_ID, "Lácteos", null, status, CREATED_AT, CREATED_AT);
     }
 
     private static Product product(ProductStatus status) {
