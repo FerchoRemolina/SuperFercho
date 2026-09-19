@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -80,6 +81,7 @@ class HttpAuthorizationSecurityTest {
     private static final UUID ORDER_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
     private static final UUID CATEGORY_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
     private static final UUID PAYMENT_ID = UUID.fromString("55555555-5555-5555-5555-555555555555");
+    private static final UUID DOCUMENT_ID = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
 
     @Autowired
     private MockMvc mockMvc;
@@ -345,6 +347,130 @@ class HttpAuthorizationSecurityTest {
                 .andExpect(accessDenied());
         mockMvc.perform(post("/api/v1/payments/{paymentId}/refund", PAYMENT_ID)
                         .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(accessDenied());
+    }
+
+    @Test
+    void shouldRejectKnowledgeAdminRoutesWithoutJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/knowledge/documents")).andExpect(unauthenticated());
+        mockMvc.perform(get("/api/v1/knowledge/documents/{documentId}", DOCUMENT_ID)).andExpect(unauthenticated());
+        mockMvc.perform(get("/api/v1/knowledge/search").param("query", "horario").param("limit", "5"))
+                .andExpect(unauthenticated());
+        mockMvc.perform(post("/api/v1/knowledge/documents")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title": "Horarios", "source": "faq", "content": "Abierto 8 a 20"}
+                                """))
+                .andExpect(unauthenticated());
+        mockMvc.perform(put("/api/v1/knowledge/documents/{documentId}/content", DOCUMENT_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"content": "Actualizado"}
+                                """))
+                .andExpect(unauthenticated());
+        mockMvc.perform(post("/api/v1/knowledge/documents/{documentId}/process", DOCUMENT_ID))
+                .andExpect(unauthenticated());
+        mockMvc.perform(post("/api/v1/knowledge/documents/{documentId}/deactivate", DOCUMENT_ID))
+                .andExpect(unauthenticated());
+        mockMvc.perform(post("/api/v1/knowledge/documents/{documentId}/reactivate", DOCUMENT_ID))
+                .andExpect(unauthenticated());
+    }
+
+    @Test
+    void shouldRejectKnowledgeAdminRoutesWithCustomerJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/knowledge/documents")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(accessDenied());
+        mockMvc.perform(get("/api/v1/knowledge/documents/{documentId}", DOCUMENT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(accessDenied());
+        mockMvc.perform(get("/api/v1/knowledge/search")
+                        .param("query", "horario")
+                        .param("limit", "5")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(accessDenied());
+        mockMvc.perform(post("/api/v1/knowledge/documents")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title": "Horarios", "source": "faq", "content": "Abierto 8 a 20"}
+                                """))
+                .andExpect(accessDenied());
+        mockMvc.perform(put("/api/v1/knowledge/documents/{documentId}/content", DOCUMENT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"content": "Actualizado"}
+                                """))
+                .andExpect(accessDenied());
+        mockMvc.perform(post("/api/v1/knowledge/documents/{documentId}/process", DOCUMENT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(accessDenied());
+        mockMvc.perform(post("/api/v1/knowledge/documents/{documentId}/deactivate", DOCUMENT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(accessDenied());
+        mockMvc.perform(post("/api/v1/knowledge/documents/{documentId}/reactivate", DOCUMENT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(accessDenied());
+    }
+
+    @Test
+    void shouldAllowKnowledgeAdminRoutesWithAdminJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/knowledge/documents")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(notBlockedBySecurity());
+        mockMvc.perform(get("/api/v1/knowledge/documents/{documentId}", DOCUMENT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(notBlockedBySecurity());
+        mockMvc.perform(get("/api/v1/knowledge/search")
+                        .param("query", "horario")
+                        .param("limit", "5")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(notBlockedBySecurity());
+        mockMvc.perform(post("/api/v1/knowledge/documents")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title": "Horarios", "source": "faq", "content": "Abierto 8 a 20"}
+                                """))
+                .andExpect(notBlockedBySecurity());
+        mockMvc.perform(put("/api/v1/knowledge/documents/{documentId}/content", DOCUMENT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"content": "Actualizado"}
+                                """))
+                .andExpect(notBlockedBySecurity());
+        mockMvc.perform(post("/api/v1/knowledge/documents/{documentId}/process", DOCUMENT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(notBlockedBySecurity());
+        mockMvc.perform(post("/api/v1/knowledge/documents/{documentId}/deactivate", DOCUMENT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(notBlockedBySecurity());
+        mockMvc.perform(post("/api/v1/knowledge/documents/{documentId}/reactivate", DOCUMENT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(notBlockedBySecurity());
+    }
+
+    @Test
+    void shouldRejectInvalidBearerTokenOnKnowledgeAdminRoutes() throws Exception {
+        mockMvc.perform(get("/api/v1/knowledge/documents").header(HttpHeaders.AUTHORIZATION, "Bearer not-a-jwt"))
+                .andExpect(unauthenticated());
+        mockMvc.perform(get("/api/v1/knowledge/search")
+                        .param("query", "horario")
+                        .param("limit", "5")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer not-a-jwt"))
+                .andExpect(unauthenticated());
+    }
+
+    @Test
+    void shouldDenyUndefinedKnowledgeRoutes() throws Exception {
+        mockMvc.perform(get("/api/v1/knowledge").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(accessDenied());
+        mockMvc.perform(post("/api/v1/knowledge/documents/{documentId}/delete", DOCUMENT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(accessDenied());
+        mockMvc.perform(get("/api/v1/knowledge/chunks").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
                 .andExpect(accessDenied());
     }
 
