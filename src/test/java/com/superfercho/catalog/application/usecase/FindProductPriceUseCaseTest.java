@@ -49,7 +49,20 @@ class FindProductPriceUseCaseTest {
         assertTrue(result.isEmpty());
     }
 
+    @Test
+    void shouldReturnEmptyWhenProductIsInactive() {
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product(ProductStatus.INACTIVE)));
+
+        Optional<ProductPriceInfo> result = new FindProductPriceUseCase(productRepository).findById(PRODUCT_ID);
+
+        assertTrue(result.isEmpty());
+    }
+
     private static Product product() {
+        return product(ProductStatus.ACTIVE);
+    }
+
+    private static Product product(ProductStatus status) {
         return Product.create(
                 PRODUCT_ID,
                 CATEGORY_ID,
@@ -60,7 +73,7 @@ class FindProductPriceUseCaseTest {
                 PRICE,
                 10,
                 null,
-                ProductStatus.ACTIVE,
+                status,
                 CREATED_AT,
                 CREATED_AT);
     }
