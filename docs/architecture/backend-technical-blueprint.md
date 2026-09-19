@@ -1,44 +1,38 @@
 # SuperFercho Backend Technical Architecture Blueprint
 
-**Status:** Authoritative architectural specification for implementation  
-**Type:** Documentation only (no application source)  
+**Status:** Architectural reference of the implemented system (MVP closed)
+**Type:** Documentation only
 **Baseline:** Modular monolith, Clean / Hexagonal Architecture  
-**Companion rules (unchanged by this document):** `.cursor/rules/00-global-architecture.mdc`, `01-java-spring.mdc`, `02-testing.mdc`, `03-git-workflow.mdc`, `04-ai-rag-mcp.mdc`
-
-This blueprint integrates the approved MVP decisions. It replaces earlier candidate designs where those candidates conflicted with the decisions below.
-
-Cursor architecture rules under `.cursor/rules/` are **not** modified by this document. One remaining rules-file mismatch is recorded in §19 and in the consistency audit.
+**Source of truth:** Application source and Flyway migrations. This document describes that system; it does not override it.
 
 ---
 
-## 0. Approved technology and module baseline
+## 0. Baseline tecnológico y módulos
 
-| Concern | Decision |
+| Concern | Implemented decision |
 |---|---|
 | Language | Java 21 |
-| Framework | Spring Boot 3.x (exact minor deferred) |
-| Build | Maven, **single module**, Maven Wrapper |
+| Framework | Spring Boot 3.5.16 |
+| Build | Maven, single module, Maven Wrapper |
 | Architecture | Modular monolith, Clean / Hexagonal |
 | Database | One PostgreSQL database |
 | Knowledge vectors | pgvector in that same PostgreSQL database |
-| Persistence | Spring Data JPA / Hibernate |
-| Schema evolution | Flyway (immutable applied migrations; never `ddl-auto=update`) |
+| Persistence | Spring Data JPA / Hibernate; `ddl-auto: none`; `open-in-view: false`; Hibernate JDBC timezone UTC |
+| Schema evolution | Flyway (`V1`–`V9`) |
 | API | REST under `/api/v1` |
-| Security | Spring Security, JWT access tokens |
+| Security | Spring Security, JWT Bearer access tokens (~15 minutes) |
 | Tests | JUnit 5, Mockito, Spring Boot Test, MockMvc, Testcontainers PostgreSQL |
-| Integration-test DB | PostgreSQL (+ pgvector when Knowledge is tested). **H2 is not used** |
+| Integration-test DB | PostgreSQL (+ pgvector for Knowledge). H2 is not used |
 
-**Forbidden unless a later explicit authorization changes architecture:**
-
-microservices, Kafka, RabbitMQ for internal architecture, Redis, Elasticsearch, Kubernetes, Saga, XA, distributed transactions, a second database, a second vector database, LangChain, LangGraph, or another AI orchestration framework.
+**Not part of the system:** microservices, Kafka, RabbitMQ as internal architecture, Redis, Elasticsearch, Kubernetes, Saga, XA, distributed transactions, a second database, a second vector store, LangChain, LangGraph, or another AI orchestration framework.
 
 **Business modules:** `identity`, `catalog`, `shopping`, `orders`, `payments`, `knowledge`, `assistant`.
 
-**MCP** is an integration / tool-exposure layer, **not** a business module.
+**MCP** (`com.superfercho.mcp`) is a stub package, not a business module and not an operational integration layer.
 
 ---
 
-## 1. Project structure
+## 1. Estructura del artefacto
 
 ### 1.1 Maven layout (single module)
 
@@ -68,61 +62,54 @@ superfercho/
     └── resources/application-test.yml
 ```
 
-Do not create a Maven multi-module build for the MVP.
-
 ### 1.2 Package tree per business module
 
-Empty packages are not created. `domain/service` is omitted until a real domain service exists.
+REST controllers live under `infrastructure/rest`. There is no `presentation/rest` package.
 
 ```text
 com.superfercho.identity
-├── domain/model | repository | exception
-├── application/usecase | dto | port
-├── infrastructure/persistence | security | configuration
-└── presentation/rest
+├── domain/model | exception
+├── application/usecase | dto | port | exception
+└── infrastructure/persistence | security | rest | configuration
 
 com.superfercho.catalog
-├── domain/model | repository | exception
-├── application/usecase | dto | port          # includes ProductImageStoragePort
-├── infrastructure/persistence | storage | configuration
-└── presentation/rest
+├── domain/model | exception
+├── application/usecase | dto | port | exception
+└── infrastructure/persistence | rest | configuration
+    # InventoryPort implemented in persistence (InventoryPersistenceAdapter)
 
 com.superfercho.shopping
-├── domain/model | repository | exception
-├── application/usecase | dto | port          # ProductCatalogPort
-├── infrastructure/persistence | catalog | configuration
-└── presentation/rest
+├── domain/model | exception
+├── application/service | dto | port/in | port/out | exception
+└── infrastructure/persistence | catalog | identity | rest | configuration
 
 com.superfercho.orders
-├── domain/model | repository | exception
-├── application/usecase | dto | port          # ShoppingCartPort, CustomerAddressPort,
-│                                             # InventoryPort, PaymentPort
-├── infrastructure/persistence | shopping | identity | catalog
-│                             | payments | scheduling | configuration
-└── presentation/rest
+├── domain/model | exception
+├── application/usecase | dto | port | exception
+└── infrastructure/persistence | shopping | identity | catalog
+                              | rest | clock | configuration
 
 com.superfercho.payments
-├── domain/model | repository | exception
-├── application/usecase | dto
-├── infrastructure/persistence | configuration
-└── (no public payment resource)
+├── domain/model | exception
+├── application/usecase | dto | port | exception
+└── infrastructure/persistence | integration | rest | configuration
 
 com.superfercho.knowledge
-├── domain/model | repository | exception
-├── application/usecase | dto | port          # KnowledgeVectorStorePort, EmbeddingPort
-├── infrastructure/persistence | vector | embedding | configuration
-└── presentation/rest                         # HTTP contract deferred to Knowledge phase
+├── domain/model | exception
+├── application/usecase | dto | port | exception
+└── infrastructure/persistence | rest | clock | configuration
+    └── integration/embedding | vector | chunking
 
 com.superfercho.assistant
-├── domain/model | repository | exception
-├── application/usecase | dto | port | tool   # LLMPort + consumer ports to use cases
-├── infrastructure/persistence | llm | catalog | shopping | orders | knowledge | configuration
-└── presentation/rest
+├── domain/model | exception
+├── application/service | dto | port/in | port/out | tool | confirmation | exception
+└── infrastructure/rest | llm | conversation | confirmation | identity | clock | configuration
 
 com.superfercho.mcp
-├── tool
-└── configuration
+└── package-info.java          # stub only; no tools, transport, or auth
 ```
+
+Use cases are registered as beans in each module’s `infrastructure/configuration`. Domain has no Spring, JPA, or HTTP annotations.
 
 ### 1.3 Platform package (minimal)
 
@@ -130,85 +117,74 @@ com.superfercho.mcp
 com.superfercho.platform
 ├── money                       # Money value object (COP)
 ├── time                        # Clock bean (UTC)
-└── error                       # RFC 7807 problem mapping (presentation)
+└── error                       # RFC 7807 fallback mapping
 ```
 
-`Money` lives here because Catalog, Shopping, Orders, and Payments share the same monetary concept. The platform layer must not accumulate unrelated utilities.
-
-MCP stays beside modules. Assistant owns conversations and orchestration; MCP is a driving adapter like REST.
+`Money` lives here because Catalog, Shopping, Orders, and Payments share the same monetary concept. The platform layer does not accumulate unrelated utilities.
 
 ---
 
-## 2. Module dependencies
+## 2. Dependencias y ownership de ports
 
 Logical direction inside one deployable JAR:
 
 ```text
-REST / MCP / Assistant tools
+REST / Assistant tools
         ↓
 application use cases
         ↓
 domain
 
-infrastructure adapters implement ports
-and may call another module's application contract only
+infrastructure adapters implement consumer ports
+and call the provider module through its application API
+(use cases or application repository ports, never JPA)
 ```
 
 | Consumer | Provider | Port / mechanism | Forbidden |
 |---|---|---|---|
-| Shopping → Catalog | Product query / availability | `ProductCatalogPort` | Catalog JPA/repositories |
-| Orders → Shopping | Read / clear cart | `ShoppingCartPort` | Shopping persistence |
-| Orders → Identity | Load usable address | `CustomerAddressPort` | Identity persistence |
-| Orders → Catalog | Atomic stock + sale snapshot | `InventoryPort` | Catalog persistence |
-| Orders → Payments | Charge / refund simulated payment | `PaymentPort` | Payments persistence |
-| Assistant → business modules | Same use cases as REST | Assistant-owned ports → application use cases | Any other module’s DB/JPA |
+| Shopping → Catalog | Current ACTIVE price | Shopping `ProductCatalogPort` → Catalog `ProductQueryPort` (`FindProductPriceUseCase`) | Catalog JPA/repositories |
+| Orders → Catalog | Sale snapshot + availability | Orders `ProductCatalogPort` | Catalog JPA |
+| Orders → Catalog | Atomic decrement / restore | Catalog `InventoryPort` (provider-owned) | Catalog JPA from Orders |
+| Orders → Shopping | Load / clear active cart | Orders `ShoppingCartPort` | Shopping persistence |
+| Orders → Identity | Load usable address | Orders `CustomerAddressPort` | Identity JPA |
+| Orders → Payments | Charge / refund simulated payment | Orders `PaymentPort` | Payments persistence |
+| Assistant → business modules | Same use cases as REST (allowlisted tools) | Direct use-case calls from Assistant tools | Any other module’s DB/JPA |
 | Knowledge → pgvector | Vector insert/search | `KnowledgeVectorStorePort` | Second vector database |
-| MCP → business modules | None as owner | MCP tool → application use case | MCP → repository/DB |
 
-Provider modules **must not** depend on their consumers. Catalog, Identity, Payments, and Knowledge must not depend on Orders, Shopping, or Assistant.
+Provider modules do not depend on their consumers. Catalog, Identity, Payments, and Knowledge do not depend on Orders, Shopping, or Assistant.
 
-No module may depend on another module’s domain entities, JPA entities, repositories, or infrastructure classes.
+No module uses another module’s JPA entities or Spring Data repositories. Adapter wiring is mixed: Shopping and Payments are consumed through application use cases; Orders’ catalog and address adapters currently call Catalog `ProductRepository` and Identity `AddressRepository` (application ports) and map those modules’ domain models into Orders DTOs. Assistant tools call use cases only.
 
-### Consumer-owned ports
+`InventoryPort` is owned by **Catalog**. Orders imports that application port and calls it from checkout and cancel.
 
-The consuming module defines the port. An adapter in the consumer’s infrastructure layer calls the provider’s **application** contract.
+`CurrentUserProvider` is not a single global contract. Identity, Shopping, Orders, and Assistant each declare their own port. Identity’s security adapter (`SpringSecurityCurrentUserProvider`) is the JWT principal source; other modules adapt to it. Several use cases read the provider internally rather than receiving an explicit `Actor` argument.
 
-Example — checkout:
-
-```text
-orders.application.usecase.Checkout
-  → PaymentPort, InventoryPort, ShoppingCartPort, CustomerAddressPort
-      ↑ orders.infrastructure.* adapters
-      ↓ provider application use cases
-```
-
-`CurrentUserProvider` is an Identity security/application identity port used by driving adapters (REST, Assistant, MCP). Use cases receive an explicit `Actor` / `UserId`. Domain objects never read Spring `SecurityContext`.
+Domain objects do not read Spring `SecurityContext`.
 
 ---
 
-## 3. Domain model
+## 3. Modelo de dominio
 
-No domain services are required for the MVP. Invariants belong on aggregates. Checkout is an application use case.
+Invariants belong on aggregates. Checkout is an application use case.
 
-### 3.1 Identity — one `User` aggregate
+### 3.1 Identity
 
-There is **no** separate Customer or Admin aggregate. A user has **exactly one** role: `CUSTOMER` or `ADMIN`.
+There is no separate Customer or Admin aggregate. A user has exactly one role: `CUSTOMER` or `ADMIN`.
 
-Public registration creates `CUSTOMER` only. Users cannot self-register as `ADMIN`. The first `ADMIN` is provisioned through controlled bootstrap/administrative configuration, not the public register endpoint.
+Public registration (`RegisterCustomerUseCase`) creates `CUSTOMER` only. Users cannot self-register as `ADMIN`. There is no public profile endpoint and no bootstrap-admin use case in the runtime API.
 
-For the MVP, `ADMIN` is **not** required to behave as a `CUSTOMER`.
+`ADMIN` is not a shopper: cart, lists, checkout, and assistant chat require `CUSTOMER`.
 
 | Kind | Name |
 |---|---|
 | Aggregate | `User` |
-| Entity | `Address` (inside the User aggregate) |
-| VO | `UserId`, `Email`, `HashedPassword`, `DocumentIdentity`, `Role`, `UserStatus`, `AddressId`, `Phone` |
-| Repository | `UserRepository` |
-| Exceptions | `DuplicateEmail`, `DuplicateDocumentIdentity`, `InvalidAddress`, `DefaultAddressInvariantViolation`, `UserNotFound`, `AddressNotFound`, `AddressNotUsable` |
+| Aggregate | `Address` (owned by a user; separate repository) |
+| VO / enums | `Role`, `UserStatus`, `AddressStatus` |
+| Repository | `UserRepository`, `AddressRepository` |
 
 **User fields:** `id` (UUID), `documentType`, `documentNumber`, `fullName`, `email`, `phone`, `passwordHash`, `role`, `status`, timestamps.
 
-`documentType` is a simple business field (opaque string or a small closed set). Do not add Colombian tax, RUT/NIT, or check-digit rules.
+`documentType` is a business string. There are no Colombian tax, RUT/NIT, or check-digit rules.
 
 **Address fields:** `label`, `recipientName`, `addressLine`, `additionalInfo`, `city`, `department`, `phone`, `isDefault`, `status`, timestamps.
 
@@ -217,8 +193,8 @@ Rules:
 - `email` unique; `documentType` + `documentNumber` unique
 - multiple addresses per user
 - at most one **active** default address
-- addresses are **deactivated**, not physically deleted, when history must be preserved
-- inactive addresses cannot be selected for new checkout
+- addresses are deactivated, not physically deleted
+- inactive addresses cannot be selected for checkout
 - orders store an immutable shipping-address snapshot (not a live address row)
 
 ### 3.2 Catalog
@@ -227,22 +203,26 @@ Rules:
 |---|---|
 | Aggregate | `Product` |
 | Aggregate | `Category` |
-| VO | `ProductId`, `CategoryId`, `Money`, `Barcode`, `StockQuantity`, `CatalogStatus` |
+| Enums | `ProductStatus`, `CategoryStatus` (`ACTIVE`, `INACTIVE`) |
 | Repository | `ProductRepository`, `CategoryRepository` |
-| Exceptions | `InvalidPrice`, `InvalidStock`, `ProductNotFound`, `ProductInactive`, `CategoryInactive`, `DuplicateBarcode`, `InsufficientStock` |
 
-**Category 1 → N Products.** A product has exactly one main category. No many-to-many.
+**Category 1 → N Products.** A product has exactly one main category.
 
-**Product fields:** `id`, category reference, optional unique barcode, `name`, `brand`, `description`, `price` (`Money`, COP), `stock`, image reference/URL, `status`, timestamps.
+**Product fields:** `id`, `categoryId`, optional unique barcode, `name`, `brand` (nullable), `description`, `price` (`Money`, COP), `stock`, `imageUrl` (nullable string), `status`, timestamps.
+
+There is no image-storage port. The product stores a URL string.
 
 Rules:
 
 - `price >= 0`, `stock >= 0`
-- `stock = 0` means unavailable / out of stock
+- `stock = 0` means unavailable
 - inactive products cannot be publicly purchased or publicly fetched (public GET → 404)
-- inactive categories cannot be publicly used
+- inactive categories cannot be used publicly
 - Catalog owns stock
-- historical products/categories are **not physically deleted** when orders or other history still need the row; HTTP `DELETE` on admin catalog resources means **deactivation**
+- historical rows are not physically deleted
+- activation/deactivation are explicit use cases (`Activate*` / `Deactivate*`), not HTTP DELETE
+
+Public catalog reads default to `CatalogView.PUBLIC`. Admin listing uses `view=ADMIN`.
 
 ### 3.3 Shopping
 
@@ -252,18 +232,15 @@ Rules:
 | Entity | `CartItem` |
 | Aggregate | `ShoppingList` |
 | Entity | `ShoppingListItem` |
-| VO | `CartId`, `ShoppingListId`, `Quantity` |
-| Repository | `CartRepository`, `ShoppingListRepository` |
-| Exceptions | `CartNotFound`, `EmptyCart`, `InvalidQuantity`, `ShoppingListNotFound`, `ProductUnavailableForCart` |
+| Enum | `CartStatus` (`ACTIVE` only) |
 
-- one active cart per user
-- one product line per product in a cart
+- one cart per customer (`UNIQUE` on `customer_id`)
+- one product line per product in a cart (domain invariant; Flyway does not declare `UNIQUE (cart_id, product_id)`)
 - quantity > 0
-- stock is **not** reserved when adding to cart or lists
-- cart stored price is **informational only**; Catalog current price is authoritative at checkout
-- adding list items into a cart (application use case / assistant tool, or client repeating `POST /cart/items`) must use the same cart validation as adding a single cart item
-
-The MVP REST contract does not include a dedicated “add list to cart” path. That behavior remains an application capability; the HTTP client may compose `POST /api/v1/cart/items`. Do not add extra REST paths beyond §10.
+- stock is not reserved when adding to cart or lists
+- cart stored price (`price_at_addition`) is informational; Catalog current price is authoritative at checkout
+- adding a product requires an ACTIVE catalog product via `ProductQueryPort`; inactive/missing → not found
+- `AddShoppingListToCart` is an application/tool capability; there is no dedicated REST path
 
 ### 3.4 Orders
 
@@ -271,11 +248,11 @@ The MVP REST contract does not include a dedicated “add list to cart” path. 
 |---|---|
 | Aggregate | `Order` |
 | Entity | `OrderItem` |
-| VO | `OrderId`, `OrderStatus`, `ShippingAddressSnapshot`, `OrderItemSnapshot`, `CancellationWindow` |
+| VO | `OrderNumber`, `ShippingAddressSnapshot` |
+| Enum | `OrderStatus` |
 | Repository | `OrderRepository` |
-| Exceptions | `InvalidOrderTransition`, `OrderNotCancellable`, `CancellationWindowExpired`, `OrderNotFound`, `OrderNotOwned`, `EmptyCheckout`, `PriceChanged`, `CheckoutConflict` |
 
-**Authoritative order states:** `PENDING`, `CONFIRMED`, `PREPARING`, `READY`, `DELIVERED`, `CANCELLED`.
+**Order states:** `PENDING`, `CONFIRMED`, `PREPARING`, `READY`, `DELIVERED`, `CANCELLED`.
 
 **Valid transitions only:**
 
@@ -287,41 +264,49 @@ PREPARING  → READY
 READY      → DELIVERED
 ```
 
-No arbitrary jumps (for example `PENDING → DELIVERED` or `CANCELLED → CONFIRMED`).
-
-Customer cancellation: only while `PENDING` and within 15 minutes of order creation / payment approval (COD timer starts at order creation; simulated card at payment approval, which is the same commit instant in this MVP). Cancellation restores stock. If payment was `APPROVED` simulated card, payment becomes `REFUNDED`. COD payment stays `PENDING` in the MVP.
+Customer cancellation: only while `PENDING` and within 15 minutes of `createdAt` (`Order.CUSTOMER_CANCELLATION_WINDOW`). Cancellation restores stock. If the linked payment is `APPROVED`, Payments records a refund via `refundedAt`; payment status stays `APPROVED`. COD payments remain `PENDING` and are not refunded.
 
 After 15 minutes, remaining `PENDING` orders are auto-confirmed (`PENDING → CONFIRMED`). Customers then cannot cancel.
 
-Idempotency storage is application/infrastructure owned by Orders, not a domain aggregate.
+`order_number` is assigned at creation (`ORD-` + fragment of the order UUID). Idempotency storage is application/infrastructure owned by Orders, not a domain aggregate.
+
+Admin status updates (`UpdateOrderStatusUseCase`) apply adjacent transitions `CONFIRMED → PREPARING → READY → DELIVERED` (and may confirm `PENDING → CONFIRMED`). They do not cancel.
 
 ### 3.5 Payments
 
 | Kind | Name |
 |---|---|
 | Aggregate | `Payment` |
-| VO | `PaymentId`, `PaymentMethod`, `PaymentStatus`, `Money` |
+| Enums | `PaymentMethod`, `PaymentStatus` |
 | Repository | `PaymentRepository` |
-| Exceptions | `UnsupportedPaymentMethod`, `InvalidPaymentState`, `PaymentNotFound` |
 
 **Methods:** `SIMULATED_CARD`, `CASH_ON_DELIVERY`.
 
-**MVP statuses:** `PENDING`, `APPROVED`, `DECLINED`, `REFUNDED`.
+**Statuses:** `PENDING`, `APPROVED`, `DECLINED`.
 
-`PAID` is **not** an MVP status. A later delivery/cash-collection phase may introduce `PAID` for COD. That is deferred.
+There is no `REFUNDED` status. A refund of an `APPROVED` payment sets `refundedAt` and leaves status `APPROVED`.
 
-Never store card number, CVV, expiration date, or full payment credentials.
+`PAID` is not a status.
 
-**Status mapping:**
+Card number, CVV, expiration date, and payment credentials are not stored.
 
-| Method | Success at checkout | Decline | Customer cancel in window |
-|---|---|---|---|
-| `SIMULATED_CARD` | `APPROVED`; order `PENDING` | checkout fails; **order is not created** | payment `REFUNDED`; stock restored |
-| `CASH_ON_DELIVERY` | payment `PENDING`; order `PENDING` | not applicable at checkout | payment remains `PENDING`; stock restored |
+**Runtime simulator (`ProcessPaymentUseCase`):**
 
-There is no real external refund provider. `REFUNDED` is a local simulated-card state change inside the cancel transaction.
+| Method | Checkout result |
+|---|---|
+| `SIMULATED_CARD` | always `APPROVED`; `provider_reference = sim-approved`; order `PENDING` |
+| `CASH_ON_DELIVERY` | `PENDING`; `provider_reference = cod-pending`; order `PENDING` |
 
-`DECLINED` means the simulated charge failed. Checkout rolls back; no successful order. Failed checkout must not leave partial business state (no order, stock unchanged, cart unchanged). Persisting a `DECLINED` row is not required for the MVP; the HTTP 409/business problem is sufficient.
+`DECLINED` exists on the enum and in the PostgreSQL CHECK. The current simulator does not produce it. Checkout still rejects a `DECLINED` result if one were returned (`PaymentDeclinedException`).
+
+**Cancel mapping:**
+
+| Method | Customer cancel in window |
+|---|---|
+| `SIMULATED_CARD` (`APPROVED`) | `refundedAt` set; status remains `APPROVED`; stock restored |
+| `CASH_ON_DELIVERY` (`PENDING`) | no `refundedAt`; status remains `PENDING`; stock restored |
+
+There is no external refund provider.
 
 ### 3.6 Knowledge
 
@@ -329,13 +314,12 @@ There is no real external refund provider. `REFUNDED` is a local simulated-card 
 |---|---|
 | Aggregate | `KnowledgeDocument` |
 | Entity | `KnowledgeChunk` |
-| VO | `DocumentId`, `ChunkId`, `DocumentMetadata` |
+| Enum | `DocumentStatus`: `RECEIVED`, `CHUNKED`, `READY`, `FAILED`, `INACTIVE` |
 | Repository | `KnowledgeDocumentRepository` |
-| Exceptions | `DocumentNotFound`, `InvalidDocument` |
 
-Embeddings are infrastructure behind `KnowledgeVectorStorePort`. Chunking/embedding provider/dimension are deferred to the Knowledge phase.
+Embeddings are infrastructure behind `KnowledgeVectorStorePort`. Chunking is `DocumentChunkerPort` (`CharacterOverlapDocumentChunker`). Embedding vendor is `EmbeddingPort` (`OpenAiEmbeddingAdapter`, model `text-embedding-3-small`, dimension 1536).
 
-RAG is informational (recipes, guides, education). It is **not** the source of truth for stock, price, cart, orders, payments, or identity.
+RAG is informational. It is not the source of truth for stock, price, cart, orders, payments, or identity.
 
 ### 3.7 Assistant
 
@@ -343,745 +327,828 @@ RAG is informational (recipes, guides, education). It is **not** the source of t
 |---|---|
 | Aggregate | `Conversation` |
 | Entity | `Message` |
-| VO | `ConversationId`, `MessageRole`, `ToolCallId` |
-| Repository | `ConversationRepository` (Assistant’s tables only) |
-| Exceptions | `ConversationNotFound`, `ConversationNotOwned`, `ToolNotAllowed`, `ConfirmationRequired`, `InvalidToolArguments` |
+| Enums | `MessageRole`; sensitive types `CHECKOUT`, `CANCEL_ORDER` |
 
-Assistant domain does not own Product, Cart, Order, or Payment types. The public REST surface is only `POST /api/v1/assistant/chat`; conversations may still be persisted internally.
+Conversations are persisted in process memory (`ConversationStore` → `InMemoryConversationStore`). There is no Assistant schema and no SQL tables.
+
+Assistant domain does not own Product, Cart, Order, or Payment types. The public REST surface is `POST /api/v1/assistant/chat`.
 
 ---
 
-## 4. Application use cases (MVP)
+## 4. Casos de uso implementados
 
 ### Identity
 
-- `RegisterCustomer` — public; role `CUSTOMER` only
-- `AuthenticateUser`
-- `GetCurrentUser`
-- `ListAddresses`, `AddAddress`, `UpdateAddress`, `DeactivateAddress`
-- `GetAddressForCustomer` — application contract for Orders (not a public “pass any userId” API)
-- `ProvisionBootstrapAdmin` — controlled configuration, not public registration
+- `RegisterCustomerUseCase` — public; role `CUSTOMER` only
+- `AuthenticateUserUseCase`
+- `ListAddressesUseCase`, `AddAddressUseCase`, `UpdateAddressUseCase`, `DeactivateAddressUseCase`, `SetDefaultAddressUseCase`
+
+There is no `GetCurrentUser` use case and no public admin-provisioning use case.
 
 ### Catalog
 
-- `CreateCategory`, `UpdateCategory`, `DeactivateCategory`, `ListPublicCategories`
-- `CreateProduct`, `UpdateProduct`, `DeactivateProduct`
-- `GetPublicProduct`, `SearchPublicProducts`
-- `GetProductForSale` — internal sale snapshot for Shopping/Orders adapters
-- `DecrementStock`, `RestoreStock`
-- `StoreProductImage` — used when an admin product write includes an image; local filesystem adapter
+- `CreateCategoryUseCase`, `UpdateCategoryUseCase`, `ActivateCategoryUseCase`, `DeactivateCategoryUseCase`, `ListCategoriesUseCase`, `GetCategoryUseCase`
+- `CreateProductUseCase`, `UpdateProductUseCase`, `ActivateProductUseCase`, `DeactivateProductUseCase`, `ChangeProductPriceUseCase`
+- `GetProductUseCase`, `ListProductsUseCase`, `SearchProductsUseCase`
+- `FindProductPriceUseCase` — implements `ProductQueryPort` (ACTIVE only)
+- `InventoryPort.decreaseStockAtomically` / `restoreStock`
 
 ### Shopping
 
-- `GetOrCreateActiveCart`, `GetCart`
-- `AddCartItem`, `UpdateCartItemQuantity`, `RemoveCartItem`, `ClearCart`
-- `CreateShoppingList`, `UpdateShoppingList`, `ListShoppingLists`, `GetShoppingList`, `DeactivateOrDeleteShoppingList`
-- `AddShoppingListToCart` — application/tool capability; same validation as `AddCartItem` (no extra REST path in the MVP contract)
+- `GetCartUseCase`, `AddProductToCartUseCase`, `ChangeCartItemQuantityUseCase`, `RemoveProductFromCartUseCase`, `ClearCartUseCase`
+- `CreateShoppingListUseCase`, `RenameShoppingListUseCase`, `ListShoppingListsUseCase`, `GetShoppingListUseCase`
+- `AddProductToShoppingListUseCase`, `ChangeShoppingListItemQuantityUseCase`, `RemoveProductFromShoppingListUseCase`, `ClearShoppingListUseCase`
+- `AddShoppingListToCartUseCase` — application/tool; same cart validation as `AddProductToCartUseCase`
+
+There is no REST delete of a shopping list.
 
 ### Orders
 
-- `Checkout` — transaction boundary for purchase
-- `GetCustomerOrders`, `GetOrderForCustomer`
-- `CancelOrder`
-- `ListOrdersForAdmin`, `GetOrderForAdmin`, `UpdateOrderStatus`
-- `AutoConfirmPendingOrders`
+- `CheckoutUseCase` — wrapped by `TransactionalCheckoutUseCase`
+- `ListOrdersUseCase`, `GetOrderUseCase` — authenticated customer; ownership enforced
+- `CancelOrderUseCase` — wrapped by `TransactionalCancelOrderUseCase`
+- `UpdateOrderStatusUseCase` — HTTP restricted to `ADMIN`
+- `AutoConfirmPendingOrdersUseCase`
 
 ### Payments
 
-- `ProcessSimulatedPayment` — local, joins caller transaction; not a public API
-- `RefundSimulatedCardPayment` — local `APPROVED` → `REFUNDED`; invoked from cancel via `PaymentPort`
-- `GetPaymentForOrder` — internal; order responses may embed a summary
+- `ProcessPaymentUseCase` — local simulator; joins caller transaction
+- `RefundPaymentUseCase` — `APPROVED` → set `refundedAt`
+- `GetPaymentUseCase` — `GET /api/v1/payments/{paymentId}` for `ADMIN`
 
 ### Knowledge
 
-- `CreateKnowledgeDocument`, `ChunkKnowledgeDocument`, `GenerateEmbeddings`, `SearchKnowledge`
+- `CreateDocumentUseCase`, `GetDocumentUseCase`, `ListDocumentsUseCase`
+- `ReplaceDocumentContentUseCase`, `ProcessDocumentUseCase`
+- `DeactivateDocumentUseCase`, `ReactivateDocumentUseCase`
+- `SearchKnowledgeUseCase`
 
-HTTP for Knowledge is **not** in the MVP REST contract. Presentation is deferred to the Knowledge phase. Assistant retrieval uses `SearchKnowledge` as an application use case.
+HTTP for Knowledge is implemented and restricted to `ADMIN`. Assistant retrieval uses `SearchKnowledgeUseCase`.
 
 ### Assistant
 
-- `Chat` — authenticated; identity from `CurrentUserProvider`; may start or continue an internal conversation
-- `ExecuteApprovedTool` — allowlisted tools, confirmation for checkout
+- `ChatUseCase` / `ChatApplicationService` — identity from Assistant `CurrentUserProvider`
+- Allowlisted tools; explicit confirmation for `checkout` and `cancel_order`
 
 ### MCP
 
-No business use cases. Tools delegate to the use cases above.
+No business use cases. No operational tools.
 
 ---
 
-## 5. Cross-module ports
+## 5. Contratos entre módulos
 
-### `ProductCatalogPort`
+### Catalog `ProductQueryPort`
+
+- **Owner:** Catalog
+- **Implementation:** `FindProductPriceUseCase`
+- **Purpose:** Operational lookup of an ACTIVE product’s current COP price
+- **Output:** empty when missing or not `ACTIVE`
+
+### Shopping `ProductCatalogPort`
 
 - **Owner:** Shopping
-- **Purpose:** Current name, status, category usability, COP price, stock (informational; no reservation)
-- **Input:** `ProductId` (+ quantity when checking availability)
-- **Output:** sale snapshot
-- **Adapter:** `shopping.infrastructure.catalog` → Catalog `GetProductForSale`
+- **Purpose:** Current price for cart/list writes
+- **Adapter:** `shopping.infrastructure.catalog.ProductCatalogAdapter` → `ProductQueryPort`
 
-### `ShoppingCartPort`
+### Orders `ProductCatalogPort`
 
 - **Owner:** Orders
-- **Purpose:** Load the authenticated user’s active cart; clear after successful checkout
-- **Input:** `UserId` from auth
-- **Output:** lines `(productId, quantity)`; optional display price must not be charged
-- **Adapter:** `orders.infrastructure.shopping` → Shopping `GetCart` / `ClearCart`
+- **Purpose:** Name, ACTIVE flag, stock availability, current price; availability check for checkout lines
+- **Adapter:** `orders.infrastructure.catalog.ProductCatalogAdapter` → Catalog `ProductRepository` (maps Catalog `Product` to Orders `ProductCatalogInfo`)
 
-### `CustomerAddressPort`
+Not a duplicate of Shopping’s port. Different shape, different consumer. `checkAvailability` compares requested quantity to catalog stock. ACTIVE/saleability is enforced when building order items from `getProduct`.
 
-- **Owner:** Orders
-- **Purpose:** Load an **active** address owned by the authenticated user
-- **Input:** `UserId` + `AddressId`
-- **Output:** address fields for snapshot, or not found / not owned / inactive
-- **Adapter:** `orders.infrastructure.identity` → Identity `GetAddressForCustomer`
+### Catalog `InventoryPort`
 
-### `InventoryPort`
+- **Owner:** Catalog
+- **Purpose:** Atomic decrement; restore on cancel
+- **Input:** `(productId, quantity)` lines
+- **Implementation:** `InventoryPersistenceAdapter` / native SQL
+- **Consumer:** Orders checkout and cancel
 
-- **Owner:** Orders
-- **Purpose:** Re-validate saleability; atomic decrement; restore on cancel
-- **Input:** `(ProductId, quantity)` lines
-- **Output:** snapshots `(id, name, unit Money)` or insufficient-stock product ids
-- **Adapter:** `orders.infrastructure.catalog` → Catalog `DecrementStock` / `RestoreStock`
+Shopping does not decrement stock.
 
-Not a duplicate of `ProductCatalogPort`. Shopping must not decrement stock.
-
-### `PaymentPort`
+### Orders `ShoppingCartPort`
 
 - **Owner:** Orders
-- **Purpose:** Simulated card or COD; refund approved simulated card on cancel
-- **Input:** checkout correlation, `Money` (COP), method, non-sensitive simulation outcome; refund: payment/order id
-- **Output:** payment id + `PaymentStatus`
-- **Adapter:** `orders.infrastructure.payments` → Payments application use cases
+- **Purpose:** Load the authenticated customer’s cart; clear after successful checkout
+- **Adapter:** `orders.infrastructure.shopping.ShoppingCartAdapter` → Shopping `GetCartUseCase` / `ClearCartUseCase`
 
-Deterministic/testable simulator. No PAN/CVV.
+### Orders `CustomerAddressPort`
+
+- **Owner:** Orders
+- **Purpose:** Load an active address owned by the customer
+- **Adapter:** `orders.infrastructure.identity.CustomerAddressAdapter` → Identity `AddressRepository` (owned + `ACTIVE`)
+
+### Orders `PaymentPort`
+
+- **Owner:** Orders
+- **Purpose:** Simulated charge; load payment; refund approved card via `refundedAt`
+- **Adapter:** `payments.infrastructure.integration.PaymentIntegrationAdapter` → Payments use cases
+
+No PAN/CVV. Simulator is deterministic: CARD → `APPROVED`, COD → `PENDING`.
+
+### Orders `IdempotencyPort`
+
+- **Owner:** Orders
+- **Purpose:** Validate reuse of `(customerId, idempotencyKey)` and persist fingerprint + materialized checkout result (24h retention)
 
 ### `CurrentUserProvider`
 
-- **Owner:** Identity (security)
-- **Purpose:** Authenticated principal for REST, Assistant, MCP
-- **Output:** `UserId`, `Role`, `status`
-- **Adapter:** `identity.infrastructure.security`
-- Domain must not call `SecurityContext`
+- Identity: `identity.application.port.CurrentUserProvider` → `SpringSecurityCurrentUserProvider`
+- Shopping, Orders, Assistant: consumer-owned ports + identity adapters
+- Output: authenticated `userId` (`UUID`)
+- Authorization roles come from the JWT security filter, not from this port
 
-### `KnowledgeVectorStorePort`
+### Knowledge ports
 
-- **Owner:** Knowledge
-- **Purpose:** Vector insert/search; MVP adapter is PostgreSQL + pgvector
-- **Adapter:** `knowledge.infrastructure.vector`
+| Port | Owner | Adapter |
+|---|---|---|
+| `KnowledgeVectorStorePort` | Knowledge | `PgVectorKnowledgeStoreAdapter` |
+| `EmbeddingPort` | Knowledge | `OpenAiEmbeddingAdapter` (tests: fake) |
+| `DocumentChunkerPort` | Knowledge | `CharacterOverlapDocumentChunker` |
 
-### `EmbeddingPort`
-
-- **Owner:** Knowledge
-- **Purpose:** Isolate embedding vendor (vendor/model/dimension deferred)
-- **Adapter:** `knowledge.infrastructure.embedding`
-- Tests use a deterministic fake
-
-### `LLMPort`
+### Assistant `LLMPort`
 
 - **Owner:** Assistant
-- **Purpose:** Isolate chat + tool-calling (provider deferred)
-- **Adapter:** `assistant.infrastructure.llm`
+- **Adapter:** `OpenAiChatAdapter`
 - Tests use a deterministic fake
 
-### `ProductImageStoragePort`
-
-- **Owner:** Catalog (infrastructure port)
-- **Purpose:** Store/replace image bytes; return a URL/reference stored on the product
-- **MVP adapter:** local filesystem
-- **Not in MVP:** S3, Cloudinary, Azure Blob, or any cloud object store
-- The provider remains replaceable behind the port
-- Database stores only the resulting URL/reference
-- Admin `POST`/`PUT` product resources may include an image part; there is no separate public image endpoint
+There is no `ProductImageStoragePort`.
 
 ---
 
-## 6. Database design
+## 6. Persistencia
 
-One PostgreSQL database. Flyway is authoritative. `spring.jpa.hibernate.ddl-auto` is `validate` or `none`, never `update`.
+One PostgreSQL database. Flyway is authoritative. `spring.jpa.hibernate.ddl-auto` is `none`.
 
-**Schema per business module:** `identity`, `catalog`, `shopping`, `orders`, `payments`, `knowledge`, `assistant`.
+**Schemas present:** `identity`, `catalog`, `shopping`, `orders`, `payments`, `knowledge`.
 
-Still one deployable, one DataSource, one local transaction manager.
+There is no `assistant` schema.
 
-**Cross-module references:** logical UUIDs, **no** physical foreign keys.  
-**Intra-module relationships:** real PostgreSQL foreign keys, unique constraints, and CHECKs.
+One DataSource, one local transaction manager.
 
-Technical keys: UUID. Monetary amounts: `NUMERIC(12,2)` with currency stored as `COP` (or omitted as a column if the application always implies COP; prefer an explicit `currency CHAR(3)` CHECK (`currency = 'COP'`) so persistence cannot silently become multi-currency).
+**Cross-module references:** logical UUIDs, no physical foreign keys.
+**Intra-module relationships:** PostgreSQL foreign keys, unique constraints, and CHECKs.
 
-Canonical time: **UTC** `TIMESTAMPTZ`.
+Technical keys: UUID. Monetary amounts: `NUMERIC(12,2)` with `currency CHAR(3)` CHECK (`currency = 'COP'`). Canonical time: UTC `TIMESTAMPTZ`.
 
-### 6.1 Identity
+### 6.1 V1 — pgvector
+
+`CREATE EXTENSION IF NOT EXISTS vector;`
+
+No business tables.
+
+### 6.2 V2 — Identity
 
 **`identity.users`**
 
 - `id` UUID PK
-- `email` VARCHAR NOT NULL UNIQUE
-- `password_hash` VARCHAR NOT NULL
-- `document_type` VARCHAR NOT NULL
-- `document_number` VARCHAR NOT NULL
+- `document_type` VARCHAR(50) NOT NULL
+- `document_number` VARCHAR(50) NOT NULL
 - UNIQUE (`document_type`, `document_number`)
-- `full_name` VARCHAR NOT NULL
-- `phone` VARCHAR NOT NULL
-- `role` VARCHAR NOT NULL CHECK (`role` IN ('CUSTOMER', 'ADMIN'))
-- `status` VARCHAR NOT NULL CHECK (`status` IN ('ACTIVE', 'INACTIVE'))
+- `full_name` VARCHAR(255) NOT NULL
+- `email` VARCHAR(255) NOT NULL UNIQUE
+- `phone` VARCHAR(50) NOT NULL
+- `password_hash` VARCHAR(255) NOT NULL
+- `role` VARCHAR(20) NOT NULL CHECK (`CUSTOMER`, `ADMIN`)
+- `status` VARCHAR(20) NOT NULL CHECK (`ACTIVE`, `INACTIVE`)
 - `created_at` / `updated_at` TIMESTAMPTZ NOT NULL
 
 **`identity.addresses`**
 
 - `id` UUID PK
-- `user_id` UUID NOT NULL FK → `users.id`
-- `label` VARCHAR NOT NULL
-- `recipient_name` VARCHAR NOT NULL
-- `address_line` VARCHAR NOT NULL
-- `additional_info` VARCHAR NULL
-- `city` VARCHAR NOT NULL
-- `department` VARCHAR NOT NULL
-- `phone` VARCHAR NOT NULL
+- `user_id` UUID NOT NULL FK → `identity.users.id`
+- `label`, `recipient_name`, `address_line`, `city`, `department`, `phone` NOT NULL
+- `additional_info` VARCHAR(255) NULL
 - `is_default` BOOLEAN NOT NULL
-- `status` VARCHAR NOT NULL CHECK (`status` IN ('ACTIVE', 'INACTIVE'))
+- `status` VARCHAR(20) NOT NULL CHECK (`ACTIVE`, `INACTIVE`)
 - timestamps
 - Partial unique: one active default per user  
-  `CREATE UNIQUE INDEX … ON identity.addresses (user_id) WHERE is_default AND status = 'ACTIVE'`
-- Index `(user_id, status)`
+  `uk_identity_addresses_one_active_default` on `(user_id) WHERE is_default = true AND status = 'ACTIVE'`
+- Index `idx_identity_addresses_user_id`
 
-### 6.2 Catalog
+### 6.3 V3 — Catalog
 
 **`catalog.categories`**
 
 - `id` UUID PK
-- `name` VARCHAR NOT NULL
-- `status` VARCHAR NOT NULL CHECK (`status` IN ('ACTIVE', 'INACTIVE'))
+- `name` VARCHAR(255) NOT NULL
+- `description` TEXT NULL
+- `status` VARCHAR(20) NOT NULL CHECK (`ACTIVE`, `INACTIVE`)
 - timestamps
+- Index on `status`
 
 **`catalog.products`**
 
 - `id` UUID PK
-- `category_id` UUID NOT NULL FK → `categories.id`
-- `name` VARCHAR NOT NULL
-- `brand` VARCHAR NOT NULL
+- `category_id` UUID NOT NULL FK → `catalog.categories.id`
+- `barcode` VARCHAR(64) NULL; unique where NOT NULL
+- `name` VARCHAR(255) NOT NULL
+- `brand` VARCHAR(255) NULL
 - `description` TEXT NULL
-- `barcode` VARCHAR NULL; unique where NOT NULL
-- `price_amount` NUMERIC(12,2) NOT NULL CHECK (`price_amount` >= 0)
-- `currency` CHAR(3) NOT NULL CHECK (`currency` = 'COP')
-- `stock` INTEGER NOT NULL CHECK (`stock` >= 0)
-- `image_uri` VARCHAR NULL
-- `status` VARCHAR NOT NULL CHECK (`status` IN ('ACTIVE', 'INACTIVE'))
-- `version` BIGINT NOT NULL DEFAULT 0
+- `price_amount` NUMERIC(12,2) NOT NULL CHECK (`>= 0`)
+- `currency` CHAR(3) NOT NULL CHECK (`= 'COP'`)
+- `stock` INTEGER NOT NULL CHECK (`>= 0`)
+- `image_url` VARCHAR(1024) NULL
+- `status` VARCHAR(20) NOT NULL CHECK (`ACTIVE`, `INACTIVE`)
 - timestamps
-- Indexes: `(category_id, status)`, `(status)`, name/brand text as needed for ILIKE
+- Indexes: `category_id`, `status`, `(category_id, status)`
+
+There is no `version` column and no `image_uri` column.
 
 Atomic decrement:
 
 ```text
 UPDATE catalog.products
-   SET stock = stock - :qty, version = version + 1
- WHERE id = :id AND status = 'ACTIVE' AND stock >= :qty
+   SET stock = stock - :quantity,
+       updated_at = :updatedAt
+ WHERE id = :id
+   AND status = 'ACTIVE'
+   AND stock >= :quantity
+   AND :quantity > 0
 ```
 
-Zero rows → insufficient stock. This is the concurrency control.
+Zero rows → insufficient stock. Restore uses `stock = stock + :quantity` without requiring `ACTIVE`.
 
-### 6.3 Shopping
+### 6.4 V4 — Orders
+
+**`orders.orders`**
+
+- `id` UUID PK
+- `order_number` VARCHAR(64) NOT NULL UNIQUE
+- `customer_id` UUID NOT NULL (logical)
+- `status` VARCHAR(20) NOT NULL CHECK (`PENDING`, `CONFIRMED`, `PREPARING`, `READY`, `DELIVERED`, `CANCELLED`)
+- `subtotal_amount` / `total_amount` NUMERIC(12,2) NOT NULL CHECK (`>= 0`)
+- `subtotal_currency` / `total_currency` CHAR(3) NOT NULL CHECK (`= 'COP'`)
+- `payment_id` UUID NULL (logical)
+- shipping snapshot: `shipping_recipient_name`, `shipping_address_line`, `shipping_additional_info`, `shipping_city`, `shipping_department`, `shipping_phone`
+- `created_at` TIMESTAMPTZ NOT NULL
+- `confirmed_at` / `cancelled_at` NULL
+- `updated_at` TIMESTAMPTZ NOT NULL
+- Indexes: `customer_id`, `status`, `created_at`
+
+There is no `payment_method`, `cancellation_deadline_at`, `placed_at`, `version`, or `user_id` column. The 15-minute window is `created_at + 15 minutes` in domain.
+
+**`orders.order_items`**
+
+- `id` UUID PK
+- `order_id` UUID NOT NULL FK → `orders.orders.id` ON DELETE CASCADE
+- `item_index` INTEGER NOT NULL CHECK (`>= 0`)
+- `product_id` UUID NOT NULL (logical)
+- `product_name` VARCHAR(255) NOT NULL
+- `unit_price_amount` NUMERIC(12,2) NOT NULL
+- `unit_price_currency` CHAR(3) NOT NULL CHECK (`= 'COP'`)
+- `quantity` INTEGER NOT NULL CHECK (`> 0`)
+- `subtotal_amount` / `subtotal_currency`
+
+### 6.5 V5 — Shopping
 
 **`shopping.carts`**
 
 - `id` UUID PK
-- `user_id` UUID NOT NULL (logical)
-- `status` VARCHAR NOT NULL (active cart)
-- Partial unique: one active cart per user
+- `customer_id` UUID NOT NULL UNIQUE (logical)
+- `status` VARCHAR(20) NOT NULL CHECK (`ACTIVE`)
 - timestamps
 
 **`shopping.cart_items`**
 
 - `id` UUID PK
-- `cart_id` UUID NOT NULL FK → `carts.id`
+- `cart_id` UUID NOT NULL FK → `shopping.carts.id` ON DELETE CASCADE
+- `item_index` INTEGER NOT NULL
 - `product_id` UUID NOT NULL (logical)
-- `quantity` INTEGER NOT NULL CHECK (`quantity` > 0)
-- UNIQUE (`cart_id`, `product_id`)
-- optional `last_seen_unit_price` NUMERIC NULL (display only)
+- `quantity` INTEGER NOT NULL CHECK (`> 0`)
+- `price_at_addition_amount` NUMERIC(12,2) NOT NULL
+- `price_at_addition_currency` CHAR(3) NOT NULL CHECK (`= 'COP'`)
+- `added_at` / `updated_at`
 
-**`shopping.shopping_lists`** / **`shopping.shopping_list_items`**
+**`shopping.shopping_lists` / `shopping.shopping_list_items`**
 
-- list: `id`, `user_id` (logical), `name`, timestamps
-- items: FK to list, `product_id` (logical), `quantity` > 0, UNIQUE (`list_id`, `product_id`)
+- list: `id`, `customer_id` (logical), `name`, timestamps
+- items: FK to list ON DELETE CASCADE, `item_index`, `product_id` (logical), `quantity` > 0
 
-### 6.4 Orders
-
-**`orders.orders`**
-
-- `id` UUID PK
-- `user_id` UUID NOT NULL (logical)
-- `status` VARCHAR NOT NULL CHECK IN (`PENDING`, `CONFIRMED`, `PREPARING`, `READY`, `DELIVERED`, `CANCELLED`)
-- `payment_id` UUID NULL (logical)
-- `payment_method` VARCHAR NOT NULL
-- `total_amount` NUMERIC(12,2) NOT NULL CHECK (`total_amount` >= 0)
-- `currency` CHAR(3) NOT NULL CHECK (`currency` = 'COP')
-- shipping snapshot columns: `ship_label`, `ship_recipient_name`, `ship_address_line`, `ship_additional_info`, `ship_city`, `ship_department`, `ship_phone`
-- `source_address_id` UUID NULL (logical)
-- `placed_at` TIMESTAMPTZ NOT NULL
-- `cancellation_deadline_at` TIMESTAMPTZ NOT NULL
-- `confirmed_at` / `cancelled_at` NULL
-- `version` BIGINT NOT NULL
-- Indexes: `(user_id, placed_at DESC)`, `(status, placed_at)` / `(status, cancellation_deadline_at)`
-
-**`orders.order_items`**
-
-- FK to order
-- `product_id` UUID NOT NULL (logical)
-- `product_name` VARCHAR NOT NULL (snapshot)
-- `unit_price` NUMERIC(12,2) NOT NULL
-- `quantity` INTEGER NOT NULL CHECK (`quantity` > 0)
-- `line_total` NUMERIC(12,2) NOT NULL
-
-**`orders.checkout_idempotency`**
-
-- `user_id` UUID NOT NULL
-- `idempotency_key` VARCHAR NOT NULL
-- UNIQUE (`user_id`, `idempotency_key`)
-- `request_hash` VARCHAR NOT NULL
-- `order_id` UUID NULL (logical)
-- `response_payload` JSONB NULL
-- `created_at` TIMESTAMPTZ NOT NULL
-- successful-record retention: **24 hours** (application/purge policy; not a second store)
-
-Do not introduce `FAILED` / `RECOVERING` states unless a later implementation proves they are necessary. Concurrent duplicates are handled by the unique constraint and row lock inside the checkout transaction.
-
-### 6.5 Payments
+### 6.6 V6 — Payments
 
 **`payments.payments`**
 
 - `id` UUID PK
 - `order_id` UUID NOT NULL (logical)
-- `method` VARCHAR NOT NULL CHECK IN (`SIMULATED_CARD`, `CASH_ON_DELIVERY`)
-- `status` VARCHAR NOT NULL CHECK IN (`PENDING`, `APPROVED`, `DECLINED`, `REFUNDED`)
-- `amount` NUMERIC(12,2) NOT NULL CHECK (`amount` >= 0)
-- `currency` CHAR(3) NOT NULL CHECK (`currency` = 'COP')
-- `provider_reference` VARCHAR NULL (simulator id only)
+- `amount` NUMERIC(12,2) NOT NULL CHECK (`>= 0`)
+- `currency` CHAR(3) NOT NULL CHECK (`= 'COP'`)
+- `payment_method` VARCHAR(20) NOT NULL CHECK (`SIMULATED_CARD`, `CASH_ON_DELIVERY`)
+- `status` VARCHAR(20) NOT NULL CHECK (`PENDING`, `APPROVED`, `DECLINED`)
+- `provider_reference` VARCHAR(255) NULL
+- `created_at` / `updated_at` TIMESTAMPTZ NOT NULL
+- `refunded_at` TIMESTAMPTZ NULL
+
+No PAN, CVV, or expiry columns.
+
+### 6.7 V7 — Checkout idempotency
+
+**`orders.checkout_idempotency`**
+
+- `id` UUID PK
+- `customer_id` UUID NOT NULL
+- `idempotency_key` TEXT NOT NULL
+- UNIQUE (`customer_id`, `idempotency_key`)
+- `fingerprint` TEXT NOT NULL
+- materialized result: `result_order_id`, `result_order_number`, `result_order_status`, `result_payment_status`, `result_total_amount`, `result_total_currency`
+- `created_at` / `expires_at` TIMESTAMPTZ NOT NULL
+- Index on `expires_at`
+
+Retention in Application is 24 hours (`CheckoutUseCase.IDEMPOTENCY_RETENTION`). Same key + same fingerprint → replay. Same key + different fingerprint → conflict.
+
+### 6.8 V8 — Knowledge documents
+
+**`knowledge.documents`**
+
+- `id` UUID PK
+- `title` VARCHAR(255) NOT NULL
+- `source` VARCHAR(255) NOT NULL
+- `content` TEXT NOT NULL
+- `status` VARCHAR(20) NOT NULL CHECK (`RECEIVED`, `CHUNKED`, `READY`, `FAILED`, `INACTIVE`)
 - timestamps
 
-No PAN, CVV, expiry columns.
+**`knowledge.document_chunks`**
 
-### 6.6 Knowledge
+- `id` UUID PK
+- `document_id` UUID NOT NULL FK → `knowledge.documents.id` ON DELETE CASCADE
+- `position` INTEGER NOT NULL CHECK (`>= 0`)
+- UNIQUE (`document_id`, `position`)
+- `text` TEXT NOT NULL
+- `embedded` BOOLEAN NOT NULL
 
-Flyway: `CREATE EXTENSION IF NOT EXISTS vector;`
+### 6.9 V9 — Embeddings
 
-**`knowledge.documents`**, **`knowledge.chunks`** with `embedding VECTOR(n)` where **n is deferred** to the Knowledge phase, plus an HNSW/IVFFlat index choice also deferred.
+**`knowledge.document_embeddings`**
 
-### 6.7 Assistant
-
-**`assistant.conversations`**, **`assistant.messages`** with `user_id` logical UUID. No FKs to other modules.
+- `chunk_id` UUID PK
+- `document_id` UUID NOT NULL FK → `knowledge.documents.id` ON DELETE CASCADE
+- `position` INTEGER NOT NULL
+- `embedding vector(1536)` NOT NULL
+- HNSW index `idx_knowledge_document_embeddings_vector` using `vector_cosine_ops`
 
 ---
 
-## 7. Transaction boundaries
+## 7. Fronteras transaccionales
 
-`@Transactional` belongs on application use cases only. Single local PostgreSQL transaction. No Saga, XA, brokers, or outbox.
+Transactions are started in Infrastructure wrappers via `TransactionTemplate`, not with `@Transactional` on Application use cases. Domain does not manage transactions. Single local PostgreSQL transaction. No Saga, XA, brokers, or outbox.
 
 | Use case | Boundary |
 |---|---|
 | Register / address mutations | One TX; unique and partial-unique constraints enforce invariants |
-| Cart / shopping-list writes | One TX on shopping tables only; catalog is read via port; **no stock write** |
-| **Checkout** | **One TX for all participating PostgreSQL writes** (idempotency, stock, payment, order, cart clear) |
-| `ProcessSimulatedPayment` | Joins the caller TX |
-| `CancelOrder` | One TX: order `CANCELLED`, stock restore, simulated-card `REFUNDED` when applicable |
-| `AutoConfirmPendingOrders` | **One TX per order**; scheduler must not wrap the batch |
+| Cart / shopping-list writes | One TX on shopping tables; catalog is read via port; no stock write |
+| **Checkout** | `TransactionalCheckoutUseCase` wraps `CheckoutUseCase.execute` in one local TX (idempotency, stock, payment, order, cart clear) |
+| `ProcessPaymentUseCase` | Joins the caller TX |
+| **Cancel** | `TransactionalCancelOrderUseCase` wraps cancel + stock restore + optional refund |
+| `AutoConfirmPendingOrdersUseCase` | One persist per eligible order inside the use case loop; scheduler does not wrap the batch |
 
 Failed checkout rolls back completely.
 
 ---
 
-## 8. Checkout sequence
+## 8. Checkout
 
-**Endpoint:** `POST /api/v1/checkout`  
-**Auth:** JWT, role `CUSTOMER`  
-**Header:** `Idempotency-Key` required  
+**Endpoint:** `POST /api/v1/orders`
+**Auth:** JWT, role `CUSTOMER`
+**Header:** `Idempotency-Key` (Spring `required = false`; Application rejects null/blank)
+**Body:** `addressId`, `paymentMethod`, `items[]` with `productId`, `quantity`, `expectedUnitPrice`
 **Currency:** COP  
-**Transaction:** one local PostgreSQL transaction on `Checkout`
+**Transaction:** `TransactionalCheckoutUseCase` → `TransactionTemplate` → `CheckoutUseCase`
 
-Payment simulation participates in that same caller transaction.
+The request item set (product ids and quantities) must match the active cart exactly. Cart display prices are not charged.
 
-### 8.1 Outside the transaction
+### 8.1 Identity and idempotency
 
-1. Authenticate. `CurrentUserProvider` yields `UserId`. Reject any client-supplied user/customer id.
-2. Require `Idempotency-Key`. Missing/blank → 400.
+1. `CurrentUserProvider` yields the customer id. Client-supplied user ids are ignored.
+2. Missing/blank `Idempotency-Key` → validation error.
+3. Fingerprint is computed from address, method, items, quantities, and `expectedUnitPrice`.
+4. Same key + same fingerprint + unexpired record → return the materialized original result.
+5. Same key + different fingerprint → conflict.
 
-### 8.2 Inside `Checkout`
+### 8.2 Inside the transaction
 
-3. **Idempotency.** Lock/insert `(user_id, idempotency_key)` in the same TX.
-   - Same key + same logical request + existing success → return the original successful order (24h retention).
-   - Same key + different request hash → **409 Conflict**.
-4. **Address.** Active, owned by the user. Inactive → not selectable.
-5. **Cart.** Active cart; empty → 409.
-6. **Product availability/status.** Each line must be active, category usable, stock sufficient to sell.
-7. **Explicit price acceptance.** Request includes accepted unit prices (COP) per product. Catalog current price is the source of truth. Cart prices are ignored for charging.
-8. If any current price ≠ accepted price → **409 Conflict** listing affected `productId`, current price, accepted price. Do **not** silently charge the new price. Client retries with current prices.
-9. **Atomic stock decrement** via `InventoryPort` (`UPDATE … WHERE stock >= qty`). Concurrent checkouts cannot produce negative stock.
-10. **Payment** via `PaymentPort`.
-    - `SIMULATED_CARD` `DECLINED` → throw; full rollback; no order.
-    - `SIMULATED_CARD` `APPROVED` → continue.
-    - `CASH_ON_DELIVERY` → payment `PENDING`.
-11. **Create order** `PENDING` with item snapshots (name, unit price, qty) and shipping-address snapshot. `placed_at = clock.instant()` (UTC). `cancellation_deadline_at = placed_at + 15 minutes`.
-12. **Clear cart.**
-13. Persist idempotency success payload.
-14. Commit.
+6. Load active cart. Empty → conflict.
+7. Load active owned address. Missing / not owned / inactive → not available.
+8. Match request lines to cart lines.
+9. Load each product via Orders `ProductCatalogPort`. Inactive/unavailable → not available.
+10. `expectedUnitPrice` must equal Catalog current price. Mismatch → price-changed conflict. The new price is not charged silently.
+11. Availability check, then `InventoryPort.decreaseStockAtomically`. Concurrent checkouts cannot produce negative stock.
+12. `PaymentPort.processPayment` for the draft order id and total.
+    - `SIMULATED_CARD` → `APPROVED` in the current simulator.
+    - `CASH_ON_DELIVERY` → `PENDING`.
+    - `DECLINED` would abort and roll back; the simulator does not emit it.
+13. Persist `Order` `PENDING` with item snapshots and shipping snapshot. `created_at = clock`.
+14. Clear cart.
+15. Persist idempotency success (`expires_at = now + 24h`).
+16. Commit.
 
 ### 8.3 Failure matrix
 
-| Failure | Persisted business state | HTTP |
+| Failure | Persisted business state | Typical HTTP |
 |---|---|---|
 | Unauthenticated | none | 401 |
 | Not CUSTOMER | none | 403 |
-| Missing Idempotency-Key | none | 400 |
+| Missing/blank Idempotency-Key | none | 400 |
 | Validation | none | 400 |
-| Same key, same request, prior success | original order | 200 |
-| Same key, different request | none new | 409 |
-| Address missing / not owned / inactive | none | 404 or 409 as appropriate (inactive/unusable → 409; unknown → 404) |
+| Same key, same fingerprint, prior success | original order | 201 (same `POST /orders` handler) |
+| Same key, different fingerprint | none new | 409 |
+| Address missing / not owned / inactive | none | 404 / conflict |
 | Empty cart | none | 409 |
+| Request items ≠ cart | none | 400 |
 | Inactive/unavailable product | none | 409 |
-| Price changed | none | 409 with product/price details |
+| Price changed | none | 409 |
 | Insufficient stock / concurrent oversell loser | none | 409 |
-| Payment declined | none | 409 |
 | Unexpected error | rollback | 500 problem+json, no stack trace |
 
 No distributed compensation. Rollback is the compensation.
 
 ---
 
-## 9. Security architecture
+## 9. Seguridad
+
+Source: `IdentitySecurityConfiguration`.
 
 - Spring Security, stateless JWT Bearer access token.
-- **Access token lifetime ≈ 15 minutes.**
-- **No refresh-token subsystem**, rotation, or revocation infrastructure in the MVP.
-- Password hashing: BCrypt (or the Spring `PasswordEncoder` default equivalent). Never log passwords, tokens, or JWT secrets.
-- JWT secret from environment/configuration, never hard-coded.
-- `CurrentUserProvider` is the identity abstraction for presentation/application adapters.
+- CSRF, HTTP Basic, form login, and logout are disabled.
+- **Access token lifetime: 15 minutes** (`superfercho.security.jwt.expiration`).
+- No refresh-token subsystem, rotation, or revocation infrastructure.
+- Password hashing: BCrypt via `PasswordEncoder` / `BCryptPasswordHasher`.
+- JWT secret from `SUPERFERCHO_JWT_SECRET`. Not hard-coded.
 - Domain never accesses `SecurityContext`.
-- Personalized operations use the authenticated principal. Clients **must not** send arbitrary `userId` / `customerId` for ownership-sensitive operations. Ownership checks are mandatory in application logic.
-- `CUSTOMER`: `/users/me`, addresses, cart, shopping lists, checkout, own orders, cancel own pending order, assistant chat.
-- `ADMIN`: admin catalog, admin orders. ADMIN is not required to shop.
-- Assistant and MCP inherit the same authenticated identity. The model cannot supply a user id to impersonate another user.
-- No public payment, inventory, stock, or order-payment endpoints.
+- Personalized operations use the authenticated principal. Clients do not send `userId` / `customerId` for ownership. Ownership is enforced in Application (`GetOrderUseCase`, address use cases, cart/lists).
+- `ADMIN` is not required to shop and is denied customer shopping/assistant routes.
+
+### 9.1 Public
+
+| Matcher | Access |
+|---|---|
+| `POST /api/v1/auth/login` | permitAll |
+| `POST /api/v1/customers` | permitAll |
+| `/error` | permitAll |
+| GET `/api/v1/categories/**` and `/api/v1/products/**` without `view=ADMIN` | permitAll (`CatalogGetRequestMatcher.publicView()`) |
+
+### 9.2 ADMIN
+
+| Matcher | Access |
+|---|---|
+| GET catalog with `view=ADMIN` | `hasRole(ADMIN)` |
+| `POST /api/v1/categories`, `PUT /categories/{id}`, `POST …/activate`, `POST …/deactivate` | ADMIN |
+| `POST /api/v1/products`, `PUT /products/{id}`, `POST …/activate`, `POST …/deactivate`, `POST …/price` | ADMIN |
+| `POST /api/v1/orders/{orderId}/status` | ADMIN |
+| `GET /api/v1/payments/{paymentId}` | ADMIN |
+| All `/api/v1/knowledge/**` listed in the filter (documents CRUD/process/search) | ADMIN |
+
+### 9.3 CUSTOMER
+
+| Matcher | Access |
+|---|---|
+| `/api/v1/addresses`, `/api/v1/addresses/**` | CUSTOMER |
+| `/api/v1/cart`, `/api/v1/cart/**` | CUSTOMER |
+| `/api/v1/shopping-lists`, `/api/v1/shopping-lists/**` | CUSTOMER |
+| `POST /api/v1/orders` | CUSTOMER |
+| `GET /api/v1/orders`, `GET /api/v1/orders/{orderId}` | CUSTOMER |
+| `POST /api/v1/orders/{orderId}/cancel` | CUSTOMER |
+| `POST /api/v1/assistant/chat` | CUSTOMER |
+
+### 9.4 Default
+
+`anyRequest().denyAll()`.
+
+Assistant tools inherit the JWT principal. The model cannot supply a user id to impersonate another user.
 
 ---
 
-## 10. REST API contract (authoritative)
+## 10. Superficie REST
 
 **Base path:** `/api/v1`
 
-This is the **MVP REST contract**, not a candidate list. Do not add endpoints without a new architectural approval.
+Controllers are thin and call use cases. Errors use `application/problem+json` (RFC 7807) with an application `code` where handlers define one.
 
-### 10.1 Conventions
+Pagination (orders list): `page` default **0**, `size` default **20**, maximum **100**.
 
-| Topic | Rule |
-|---|---|
-| Pagination | `page` default **0**, `size` default **20**, maximum **100** |
-| Public inactive product | **404 Not Found** (do not leak inactive catalog as 200) |
-| Identity | From authenticated principal only |
-| Ownership | Mandatory in application logic |
-| Admin routes | `ADMIN` role |
-| Error media type | `application/problem+json` (RFC 7807) |
-| Error body | RFC 7807 fields; may include a stable application-specific `code` |
-| 400 | Validation / bad request |
-| 401 | Unauthenticated |
-| 403 | Authenticated but not allowed |
-| 404 | Resource not available (including public inactive product) |
-| 409 | Business or concurrency conflict (price change, stock, idempotency mismatch, illegal transition, payment declined, default-address invariant, duplicates) |
-| 500 | Unexpected server error (no stack traces, no secrets) |
+Public inactive product: **404**.
 
-Request/response bodies are application DTOs at the presentation boundary. Controllers stay thin and call use cases.
+Identity for ownership-sensitive operations comes from the authenticated principal only.
 
-### 10.2 Auth (public)
+### 10.1 Auth and customers (public)
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/api/v1/auth/login` | Authenticate. Body: email, password. Response: access token (~15 min). |
+| POST | `/api/v1/customers` | Register `CUSTOMER`. |
+
+### 10.2 Addresses (`CUSTOMER`)
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/v1/addresses` | List addresses of the principal. |
+| POST | `/api/v1/addresses` | Create address. |
+| PUT | `/api/v1/addresses/{addressId}` | Update owned address. |
+| DELETE | `/api/v1/addresses/{addressId}` | Deactivate (not physical delete). |
+| POST | `/api/v1/addresses/{addressId}/default` | Set default. |
+
+### 10.3 Catalog
+
+GET defaults to public view. `view=ADMIN` requires `ADMIN`.
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| POST | `/api/v1/auth/register` | no | Register `CUSTOMER`. Body: email, password, fullName, documentType, documentNumber, phone. 409 on duplicate email/document. |
-| POST | `/api/v1/auth/login` | no | Authenticate. Body: email, password. Response: access token (~15 min) + user summary. 401 invalid credentials. |
+| GET | `/api/v1/categories` | public / ADMIN view | List categories |
+| GET | `/api/v1/categories/{categoryId}` | public / ADMIN view | Get category |
+| POST | `/api/v1/categories` | ADMIN | Create |
+| PUT | `/api/v1/categories/{categoryId}` | ADMIN | Update |
+| POST | `/api/v1/categories/{categoryId}/activate` | ADMIN | Activate |
+| POST | `/api/v1/categories/{categoryId}/deactivate` | ADMIN | Deactivate |
+| GET | `/api/v1/products` | public / ADMIN view | List (optional `categoryId`, `status`) |
+| GET | `/api/v1/products/search` | public / ADMIN view | Search text |
+| GET | `/api/v1/products/{productId}` | public / ADMIN view | Get; public inactive → 404 |
+| POST | `/api/v1/products` | ADMIN | Create (`imageUrl` string) |
+| PUT | `/api/v1/products/{productId}` | ADMIN | Update |
+| POST | `/api/v1/products/{productId}/activate` | ADMIN | Activate |
+| POST | `/api/v1/products/{productId}/deactivate` | ADMIN | Deactivate |
+| POST | `/api/v1/products/{productId}/price` | ADMIN | Change price |
 
-### 10.3 Current user and addresses (`CUSTOMER`)
+### 10.4 Shopping (`CUSTOMER`)
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/v1/users/me` | Current user profile (no password hash). |
-| GET | `/api/v1/users/me/addresses` | List addresses. |
-| POST | `/api/v1/users/me/addresses` | Create address (`isDefault` allowed; enforces one active default). |
-| PUT | `/api/v1/users/me/addresses/{id}` | Replace/update owned address. |
-| DELETE | `/api/v1/users/me/addresses/{id}` | **Deactivate** (not physical delete). 404 if not owned. |
+| GET | `/api/v1/cart` | Get or create the active cart |
+| POST | `/api/v1/cart/items` | Add/increase line |
+| PUT | `/api/v1/cart/items/{productId}` | Set quantity |
+| DELETE | `/api/v1/cart/items/{productId}` | Remove line |
+| DELETE | `/api/v1/cart` | Clear cart |
+| GET | `/api/v1/shopping-lists` | List lists |
+| POST | `/api/v1/shopping-lists` | Create list |
+| GET | `/api/v1/shopping-lists/{shoppingListId}` | Get owned list |
+| PATCH | `/api/v1/shopping-lists/{shoppingListId}` | Rename |
+| POST | `/api/v1/shopping-lists/{shoppingListId}/items` | Add item |
+| PATCH | `/api/v1/shopping-lists/{id}/items/{productId}` | Change item quantity |
+| DELETE | `/api/v1/shopping-lists/{id}/items/{productId}` | Remove item |
+| DELETE | `/api/v1/shopping-lists/{id}/items` | Clear items |
 
-### 10.4 Public catalog
+There is no HTTP delete of a shopping list.
+
+### 10.5 Orders
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| GET | `/api/v1/categories` | no | Active categories. |
-| GET | `/api/v1/products` | no | Search/list **active** products. Query: text, categoryId, page, size. ILIKE/indexed SQL. |
-| GET | `/api/v1/products/{id}` | no | Active product. Inactive or unknown → **404**. |
+| POST | `/api/v1/orders` | CUSTOMER | Checkout. Header `Idempotency-Key`. Body: `addressId`, `paymentMethod`, items with `expectedUnitPrice`. |
+| GET | `/api/v1/orders` | CUSTOMER | Current user’s orders (paginated) |
+| GET | `/api/v1/orders/{orderId}` | CUSTOMER | Own order; 404 if not owned |
+| POST | `/api/v1/orders/{orderId}/cancel` | CUSTOMER | Cancel if `PENDING` and within 15 minutes |
+| POST | `/api/v1/orders/{orderId}/status` | ADMIN | Adjacent status transition |
 
-### 10.5 Admin catalog (`ADMIN`)
+There is no admin order list endpoint.
 
-| Method | Path | Purpose |
-|---|---|---|
-| POST | `/api/v1/admin/categories` | Create category. |
-| PUT | `/api/v1/admin/categories/{id}` | Update category. |
-| DELETE | `/api/v1/admin/categories/{id}` | **Deactivate** (preserve history). |
-| POST | `/api/v1/admin/products` | Create product (optional image via `ProductImageStoragePort`). |
-| PUT | `/api/v1/admin/products/{id}` | Update product (optional image). |
-| DELETE | `/api/v1/admin/products/{id}` | **Deactivate** (preserve history). |
-
-Physical DELETE of catalog rows is forbidden when historical orders reference them.
-
-### 10.6 Shopping (`CUSTOMER`)
+### 10.6 Payments (`ADMIN`)
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/v1/cart` | Get or create the active cart. |
-| POST | `/api/v1/cart/items` | Add/increase line (`productId`, `quantity`). Revalidates product via `ProductCatalogPort`. |
-| PUT | `/api/v1/cart/items/{productId}` | Set quantity. |
-| DELETE | `/api/v1/cart/items/{productId}` | Remove line. |
-| GET | `/api/v1/shopping-lists` | List lists (pagination defaults apply). |
-| POST | `/api/v1/shopping-lists` | Create list (name; items may be included as nested resource data). |
-| PUT | `/api/v1/shopping-lists/{id}` | Update owned list (name and/or nested items). |
-| DELETE | `/api/v1/shopping-lists/{id}` | Delete/deactivate owned list. |
+| GET | `/api/v1/payments/{paymentId}` | Payment by id |
 
-### 10.7 Checkout and customer orders (`CUSTOMER`)
+### 10.7 Knowledge (`ADMIN`)
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/api/v1/checkout` | Checkout. Header `Idempotency-Key`. Body: `addressId`, `paymentMethod`, explicit accepted prices per product, non-sensitive simulated-card outcome when method is `SIMULATED_CARD`. See §8. |
-| GET | `/api/v1/orders` | Current user’s orders (paginated). |
-| GET | `/api/v1/orders/{id}` | Own order; 404 if not owned. Includes item snapshots, address snapshot, payment summary. |
-| POST | `/api/v1/orders/{id}/cancel` | Cancel if `PENDING` and within 15 minutes. 409 otherwise. |
+| POST | `/api/v1/knowledge/documents` | Create document |
+| GET | `/api/v1/knowledge/documents` | List |
+| GET | `/api/v1/knowledge/documents/{documentId}` | Get |
+| PUT | `/api/v1/knowledge/documents/{documentId}/content` | Replace content |
+| POST | `/api/v1/knowledge/documents/{documentId}/process` | Chunk + embed |
+| POST | `/api/v1/knowledge/documents/{documentId}/deactivate` | Deactivate |
+| POST | `/api/v1/knowledge/documents/{documentId}/reactivate` | Reactivate |
+| GET | `/api/v1/knowledge/search` | Vector search (`query`, `limit`) |
 
-**Not exposed:** public payment, inventory, stock, or order-payment resources.
-
-### 10.8 Admin orders (`ADMIN`)
-
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/api/v1/admin/orders` | List orders (paginated). |
-| GET | `/api/v1/admin/orders/{id}` | Order detail. |
-| PATCH | `/api/v1/admin/orders/{id}/status` | Adjacent allowed transition only (`CONFIRMED → PREPARING → READY → DELIVERED`). 409 on illegal jump. Admins do not use this to cancel; customer cancel remains `PENDING → CANCELLED`. |
-
-### 10.9 Assistant (`CUSTOMER`)
+### 10.8 Assistant (`CUSTOMER`)
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/api/v1/assistant/chat` | Chat. Identity from JWT. Body: message text and optional confirmation payload for checkout. Must not accept a target `userId`. High-impact purchase requires explicit confirmation. |
+| POST | `/api/v1/assistant/chat` | Chat. Identity from JWT. Optional `conversationId` and confirmation token. Must not accept a target `userId`. |
 
-MCP is not part of this REST contract. Transport is deferred.
+MCP is not part of the REST surface.
 
 ---
 
-## 11. AI / RAG / MCP
+## 11. Assistant, Knowledge y MCP
 
 ```text
-User → REST /api/v1/assistant/chat
-     → Assistant Chat use case
-     → LLMPort
-     → tool selection
-     → ExecuteApprovedTool
-     → existing application use case
+User → REST POST /api/v1/assistant/chat
+     → ChatUseCase / ChatApplicationService
+     → LLMPort (OpenAiChatAdapter)
+     → allowlisted tools
+     → existing application use cases
      → domain
      → infrastructure
 ```
 
 ```text
-Assistant
-  → SearchKnowledge
+Assistant SearchKnowledgeTool
+  → SearchKnowledgeUseCase
     → EmbeddingPort
     → KnowledgeVectorStorePort
-      → PostgreSQL + pgvector
+      → PostgreSQL + pgvector (vector(1536), HNSW cosine)
 ```
 
-Never: AI or MCP → JPA / repository / SQL of another module.
+Never: Assistant or MCP → JPA / repository / SQL of another module.
 
 | LLM may use | Must come from business use cases / tools |
 |---|---|
-| User message, conversation history | Current price, stock, availability |
+| User message, in-memory conversation history | Current price, stock, availability |
 | Retrieved knowledge snippets | Cart, orders, payments |
 | Tool results from this turn | Authenticated identity (never from the model) |
 
-**Confirmation required** before final purchase / checkout (and other irreversible payment effects). The model cannot grant permission or skip confirmation.
+**Allowlisted tools:** `search_products`, `get_product`, `list_products`, `list_categories`, `get_cart`, `add_cart_item`, `change_cart_item_quantity`, `remove_cart_item`, `clear_cart`, shopping-list tools including `add_shopping_list_to_cart`, `list_orders`, `get_order`, `checkout`, `cancel_order`, `list_addresses`, `search_knowledge`.
 
-**Prompt injection:** user text and knowledge chunks are untrusted data. Allowlisted tools, schema validation, auth, and confirmation are the control plane.
+**Confirmation required** before `checkout` and `cancel_order`. Pending tokens are stored in memory (`InMemoryPendingSensitiveActionStore`). The model cannot grant permission or skip confirmation.
 
-**MCP:** `com.superfercho.mcp` tools validate arguments, use `CurrentUserProvider` (once MCP auth is chosen), and call existing use cases. No duplicated business rules. Exact MCP transport is deferred.
+Conversations: `ConversationStore` / `InMemoryConversationStore`. Lost on process restart. No SQL schema.
 
----
+**Prompt injection:** user text and knowledge chunks are untrusted data. Allowlisted tools, argument validation, JWT identity, and confirmation are the control plane.
 
-## 12. Scheduling (automatic confirmation)
+Knowledge HTTP is ADMIN ingest/search. Assistant search is the same `SearchKnowledgeUseCase`. RAG is not a commercial source of truth.
 
-- Trigger only: `orders.infrastructure.scheduling` with Spring `@Scheduled`.
-- Poll interval is configuration, not a business rule.
-- The method only calls `AutoConfirmPendingOrders`.
-- Use case uses injectable `Clock` (UTC): confirm `PENDING` orders whose 15-minute window has elapsed.
-- Skip `CANCELLED` and already `CONFIRMED`. Idempotent conditional update (`WHERE status = 'PENDING'`).
-- One transaction per order.
-- Tests use `Clock.fixed(...)`. No `Thread.sleep` to express the rule.
-- Cancel vs confirm race: one conditional update wins.
+**MCP:** `com.superfercho.mcp` contains only `package-info.java`. Not operational. No transport, no MCP tools, no MCP authentication.
 
 ---
 
-## 13. Persistence strategy
+## 12. Auto-confirmación
+
+- Trigger: `orders.infrastructure.configuration.AutoConfirmPendingOrdersJob` with Spring `@Scheduled` (fixed delay 60s, profile `!test`).
+- The job only calls `AutoConfirmPendingOrdersUseCase`.
+- Use case uses injectable clock (UTC): confirm `PENDING` orders whose 15-minute window from `createdAt` has elapsed.
+- Skip `CANCELLED` and already `CONFIRMED`. Domain `confirm` is a conditional transition.
+- Tests use a fixed clock. Cancel vs confirm race: one valid `PENDING` transition wins.
+
+---
+
+## 13. Estrategia JPA vs Domain
 
 | Aggregate | Domain / JPA separation | Why |
 |---|---|---|
-| `User` + `Address` | Separate | Password hash, uniqueness, default-address invariant |
+| `User` | Separate | Password hash, uniqueness |
+| `Address` | Separate | Default-address invariant, deactivate |
 | `Product` | Separate | Stock invariants + atomic SQL |
-| `Category` | Simple adapter | CRUD/status; still no JPA on domain |
-| `Cart` / `ShoppingList` | Separate | Collection invariants, one active cart |
+| `Category` | Separate adapter | Status; no JPA on domain |
+| `Cart` / `ShoppingList` | Separate | Collection invariants, one cart per customer |
 | `Order` | Separate | Lifecycle, snapshots, cancellation |
-| `Payment` | Thin adapter | Few invariants; no JPA on domain; no extra mapper stack |
-| Knowledge document/chunk | Simple + vector adapter | `VECTOR` is infrastructure |
-| `Conversation` | Simple | Ownership; little other domain behavior |
+| `Payment` | Separate | Status, `refundedAt`; no JPA on domain |
+| Knowledge document/chunk | JPA document + JDBC/pgvector embeddings | `VECTOR` is infrastructure |
+| `Conversation` | In-memory store | No JPA entity |
 
-Do not generate a mapper per table. Map in the repository adapter when separation is justified.
+Mapping happens in repository adapters. There is no MapStruct.
 
 ---
 
-## 14. Test strategy
+## 14. Estrategia de tests
 
-Preserve the pyramid: domain unit tests → application tests with mocked ports → PostgreSQL/Testcontainers integration → controller/security tests → a few critical E2E flows.
+Pyramid: domain unit tests → application tests with mocked/fake ports → PostgreSQL/Testcontainers integration → controller/security tests.
 
-No H2. No real payment, LLM, or embedding providers. Do not chase 100% coverage.
+No H2. Tests do not call real payment providers. LLM and embedding ports are faked in unit/application tests.
 
-### Critical checkout / inventory tests
+### Checkout / inventory coverage that matches runtime
 
-- successful checkout (identity from JWT, owned active address, snapshots, stock down, cart cleared, payment recorded)
-- simulated card decline (no order, stock unchanged, cart intact)
-- price change without explicit acceptance (409, no charge)
+- successful checkout (JWT identity, owned active address, snapshots, stock down, cart cleared, payment recorded)
+- request items must match the cart
+- price change without matching `expectedUnitPrice` (conflict, no charge)
 - insufficient stock
 - concurrent stock race (never negative stock)
 - cancellation restores stock
-- `APPROVED` simulated card cancel → payment `REFUNDED`
-- COD: payment `PENDING`, cancel does not invent `PAID`/`REFUNDED`
-- idempotency: same key+request replay; same key+different request 409; concurrent duplicate key
-- auto-confirm after 15 minutes via fixed `Clock`
+- `APPROVED` simulated card cancel → `refundedAt` set; status remains `APPROVED`
+- COD: payment `PENDING`; cancel does not set `refundedAt`
+- idempotency: same key+fingerprint replay; same key+different fingerprint conflict
+- auto-confirm after 15 minutes via fixed clock
 - public inactive product 404
+- inactive products cannot enter cart/list via `ProductQueryPort`
 - ownership: customer cannot read another user’s order/cart/address
 - ADMIN cannot be obtained via public register
+- Knowledge REST requires ADMIN
+- Assistant chat requires CUSTOMER; tools do not accept a target user id
 
-Application tests for shopping lists must still cover moving list items into the cart **without bypassing cart validation**, even though that is not a dedicated REST path.
+`DECLINED` is not a productive simulator outcome. Application can still reject a declined payment result; that path is not generated by `ProcessPaymentUseCase`.
+
+Application tests cover moving list items into the cart without bypassing cart validation, even though that is not a dedicated REST path.
 
 ---
 
-## 15. Configuration
+## 15. Configuración
 
 No secrets in Git.
 
-**`application.yml`:** application name; `ddl-auto` validate/none; `open-in-view: false`; Flyway enabled; pagination defaults; `superfercho.orders.cancellation-window: 15m`; auto-confirm poll interval; JWT expiration ~15m; COP as the only currency.
+**`application.yml`:**
 
-**`application-local.yml`:** local JDBC via env; scheduler on; filesystem image directory.
+- application name `superfercho`
+- `ddl-auto: none`; `open-in-view: false`; Hibernate JDBC timezone UTC
+- Flyway enabled, `classpath:db/migration`
+- datasource from `SUPERFERCHO_DB_URL` / `USERNAME` / `PASSWORD`
+- `superfercho.currency: COP`
+- `superfercho.security.jwt.secret` / `expiration: 15m`
+- Knowledge OpenAI embeddings: `OPENAI_API_KEY`, `text-embedding-3-small`, embeddings URL
+- Assistant OpenAI chat: `OPENAI_API_KEY`, chat URL, model `gpt-4o-mini`, connect timeout 5s, read timeout 60s
 
-**`application-test.yml`:** Testcontainers PostgreSQL; scheduler off unless a test enables it; fake LLM/embedding; no real providers.
+**`application-local.yml`:** local JDBC overrides via env. No image-storage directory. No extra scheduler flags.
 
-**Environment placeholders:** `SUPERFERCHO_DB_URL`, `SUPERFERCHO_DB_USERNAME`, `SUPERFERCHO_DB_PASSWORD`, `SUPERFERCHO_JWT_SECRET`, later `SUPERFERCHO_LLM_*` / `SUPERFERCHO_EMBEDDING_*` when those phases start, `SUPERFERCHO_STORAGE_DIRECTORY` for local images.
+**`application-test.yml`:** JWT test secret; datasource/JPA/Flyway auto-config excluded for isolated unit tests. Integration tests use Testcontainers PostgreSQL.
+
+**Environment:** `SUPERFERCHO_DB_URL`, `SUPERFERCHO_DB_USERNAME`, `SUPERFERCHO_DB_PASSWORD`, `SUPERFERCHO_JWT_SECRET`, `OPENAI_API_KEY`, optional OpenAI URL/model/timeout overrides.
 
 ---
 
-## 16. Maven dependencies
+## 16. Dependencias Maven
 
-**Required when the corresponding phase exists:**
+Declared in `pom.xml`:
 
-- `spring-boot-starter-web`, `validation`, `data-jpa`, `security`
-- Flyway + PostgreSQL
+- `spring-boot-starter-web`, `data-jpa`, `security`
+- Flyway core + PostgreSQL Flyway
 - PostgreSQL JDBC
-- JWT support (Nimbus / Spring Security JWT)
+- Nimbus JOSE JWT
 - `spring-boot-starter-test`, `spring-security-test`
-- Testcontainers PostgreSQL; pgvector image when Knowledge tests run
-- Hibernate vector module **only when Knowledge starts**
-- JDK `HttpClient` for LLM/embedding HTTP when those phases start
+- Testcontainers PostgreSQL / JUnit Jupiter / Spring Boot Testcontainers
 
-**Not introduced:** Lombok, LangChain, LangGraph, Spring AI as an orchestration framework, Redis, Kafka, RabbitMQ, Elasticsearch, MapStruct (unless later mapping volume justifies it), H2, cloud storage SDKs.
+JDK `HttpClient` is used for OpenAI chat and embeddings (no extra HTTP client dependency).
 
-**Optional later:** springdoc, Actuator, ArchUnit.
-
-Exact Spring Boot 3.x minor and PostgreSQL/pgvector versions are deferred.
+**Not present:** Lombok, LangChain, LangGraph, Spring AI as an orchestration framework, Redis, Kafka, RabbitMQ, Elasticsearch, MapStruct, H2, cloud storage SDKs, Hibernate Vector module as a Maven artifact.
 
 ---
 
-## 17. Implementation order
+## 17. Estado del sistema
 
-1. **Phase 0 — foundation:** Maven wrapper, Spring Boot, Flyway, PostgreSQL, UTC `Clock`, RFC 7807 error mapping, `Money` (COP), Testcontainers smoke
-2. **Identity:** User/address, register/login, JWT (~15 min), `CurrentUserProvider`, bootstrap admin, ownership tests
-3. **Catalog:** Category 1→N Product, public 404 for inactive, admin deactivate-on-DELETE, stock decrement/restore, local image adapter, concurrency tests
-4. **Shopping:** Cart/lists, `ProductCatalogPort`
-5. **Payments:** Payment aggregate + simulator behind application API (no public controller)
-6. **Orders / checkout:** Ports, one-TX checkout, price acceptance, idempotency 24h, cancel+refund, scheduler auto-confirm
-7. **Knowledge:** documents, ports, pgvector (provider/dimension/chunking chosen in that phase)
-8. **Assistant:** `POST /api/v1/assistant/chat`, `LLMPort` fake in tests, tools, confirmation
-9. **MCP:** thin tools; transport chosen in that phase
-10. **Hardening:** remaining security tests, secret audit, checkout E2E
+**Implemented (MVP):**
 
-Do not start Assistant before Catalog/Shopping/Orders application contracts exist.
+- Modular monolith with hexagonal modules listed in §0
+- Identity register/login/JWT/addresses
+- Catalog, stock ownership, public vs ADMIN view
+- Shopping cart and lists
+- Simulated payments (`SIMULATED_CARD`, `CASH_ON_DELIVERY`)
+- Checkout in one local TX, cancel + stock restore, auto-confirm
+- Knowledge documents, chunking, embeddings, pgvector, ADMIN REST
+- Assistant chat, `LLMPort`, allowlisted tools, confirmation for checkout and cancel
+- Security `denyAll` default
+
+**Not implemented (residual facts, not a delivery plan):**
+
+- Operational MCP (transport, tools, auth)
+- Durable Assistant conversation/confirmation storage
+- Real payment providers
+- `GET` current-user profile
+- Productive CARD `DECLINED` simulation
+- Object storage of product images
 
 ---
 
-## 18. Architectural risks
+## 18. Riesgos residuales
 
-| Risk | Impact | Mitigation |
+| Risk | Impact | Current mitigation / residual |
 |---|---|---|
-| Checkout TX split | Partial purchase | One `@Transactional` on `Checkout`; payment joins caller TX |
-| Non-atomic stock | Oversell | `UPDATE … WHERE stock >= qty`; concurrency tests |
-| Idempotency without lock | Duplicate orders | Unique `(user_id, key)` + same TX |
-| Cancel vs auto-confirm | Double process | Conditional `PENDING` update |
-| Cross-module JPA | Broken ownership | Logical UUIDs; consumer ports only |
-| RAG used as price/stock | Wrong charges | Tools + tests |
-| LLM impersonation | Wrong user’s cart | Strip client/model user ids; JWT actor |
-| Public payment API | Leaked simulator | No payment resource |
-| Physical catalog DELETE | Broken order history | HTTP DELETE = deactivate |
+| Logical UUIDs without cross-schema FK | Orphan references if a module writes an invalid id | Consumer ports validate existence; no physical FK by design |
+| RAG treated as price/stock | Wrong commercial answers | Tools must call Catalog/Shopping/Orders; tests cover inactive products |
+| In-memory Assistant state | Conversations and confirmation tokens lost on restart | Documented limitation; not durable |
+| Simulated CARD never declines | No runtime declined-charge path | `ProcessPaymentUseCase` always `APPROVED` for CARD |
+| Local refund timestamp | No external money movement | `refundedAt` on `APPROVED` only |
+| JWT without refresh/revocation | Stolen token valid until expiry (~15 min) | Short TTL; no refresh subsystem |
+| MCP stub | No alternative driving adapter | Package is non-operational |
+
+Resolved in the current code and not listed as open architecture defects: non-atomic stock, checkout without a local transaction, Assistant impersonation via client user id, Knowledge HTTP left unsecured, INACTIVE products entering the cart through Catalog query.
 
 ---
 
-## 19. Decisions: resolved vs deferred
+## 19. Decisiones vigentes
 
-### 19.1 Resolved (integrated throughout this document)
+Compatible with the current code:
 
-- REST base `/api/v1` and the endpoint list in §10 (authoritative, not candidate)
-- Pagination `page=0`, `size=20`, max `100`
+- REST base `/api/v1` as documented in §10
+- Pagination `page=0`, `size=20`, max `100` on order listing
 - Public inactive product = 404
-- RFC 7807 / `application/problem+json` with optional application `code`
-- HTTP 400/401/403/404/409/500 semantics
-- One `User` aggregate, one role, no self-register ADMIN, bootstrap ADMIN, ADMIN not a shopper
-- Address fields; deactivate not physical delete; snapshot on order
-- COP only; `Money` in minimal platform
-- Category 1→N Product; product fields including brand and image reference
-- `ProductImageStoragePort` + local filesystem; no cloud store
-- Payment statuses **PENDING / APPROVED / DECLINED / REFUNDED**; COD stays PENDING; card cancel → REFUNDED; `PAID` deferred
-- Checkout one local TX; explicit price acceptance → 409 on change
-- Idempotency-Key: same request replay; different request 409; 24h success retention
-- Adjacent-only order transitions
-- JWT access ~15 minutes; no refresh
-- PostgreSQL schemas per module; logical cross-module UUIDs
+- RFC 7807 / `application/problem+json` with optional `code`
+- One `User` type, one role, no self-register ADMIN, ADMIN not a shopper
+- Address deactivate, not physical delete; snapshot on order
+- COP only; `Money` in platform
+- Category 1→N Product; `image_url` string; no image-storage port
+- Payment statuses `PENDING` / `APPROVED` / `DECLINED`; refund via `refundedAt`
+- Simulator: CARD always `APPROVED`; COD `PENDING`
+- Checkout one local TX via Infrastructure `TransactionTemplate`
+- Explicit `expectedUnitPrice`; 409 on change
+- Idempotency-Key: fingerprint + materialized result; 24h retention
+- Adjacent-only order transitions; customer cancel `PENDING` + 15 minutes from `createdAt`
+- JWT access 15 minutes; no refresh
+- PostgreSQL schemas per module except Assistant; logical cross-module UUIDs
 - Single Maven module
-- Search: PostgreSQL ILIKE; no Elasticsearch
-- UTC `Clock`
-- AI/MCP boundaries unchanged in intent
+- Catalog search: PostgreSQL ILIKE on name/brand/barcode
+- UTC clock
+- Knowledge `vector(1536)`, `text-embedding-3-small`, HNSW cosine
+- Assistant `OpenAiChatAdapter` behind `LLMPort`
+- MCP not operational
+- `anyRequest().denyAll()`
 
-### 19.2 Deferred (do not invent now)
-
-- Specific LLM provider
-- Specific embedding provider/model
-- Embedding dimension
-- Exact knowledge chunking algorithm
-- Exact MCP transport and MCP authentication binding
-- Cloud image provider (explicitly out of MVP)
-- PostgreSQL full-text search or `pg_trgm` (only if ILIKE proves insufficient)
-- JWT refresh / rotation / revocation
-- Exact Spring Boot 3.x minor, PostgreSQL major, and pgvector version
-- Knowledge HTTP API (not in the MVP REST contract)
-- COD `PAID` at delivery / cash collection
-- Persistent idempotency `FAILED`/`RECOVERING` states
-
-### 19.3 Alignment with `.cursor/rules/`
-
-Payment statuses in `.cursor/rules/00-global-architecture.mdc` §22 match this blueprint: `PENDING`, `APPROVED`, `DECLINED`, `REFUNDED`. `PAID` is not an MVP status.
-
-No remaining payment-status contradiction with the architecture rules.
+This document follows the code. It does not claim alignment with other policy files if those files still describe `REFUNDED` as a payment status, a `presentation/rest` package, or deferred Knowledge HTTP.
 
 ---
 
-## 20. Final verdict
+## 20. Veredicto del documento
 
-The blueprint is internally consistent as an implementation specification. Payment statuses are aligned with `.cursor/rules/00-global-architecture.mdc`.
+This blueprint is an as-built description of the implemented SuperFercho backend.
 
-Remaining work is the deferred phase choices listed in §19.2.
+Where this text and the source disagree, the source and Flyway migrations win.
 
-**READY FOR PHASE 0 IMPLEMENTATION**
+Residual items in §17 are absences in the current system, not approved next phases.
