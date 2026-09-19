@@ -103,6 +103,8 @@ public class IdentitySecurityConfiguration {
                         .hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.POST, "/api/v1/orders/{orderId}/cancel")
                         .hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/assistant/chat")
+                        .hasRole("CUSTOMER")
                         .anyRequest()
                         .denyAll())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

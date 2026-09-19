@@ -348,6 +348,49 @@ class HttpAuthorizationSecurityTest {
                 .andExpect(accessDenied());
     }
 
+    @Test
+    void shouldRejectAssistantChatWithoutJwt() throws Exception {
+        mockMvc.perform(post("/api/v1/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"message": "hola"}
+                                """))
+                .andExpect(unauthenticated());
+    }
+
+    @Test
+    void shouldAllowAssistantChatWithCustomerJwt() throws Exception {
+        mockMvc.perform(post("/api/v1/assistant/chat")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"message": "hola"}
+                                """))
+                .andExpect(notBlockedBySecurity());
+    }
+
+    @Test
+    void shouldRejectAssistantChatWithAdminJwt() throws Exception {
+        mockMvc.perform(post("/api/v1/assistant/chat")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"message": "hola"}
+                                """))
+                .andExpect(accessDenied());
+    }
+
+    @Test
+    void shouldRejectInvalidBearerTokenOnAssistantChat() throws Exception {
+        mockMvc.perform(post("/api/v1/assistant/chat")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer not-a-jwt")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"message": "hola"}
+                                """))
+                .andExpect(unauthenticated());
+    }
+
     private String bearer(Role role) {
         return "Bearer " + jwtAccessTokenService.issue(USER_ID, role).token();
     }
