@@ -70,6 +70,12 @@ public class OrderPersistenceAdapter implements OrderRepository {
     }
 
     @Override
+    public PagedResult<Order> findByStatuses(List<OrderStatus> statuses, PageRequest pageRequest) {
+        return toPagedResult(
+                orderJpaRepository.findAllByStatusIn(statuses, toSpringPage(pageRequest)), pageRequest);
+    }
+
+    @Override
     public List<Order> findPendingOrdersEligibleForAutomaticConfirmation(Instant currentTime) {
         Instant createdBefore = currentTime.minus(Order.CUSTOMER_CANCELLATION_WINDOW);
         return orderJpaRepository.findByStatusAndCreatedAtBefore(OrderStatus.PENDING, createdBefore).stream()

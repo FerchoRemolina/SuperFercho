@@ -21,11 +21,13 @@ import com.superfercho.orders.application.dto.OrderItemResult;
 import com.superfercho.orders.application.dto.OrderResult;
 import com.superfercho.orders.application.dto.PagedResult;
 import com.superfercho.orders.application.dto.PaymentMethod;
+import com.superfercho.orders.application.dto.PaymentResult;
 import com.superfercho.orders.application.dto.PaymentStatus;
 import com.superfercho.orders.application.dto.ShippingAddressResult;
 import com.superfercho.orders.application.dto.UpdateOrderStatusCommand;
 import com.superfercho.orders.application.exception.InvalidOrderStatusUpdateException;
 import com.superfercho.orders.application.exception.OrderNotFoundException;
+import com.superfercho.orders.application.exception.OrderOwnershipException;
 import com.superfercho.orders.application.usecase.GetOrderUseCase;
 import com.superfercho.orders.application.usecase.ListOrdersUseCase;
 import com.superfercho.orders.application.usecase.UpdateOrderStatusUseCase;
@@ -33,6 +35,7 @@ import com.superfercho.orders.domain.exception.InvalidOrderStateTransitionExcept
 import com.superfercho.orders.domain.model.OrderStatus;
 import com.superfercho.orders.infrastructure.configuration.TransactionalCancelOrderUseCase;
 import com.superfercho.orders.infrastructure.configuration.TransactionalCheckoutUseCase;
+import com.superfercho.payments.application.exception.PaymentNotFoundException;
 import com.superfercho.platform.error.ApiExceptionHandler;
 import com.superfercho.platform.money.Money;
 import java.math.BigDecimal;
@@ -55,6 +58,7 @@ class OrderControllerTest {
 
     private static final Instant CREATED_AT = Instant.parse("2026-03-01T10:00:00Z");
     private static final UUID ORDER_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private static final UUID CUSTOMER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID ADDRESS_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final UUID PRODUCT_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
     private static final UUID ITEM_ID = UUID.fromString("99999999-9999-9999-9999-000000000001");
@@ -123,12 +127,14 @@ class OrderControllerTest {
 
     @Test
     void shouldGetOrderById() throws Exception {
-        when(getOrderUseCase.execute(new GetOrderCommand(ORDER_ID))).thenReturn(orderResult(OrderStatus.PENDING, null));
+        when(getOrderUseCase.execute(new GetOrderCommand(ORDER_ID)))
+                .thenReturn(orderResult(OrderStatus.PENDING, null, cardPayment()));
 
         mockMvc.perform(get("/api/v1/orders/{orderId}", ORDER_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(ORDER_ID.toString()))
                 .andExpect(jsonPath("$.orderNumber").value("ORD-P-1001"))
+                .andExpect(jsonPath("$.customerId").value(CUSTOMER_ID.toString()))
                 .andExpect(jsonPath("$.status").value("PENDING"))
                 .andExpect(jsonPath("$.items[0].productId").value(PRODUCT_ID.toString()))
                 .andExpect(jsonPath("$.items[0].productName").value("Leche entera"))
@@ -139,11 +145,56 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.total.currency").value("COP"))
                 .andExpect(jsonPath("$.shippingAddress.city").value("Bogotá"))
                 .andExpect(jsonPath("$.paymentId").value(PAYMENT_ID.toString()))
+                .andExpect(jsonPath("$.payment.paymentMethod").value("SIMULATED_CARD"))
+                .andExpect(jsonPath("$.payment.amount.amount").value(21.00))
+                .andExpect(jsonPath("$.payment.status").value("APPROVED"))
+                .andExpect(jsonPath("$.payment.providerReference").value("sim-1"))
+                .andExpect(jsonPath("$.payment.refundedAt").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.payment.createdAt").value(CREATED_AT.toString()))
+                .andExpect(jsonPath("$.payment.updatedAt").value(CREATED_AT.toString()))
                 .andExpect(jsonPath("$.createdAt").value(CREATED_AT.toString()))
                 .andExpect(jsonPath("$.confirmedAt").isEmpty());
 
         verify(getOrderUseCase).execute(new GetOrderCommand(ORDER_ID));
         verifyNoInteractions(transactionalCheckoutUseCase, transactionalCancelOrderUseCase, listOrdersUseCase, updateOrderStatusUseCase);
+    }
+
+    @Test
+    void shouldMapUnknownOrderAsNotFound() throws Exception {
+        when(getOrderUseCase.execute(any())).thenThrow(new OrderNotFoundException(ORDER_ID));
+
+        mockMvc.perform(get("/api/v1/orders/{orderId}", ORDER_ID))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ORDER_NOT_FOUND"));
+    }
+
+    @Test
+    void shouldMapForeignOrderAsNotFound() throws Exception {
+        when(getOrderUseCase.execute(any())).thenThrow(new OrderOwnershipException(CUSTOMER_ID, ORDER_ID));
+
+        mockMvc.perform(get("/api/v1/orders/{orderId}", ORDER_ID))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ORDER_NOT_FOUND"));
+    }
+
+    @Test
+    void shouldReturnNullPaymentWhenOrderHasNoPaymentId() throws Exception {
+        when(getOrderUseCase.execute(new GetOrderCommand(ORDER_ID)))
+                .thenReturn(orderResult(OrderStatus.PENDING, null, null));
+
+        mockMvc.perform(get("/api/v1/orders/{orderId}", ORDER_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(ORDER_ID.toString()))
+                .andExpect(jsonPath("$.payment").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    void shouldMapMissingPaymentAsNotFoundWhenPaymentIdExists() throws Exception {
+        when(getOrderUseCase.execute(any())).thenThrow(new PaymentNotFoundException(PAYMENT_ID));
+
+        mockMvc.perform(get("/api/v1/orders/{orderId}", ORDER_ID))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PAYMENT_NOT_FOUND"));
     }
 
     @Test
@@ -278,9 +329,14 @@ class OrderControllerTest {
     }
 
     private static OrderResult orderResult(OrderStatus status, Instant cancelledAt) {
+        return orderResult(status, cancelledAt, null);
+    }
+
+    private static OrderResult orderResult(OrderStatus status, Instant cancelledAt, PaymentResult payment) {
         return new OrderResult(
                 ORDER_ID,
                 "ORD-P-1001",
+                CUSTOMER_ID,
                 status,
                 List.of(new OrderItemResult(ITEM_ID, PRODUCT_ID, "Leche entera", PRICE, 2, TOTAL)),
                 TOTAL,
@@ -291,6 +347,19 @@ class OrderControllerTest {
                 CREATED_AT,
                 null,
                 cancelledAt,
+                CREATED_AT,
+                payment);
+    }
+
+    private static PaymentResult cardPayment() {
+        return new PaymentResult(
+                PAYMENT_ID,
+                TOTAL,
+                PaymentMethod.SIMULATED_CARD,
+                PaymentStatus.APPROVED,
+                "sim-1",
+                null,
+                CREATED_AT,
                 CREATED_AT);
     }
 }

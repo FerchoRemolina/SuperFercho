@@ -83,7 +83,12 @@ class PaymentIntegrationMapperTest {
                 null));
 
         assertEquals(PAYMENT_ID, result.paymentId());
+        assertEquals(AMOUNT, result.amount());
+        assertEquals(com.superfercho.orders.application.dto.PaymentMethod.CASH_ON_DELIVERY, result.paymentMethod());
         assertEquals(com.superfercho.orders.application.dto.PaymentStatus.PENDING, result.status());
         assertEquals("cod-pending", result.providerReference());
+        assertEquals(null, result.refundedAt());
+        assertEquals(NOW, result.createdAt());
+        assertEquals(NOW, result.updatedAt());
     }
 }

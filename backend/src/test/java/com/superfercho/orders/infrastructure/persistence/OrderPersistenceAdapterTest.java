@@ -109,6 +109,47 @@ class OrderPersistenceAdapterTest {
     }
 
     @Test
+    void shouldFindAllOrdersAcrossCustomers() {
+        UUID customerId = UUID.randomUUID();
+        UUID otherCustomerId = UUID.randomUUID();
+        Order own = orderRepository.save(pendingOrder("ORD-P-ALL-1", customerId, PAYMENT_ID));
+        Order other = orderRepository.save(pendingOrder("ORD-P-ALL-2", otherCustomerId, PAYMENT_ID));
+
+        assertThat(orderRepository.findAll(PageRequest.of(0, 20)).items())
+                .extracting(Order::id)
+                .contains(own.id(), other.id());
+    }
+
+    @Test
+    void shouldFindOrdersByStatusesAtDatabaseWithCorrectTotalElements() {
+        UUID customerId = UUID.randomUUID();
+        Instant at = CREATED_AT.plusSeconds(60);
+        Order pending = orderRepository.save(pendingOrder("ORD-P-SALES-1", customerId, PAYMENT_ID));
+        Order confirmed = orderRepository.save(pendingOrder("ORD-P-SALES-2", customerId, PAYMENT_ID).confirm(at));
+        Order cancelled = orderRepository.save(
+                pendingOrder("ORD-P-SALES-3", customerId, PAYMENT_ID).cancel(CREATED_AT.plusSeconds(30)));
+        Order delivered = orderRepository.save(pendingOrder("ORD-P-SALES-4", customerId, PAYMENT_ID)
+                .confirm(at)
+                .startPreparation(at)
+                .markReady(at)
+                .markDelivered(at));
+
+        var sales = List.of(OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.DELIVERED);
+        var allSales = orderRepository.findByStatuses(sales, PageRequest.of(0, 100));
+        var firstPage = orderRepository.findByStatuses(sales, new PageRequest(0, 1));
+
+        assertThat(allSales.items())
+                .extracting(Order::id)
+                .contains(confirmed.id(), delivered.id())
+                .doesNotContain(pending.id(), cancelled.id());
+        assertThat(allSales.totalElements()).isEqualTo(allSales.items().size());
+        assertThat(firstPage.items()).hasSize(1);
+        assertThat(firstPage.size()).isEqualTo(1);
+        assertThat(firstPage.totalElements()).isEqualTo(allSales.totalElements());
+        assertThat(firstPage.totalElements()).isGreaterThan(firstPage.items().size());
+    }
+
+    @Test
     void shouldFindOrdersByCustomerId() {
         UUID customerId = UUID.randomUUID();
         UUID otherCustomerId = UUID.randomUUID();

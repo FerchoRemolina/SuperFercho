@@ -355,6 +355,7 @@ class ChatApplicationServiceTest {
         return new OrderResult(
                 ORDER_ID,
                 "SF-1",
+                UUID.fromString("11111111-1111-1111-1111-111111111111"),
                 OrderStatus.CANCELLED,
                 List.of(),
                 Money.cop(new BigDecimal("10.50")),
@@ -364,6 +365,7 @@ class ChatApplicationServiceTest {
                 NOW,
                 null,
                 NOW,
-                NOW);
+                NOW,
+                null);
     }
 }

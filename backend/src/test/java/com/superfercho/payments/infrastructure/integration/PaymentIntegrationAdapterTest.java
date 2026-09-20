@@ -107,6 +107,7 @@ class PaymentIntegrationAdapterTest {
         verify(getPaymentUseCase).execute(command.capture());
         assertEquals(PAYMENT_ID, command.getValue().paymentId());
         assertEquals(PAYMENT_ID, result.paymentId());
+        assertEquals(AMOUNT, result.amount());
         assertEquals(PaymentStatus.APPROVED, result.status());
         assertEquals("sim-approved", result.providerReference());
         verifyNoInteractions(processPaymentUseCase, refundPaymentUseCase);

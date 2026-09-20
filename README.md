@@ -84,6 +84,14 @@ Documentos, chunks, embeddings, pgvector y búsqueda semántica. REST restringid
 - El simulador aprueba `SIMULATED_CARD` y deja `CASH_ON_DELIVERY` en `PENDING`.
 - Checkout y cancelación desde Assistant exigen confirmación explícita.
 
+## Frontend
+
+La UI vive en `frontend/` como aplicación Next.js independiente (App Router). Consume `/api/v1` del backend y no duplica Domain ni PostgreSQL.
+
+La fundación técnica ya está creada. Login, catálogo, carrito, checkout, pedidos, listas, admin y assistant todavía no están implementados.
+
+Detalle: [`frontend/README.md`](frontend/README.md). Blueprint: [`docs/architecture/frontend-technical-blueprint.md`](docs/architecture/frontend-technical-blueprint.md).
+
 ## Stack tecnológico
 
 | Tecnología | Uso en SuperFercho |
@@ -100,6 +108,7 @@ Documentos, chunks, embeddings, pgvector y búsqueda semántica. REST restringid
 | Testcontainers | PostgreSQL 16 + pgvector en integración |
 | Docker | Motor para Testcontainers |
 | Docker Compose | PostgreSQL local (`pgvector/pgvector:pg16`) |
+| Next.js 16 / React 19 | Frontend en `frontend/` (fundación; sin features de negocio) |
 
 ## Persistencia
 
@@ -161,7 +170,7 @@ GET de catálogo: `view` ausente o `PUBLIC`. `view=ADMIN` no es público.
 | `DELETE` | `/shopping-lists/{shoppingListId}/items` | Vacía ítems; no elimina la lista |
 | `POST` | `/orders` | Header `Idempotency-Key` |
 | `GET` | `/orders` | Query `page`, `size` |
-| `GET` | `/orders/{orderId}` | |
+| `GET` | `/orders/{orderId}` | Detalle con `payment` anidado |
 | `POST` | `/orders/{orderId}/cancel` | |
 | `POST` | `/assistant/chat` | |
 
@@ -180,6 +189,8 @@ GET de catálogo: `view` ausente o `PUBLIC`. `view=ADMIN` no es público.
 | `POST` | `/products/{productId}/deactivate` |
 | `POST` | `/products/{productId}/price` |
 | `POST` | `/orders/{orderId}/status` |
+| `GET` | `/admin/orders` |
+| `GET` | `/admin/orders/{orderId}` |
 | `GET` | `/payments/{paymentId}` |
 | `POST` | `/knowledge/documents` |
 | `GET` | `/knowledge/documents` |
@@ -189,6 +200,8 @@ GET de catálogo: `view` ausente o `PUBLIC`. `view=ADMIN` no es público.
 | `POST` | `/knowledge/documents/{documentId}/deactivate` |
 | `POST` | `/knowledge/documents/{documentId}/reactivate` |
 | `GET` | `/knowledge/search` |
+
+`GET /admin/orders` acepta `page`, `size` y `status` opcional (repetido o separado por comas). Sin `status` devuelve todos los estados. Ventas usa `CONFIRMED,PREPARING,READY,DELIVERED`. El detalle de pedido (`GET /orders/{orderId}` y `GET /admin/orders/{orderId}`) incluye `payment` anidado cuando hay `paymentId`. El comprobante de compra es una vista de ese detalle; no hay `/receipt` ni `/admin/sales`. `GET /payments/{paymentId}` sigue siendo solo `ADMIN`.
 
 ## Seguridad
 
@@ -210,6 +223,7 @@ Cierre de MVP: 954 tests ejecutados, 0 failures, 0 errors, 0 skipped.
 - Docker (Testcontainers en las pruebas de integración)
 - Docker Compose (PostgreSQL/pgvector local)
 - Maven Wrapper (`backend/mvnw` / `backend/mvnw.cmd`)
+- Node.js 20.9+ y pnpm 12.4.2 (solo para `frontend/`)
 
 ## Configuración
 
@@ -268,6 +282,16 @@ cd backend
 ```
 
 Puerto: `SERVER_PORT` (8080). Requiere `SUPERFERCHO_JWT_SECRET`. Embeddings y chat requieren `OPENAI_API_KEY`.
+
+### Frontend
+
+```bash
+cd frontend
+corepack pnpm install
+corepack pnpm dev
+```
+
+Origen: `http://localhost:3000`. Rewrite de `/api/v1` hacia Spring en `8080`. Detalle en [`frontend/README.md`](frontend/README.md).
 
 ### Pruebas
 

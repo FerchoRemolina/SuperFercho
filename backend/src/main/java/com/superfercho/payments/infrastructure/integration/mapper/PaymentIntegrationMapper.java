@@ -18,7 +18,21 @@ public final class PaymentIntegrationMapper {
 
     public static PaymentResult toResult(PaymentResponse response) {
         return new PaymentResult(
-                response.paymentId(), toOrdersPaymentStatus(response.status()), response.providerReference());
+                response.paymentId(),
+                response.amount(),
+                toOrdersPaymentMethod(response.paymentMethod()),
+                toOrdersPaymentStatus(response.status()),
+                response.providerReference(),
+                response.refundedAt(),
+                response.createdAt(),
+                response.updatedAt());
+    }
+
+    public static com.superfercho.orders.application.dto.PaymentMethod toOrdersPaymentMethod(PaymentMethod method) {
+        return switch (method) {
+            case SIMULATED_CARD -> com.superfercho.orders.application.dto.PaymentMethod.SIMULATED_CARD;
+            case CASH_ON_DELIVERY -> com.superfercho.orders.application.dto.PaymentMethod.CASH_ON_DELIVERY;
+        };
     }
 
     public static PaymentMethod toPaymentsPaymentMethod(

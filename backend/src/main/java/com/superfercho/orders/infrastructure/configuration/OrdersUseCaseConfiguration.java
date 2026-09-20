@@ -12,7 +12,9 @@ import com.superfercho.orders.application.port.ShoppingCartPort;
 import com.superfercho.orders.application.usecase.AutoConfirmPendingOrdersUseCase;
 import com.superfercho.orders.application.usecase.CancelOrderUseCase;
 import com.superfercho.orders.application.usecase.CheckoutUseCase;
+import com.superfercho.orders.application.usecase.GetAdminOrderUseCase;
 import com.superfercho.orders.application.usecase.GetOrderUseCase;
+import com.superfercho.orders.application.usecase.ListAdminOrdersUseCase;
 import com.superfercho.orders.application.usecase.ListOrdersUseCase;
 import com.superfercho.orders.application.usecase.UpdateOrderStatusUseCase;
 import com.superfercho.orders.infrastructure.clock.SystemClockAdapter;
@@ -73,13 +75,24 @@ public class OrdersUseCaseConfiguration {
     }
 
     @Bean
-    GetOrderUseCase getOrderUseCase(CurrentUserProvider currentUserProvider, OrderRepository orderRepository) {
-        return new GetOrderUseCase(currentUserProvider, orderRepository);
+    GetOrderUseCase getOrderUseCase(
+            CurrentUserProvider currentUserProvider, OrderRepository orderRepository, PaymentPort paymentPort) {
+        return new GetOrderUseCase(currentUserProvider, orderRepository, paymentPort);
     }
 
     @Bean
     ListOrdersUseCase listOrdersUseCase(CurrentUserProvider currentUserProvider, OrderRepository orderRepository) {
         return new ListOrdersUseCase(currentUserProvider, orderRepository);
+    }
+
+    @Bean
+    GetAdminOrderUseCase getAdminOrderUseCase(OrderRepository orderRepository, PaymentPort paymentPort) {
+        return new GetAdminOrderUseCase(orderRepository, paymentPort);
+    }
+
+    @Bean
+    ListAdminOrdersUseCase listAdminOrdersUseCase(OrderRepository orderRepository) {
+        return new ListAdminOrdersUseCase(orderRepository);
     }
 
     @Bean

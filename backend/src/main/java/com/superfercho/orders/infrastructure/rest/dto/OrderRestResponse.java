@@ -10,6 +10,7 @@ import java.util.UUID;
 public record OrderRestResponse(
         UUID id,
         String orderNumber,
+        UUID customerId,
         OrderStatus status,
         List<OrderItemRestResponse> items,
         Money subtotal,
@@ -19,12 +20,14 @@ public record OrderRestResponse(
         Instant createdAt,
         Instant confirmedAt,
         Instant cancelledAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        OrderPaymentRestResponse payment) {
 
     public static OrderRestResponse from(OrderResult order) {
         return new OrderRestResponse(
                 order.id(),
                 order.orderNumber(),
+                order.customerId(),
                 order.status(),
                 order.items().stream().map(OrderItemRestResponse::from).toList(),
                 order.subtotal(),
@@ -34,6 +37,7 @@ public record OrderRestResponse(
                 order.createdAt(),
                 order.confirmedAt(),
                 order.cancelledAt(),
-                order.updatedAt());
+                order.updatedAt(),
+                OrderPaymentRestResponse.from(order.payment()));
     }
 }

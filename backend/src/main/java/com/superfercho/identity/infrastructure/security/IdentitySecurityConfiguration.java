@@ -87,6 +87,10 @@ public class IdentitySecurityConfiguration {
                         .hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/orders/{orderId}/status")
                         .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/orders")
+                        .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/orders/**")
+                        .hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/payments/{paymentId}")
                         .hasRole("ADMIN")
                         .requestMatchers(

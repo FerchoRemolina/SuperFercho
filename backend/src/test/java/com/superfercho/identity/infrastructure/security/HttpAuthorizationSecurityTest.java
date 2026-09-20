@@ -34,13 +34,17 @@ import com.superfercho.identity.infrastructure.rest.AuthController;
 import com.superfercho.identity.infrastructure.rest.CustomerController;
 import com.superfercho.orders.application.dto.OrderItemResult;
 import com.superfercho.orders.application.dto.OrderResult;
+import com.superfercho.orders.application.dto.PagedResult;
 import com.superfercho.orders.application.dto.ShippingAddressResult;
+import com.superfercho.orders.application.usecase.GetAdminOrderUseCase;
 import com.superfercho.orders.application.usecase.GetOrderUseCase;
+import com.superfercho.orders.application.usecase.ListAdminOrdersUseCase;
 import com.superfercho.orders.application.usecase.ListOrdersUseCase;
 import com.superfercho.orders.application.usecase.UpdateOrderStatusUseCase;
 import com.superfercho.orders.domain.model.OrderStatus;
 import com.superfercho.orders.infrastructure.configuration.TransactionalCancelOrderUseCase;
 import com.superfercho.orders.infrastructure.configuration.TransactionalCheckoutUseCase;
+import com.superfercho.orders.infrastructure.rest.AdminOrderController;
 import com.superfercho.orders.infrastructure.rest.OrderController;
 import com.superfercho.platform.money.Money;
 import com.superfercho.platform.time.ClockConfiguration;
@@ -66,7 +70,8 @@ import org.springframework.test.web.servlet.ResultMatcher;
             CustomerController.class,
             AddressController.class,
             CategoryController.class,
-            OrderController.class
+            OrderController.class,
+            AdminOrderController.class
         })
 @Import({IdentitySecurityConfiguration.class, ClockConfiguration.class})
 @TestPropertySource(
@@ -141,6 +146,12 @@ class HttpAuthorizationSecurityTest {
     private ListOrdersUseCase listOrdersUseCase;
 
     @MockitoBean
+    private GetAdminOrderUseCase getAdminOrderUseCase;
+
+    @MockitoBean
+    private ListAdminOrdersUseCase listAdminOrdersUseCase;
+
+    @MockitoBean
     private UpdateOrderStatusUseCase updateOrderStatusUseCase;
 
     @BeforeEach
@@ -152,6 +163,10 @@ class HttpAuthorizationSecurityTest {
         when(listCategoriesUseCase.execute(any())).thenReturn(List.of());
         when(createCategoryUseCase.execute(any())).thenReturn(categoryResult());
         when(updateOrderStatusUseCase.execute(any())).thenReturn(orderResult());
+        when(listOrdersUseCase.execute(any())).thenReturn(new PagedResult<>(List.of(), 0, 20, 0));
+        when(getOrderUseCase.execute(any())).thenReturn(orderResult());
+        when(listAdminOrdersUseCase.execute(any())).thenReturn(new PagedResult<>(List.of(), 0, 20, 0));
+        when(getAdminOrderUseCase.execute(any())).thenReturn(orderResult());
     }
 
     @Test
@@ -284,6 +299,62 @@ class HttpAuthorizationSecurityTest {
                                 {"status": "PREPARING"}
                                 """))
                 .andExpect(notBlockedBySecurity());
+    }
+
+    @Test
+    void shouldRejectCustomerOrdersWithoutJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/orders")).andExpect(unauthenticated());
+        mockMvc.perform(get("/api/v1/orders/{orderId}", ORDER_ID)).andExpect(unauthenticated());
+    }
+
+    @Test
+    void shouldAllowCustomerOrdersWithCustomerJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/orders").header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(notBlockedBySecurity());
+        mockMvc.perform(get("/api/v1/orders/{orderId}", ORDER_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(notBlockedBySecurity());
+    }
+
+    @Test
+    void shouldRejectCustomerOrdersWithAdminJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/orders").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(accessDenied());
+        mockMvc.perform(get("/api/v1/orders/{orderId}", ORDER_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(accessDenied());
+    }
+
+    @Test
+    void shouldRejectAdminOrdersWithoutJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/orders")).andExpect(unauthenticated());
+        mockMvc.perform(get("/api/v1/admin/orders/{orderId}", ORDER_ID)).andExpect(unauthenticated());
+    }
+
+    @Test
+    void shouldRejectAdminOrdersWithCustomerJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/orders").header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(accessDenied());
+        mockMvc.perform(get("/api/v1/admin/orders/{orderId}", ORDER_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(accessDenied());
+    }
+
+    @Test
+    void shouldAllowAdminOrdersWithAdminJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/orders").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/orders/{orderId}", ORDER_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldDenyUndefinedAdminOrderRoutes() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/orders").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(accessDenied());
+        mockMvc.perform(get("/api/v1/admin").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(accessDenied());
     }
 
     @Test
@@ -569,6 +640,7 @@ class HttpAuthorizationSecurityTest {
         return new OrderResult(
                 ORDER_ID,
                 "ORD-P-1001",
+                USER_ID,
                 OrderStatus.PREPARING,
                 List.of(new OrderItemResult(
                         UUID.fromString("99999999-9999-9999-9999-000000000001"),
@@ -585,6 +657,7 @@ class HttpAuthorizationSecurityTest {
                 NOW,
                 null,
                 null,
-                NOW);
+                NOW,
+                null);
     }
 }

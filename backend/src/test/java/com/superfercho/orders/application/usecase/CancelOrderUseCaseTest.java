@@ -11,6 +11,7 @@ import com.superfercho.catalog.application.dto.StockQuantity;
 import com.superfercho.catalog.application.port.InventoryPort;
 import com.superfercho.orders.application.dto.CancelOrderCommand;
 import com.superfercho.orders.application.dto.OrderResult;
+import com.superfercho.orders.application.dto.PaymentMethod;
 import com.superfercho.orders.application.dto.PaymentResult;
 import com.superfercho.orders.application.dto.PaymentStatus;
 import com.superfercho.orders.application.exception.OrderOwnershipException;
@@ -80,7 +81,7 @@ class CancelOrderUseCaseTest {
         when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
         when(orderRepository.saveIfPending(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         when(paymentPort.getPayment(PAYMENT_ID))
-                .thenReturn(new PaymentResult(PAYMENT_ID, PaymentStatus.APPROVED, "sim-1"));
+                .thenReturn(paymentResult(PaymentStatus.APPROVED, "sim-1"));
 
         OrderResult result = cancelOrder.execute(new CancelOrderCommand(ORDER_ID));
 
@@ -119,7 +120,7 @@ class CancelOrderUseCaseTest {
         when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
         when(orderRepository.saveIfPending(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         when(paymentPort.getPayment(PAYMENT_ID))
-                .thenReturn(new PaymentResult(PAYMENT_ID, PaymentStatus.APPROVED, "sim-1"));
+                .thenReturn(paymentResult(PaymentStatus.APPROVED, "sim-1"));
 
         cancelOrder.execute(new CancelOrderCommand(ORDER_ID));
 
@@ -132,7 +133,7 @@ class CancelOrderUseCaseTest {
         when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
         when(orderRepository.saveIfPending(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         when(paymentPort.getPayment(PAYMENT_ID))
-                .thenReturn(new PaymentResult(PAYMENT_ID, PaymentStatus.APPROVED, "sim-1"));
+                .thenReturn(paymentResult(PaymentStatus.APPROVED, "sim-1"));
 
         cancelOrder.execute(new CancelOrderCommand(ORDER_ID));
 
@@ -145,7 +146,7 @@ class CancelOrderUseCaseTest {
         when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
         when(orderRepository.saveIfPending(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         when(paymentPort.getPayment(PAYMENT_ID))
-                .thenReturn(new PaymentResult(PAYMENT_ID, PaymentStatus.PENDING, "cod-1"));
+                .thenReturn(paymentResult(PaymentStatus.PENDING, "cod-1"));
 
         cancelOrder.execute(new CancelOrderCommand(ORDER_ID));
 
@@ -181,6 +182,18 @@ class CancelOrderUseCaseTest {
                 new ShippingAddressSnapshot(
                         "Ada Lovelace", "Calle 1 # 2-3", "Apto 101", "Bogotá", "Cundinamarca", "3001234567"),
                 paymentId,
+                CREATED_AT,
+                CREATED_AT);
+    }
+
+    private static PaymentResult paymentResult(PaymentStatus status, String providerReference) {
+        return new PaymentResult(
+                PAYMENT_ID,
+                Money.cop(new BigDecimal("21.00")),
+                status == PaymentStatus.PENDING ? PaymentMethod.CASH_ON_DELIVERY : PaymentMethod.SIMULATED_CARD,
+                status,
+                providerReference,
+                null,
                 CREATED_AT,
                 CREATED_AT);
     }

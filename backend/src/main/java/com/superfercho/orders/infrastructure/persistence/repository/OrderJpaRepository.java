@@ -20,6 +20,8 @@ public interface OrderJpaRepository extends JpaRepository<OrderJpaEntity, UUID> 
 
     Page<OrderJpaEntity> findAllByCustomerId(UUID customerId, Pageable pageable);
 
+    Page<OrderJpaEntity> findAllByStatusIn(List<OrderStatus> statuses, Pageable pageable);
+
     List<OrderJpaEntity> findByStatusAndCreatedAtBefore(OrderStatus status, Instant createdAtBefore);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

@@ -375,7 +375,8 @@ There is no REST delete of a shopping list.
 ### Orders
 
 - `CheckoutUseCase` — wrapped by `TransactionalCheckoutUseCase`
-- `ListOrdersUseCase`, `GetOrderUseCase` — authenticated customer; ownership enforced
+- `ListOrdersUseCase`, `GetOrderUseCase` — authenticated customer; ownership enforced. Detail composes payment via `PaymentPort` when `paymentId` is present.
+- `ListAdminOrdersUseCase`, `GetAdminOrderUseCase` — `ADMIN` reads any order; no ownership check. Optional `status` filter on the admin list. Detail composes payment via `PaymentPort` when `paymentId` is present.
 - `CancelOrderUseCase` — wrapped by `TransactionalCancelOrderUseCase`
 - `UpdateOrderStatusUseCase` — HTTP restricted to `ADMIN`
 - `AutoConfirmPendingOrdersUseCase`
@@ -812,6 +813,7 @@ Source: `IdentitySecurityConfiguration`.
 | `POST /api/v1/categories`, `PUT /categories/{id}`, `POST …/activate`, `POST …/deactivate` | ADMIN |
 | `POST /api/v1/products`, `PUT /products/{id}`, `POST …/activate`, `POST …/deactivate`, `POST …/price` | ADMIN |
 | `POST /api/v1/orders/{orderId}/status` | ADMIN |
+| `GET /api/v1/admin/orders`, `GET /api/v1/admin/orders/**` | ADMIN |
 | `GET /api/v1/payments/{paymentId}` | ADMIN |
 | All `/api/v1/knowledge/**` listed in the filter (documents CRUD/process/search) | ADMIN |
 
@@ -841,7 +843,9 @@ Assistant tools inherit the JWT principal. The model cannot supply a user id to 
 
 Controllers are thin and call use cases. Errors use `application/problem+json` (RFC 7807) with an application `code` where handlers define one.
 
-Pagination (orders list): `page` default **0**, `size` default **20**, maximum **100**.
+Pagination (orders lists): `page` default **0**, `size` default **20**, maximum **100**.
+
+Admin order list accepts optional multi-value `status` (`OrderStatus`). Repeated (`status=CONFIRMED&status=DELIVERED`) and comma-separated (`status=CONFIRMED,PREPARING,READY,DELIVERED`) forms are accepted. Omit `status` to return all orders. Invalid values → 400 `INVALID_ORDER`. The Sales (Ventas) UI uses `CONFIRMED,PREPARING,READY,DELIVERED` (excludes `PENDING` and `CANCELLED`). Filtering is applied in SQL so `totalElements` stays correct.
 
 Public inactive product: **404**.
 
@@ -911,11 +915,15 @@ There is no HTTP delete of a shopping list.
 |---|---|---|---|
 | POST | `/api/v1/orders` | CUSTOMER | Checkout. Header `Idempotency-Key`. Body: `addressId`, `paymentMethod`, items with `expectedUnitPrice`. |
 | GET | `/api/v1/orders` | CUSTOMER | Current user’s orders (paginated) |
-| GET | `/api/v1/orders/{orderId}` | CUSTOMER | Own order; 404 if not owned |
+| GET | `/api/v1/orders/{orderId}` | CUSTOMER | Own order; 404 if not owned. Nested `payment` when `paymentId` exists. |
 | POST | `/api/v1/orders/{orderId}/cancel` | CUSTOMER | Cancel if `PENDING` and within 15 minutes |
 | POST | `/api/v1/orders/{orderId}/status` | ADMIN | Adjacent status transition |
+| GET | `/api/v1/admin/orders` | ADMIN | All orders (paginated). Optional `status` filter (Sales = CONFIRMED, PREPARING, READY, DELIVERED). Same `OrderRestResponse` items, including `customerId`. List rows do not load payment. |
+| GET | `/api/v1/admin/orders/{orderId}` | ADMIN | Any customer’s order; 404 if missing. Nested `payment` when `paymentId` exists. |
 
-There is no admin order list endpoint.
+`GET /api/v1/orders` remains CUSTOMER-owned. Admin reads do not use `OwnedOrderAccess` and do not accept `customerId`/`userId` in the request.
+
+There is no `/api/v1/admin/sales` and no `/receipt` endpoint. Ventas is the admin orders list with the Sales status filter. The purchase receipt (comprobante comercial) is a UI over the enriched order detail. `paymentId == null` → HTTP 200 with `payment: null`. A dangling `paymentId` follows `PAYMENT_NOT_FOUND`. `GET /api/v1/payments/{paymentId}` remains ADMIN-only.
 
 ### 10.6 Payments (`ADMIN`)
 

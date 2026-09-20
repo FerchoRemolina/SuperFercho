@@ -3,6 +3,7 @@ package com.superfercho.orders.application.port;
 import com.superfercho.orders.application.dto.PageRequest;
 import com.superfercho.orders.application.dto.PagedResult;
 import com.superfercho.orders.domain.model.Order;
+import com.superfercho.orders.domain.model.OrderStatus;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -24,6 +25,8 @@ public interface OrderRepository {
     PagedResult<Order> findByCustomerId(UUID customerId, PageRequest pageRequest);
 
     PagedResult<Order> findAll(PageRequest pageRequest);
+
+    PagedResult<Order> findByStatuses(List<OrderStatus> statuses, PageRequest pageRequest);
 
     List<Order> findPendingOrdersEligibleForAutomaticConfirmation(Instant currentTime);
 }

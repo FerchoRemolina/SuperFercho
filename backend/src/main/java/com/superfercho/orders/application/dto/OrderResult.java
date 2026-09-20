@@ -11,6 +11,7 @@ import java.util.UUID;
 public record OrderResult(
         UUID id,
         String orderNumber,
+        UUID customerId,
         OrderStatus status,
         List<OrderItemResult> items,
         Money subtotal,
@@ -20,13 +21,19 @@ public record OrderResult(
         Instant createdAt,
         Instant confirmedAt,
         Instant cancelledAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        PaymentResult payment) {
 
     public static OrderResult from(Order order) {
+        return from(order, null);
+    }
+
+    public static OrderResult from(Order order, PaymentResult payment) {
         ShippingAddressSnapshot address = order.shippingAddress();
         return new OrderResult(
                 order.id(),
                 order.orderNumber().value(),
+                order.customerId(),
                 order.status(),
                 order.items().stream()
                         .map(item -> new OrderItemResult(
@@ -50,6 +57,7 @@ public record OrderResult(
                 order.createdAt(),
                 order.confirmedAt(),
                 order.cancelledAt(),
-                order.updatedAt());
+                order.updatedAt(),
+                payment);
     }
 }

@@ -14,7 +14,9 @@ import com.superfercho.orders.application.port.ShoppingCartPort;
 import com.superfercho.orders.application.port.in.CancelOrderUseCase;
 import com.superfercho.orders.application.port.in.CheckoutUseCase;
 import com.superfercho.orders.application.usecase.AutoConfirmPendingOrdersUseCase;
+import com.superfercho.orders.application.usecase.GetAdminOrderUseCase;
 import com.superfercho.orders.application.usecase.GetOrderUseCase;
+import com.superfercho.orders.application.usecase.ListAdminOrdersUseCase;
 import com.superfercho.orders.application.usecase.ListOrdersUseCase;
 import com.superfercho.orders.application.usecase.UpdateOrderStatusUseCase;
 import com.superfercho.orders.infrastructure.clock.SystemClockAdapter;
@@ -108,6 +110,12 @@ class OrdersUseCaseConfigurationTest {
     private ListOrdersUseCase listOrdersUseCase;
 
     @Autowired
+    private GetAdminOrderUseCase getAdminOrderUseCase;
+
+    @Autowired
+    private ListAdminOrdersUseCase listAdminOrdersUseCase;
+
+    @Autowired
     private UpdateOrderStatusUseCase updateOrderStatusUseCase;
 
     @Autowired
@@ -124,6 +132,8 @@ class OrdersUseCaseConfigurationTest {
         assertThat(applicationContext.getBean(CancelOrderUseCase.class)).isSameAs(transactionalCancelOrderUseCase);
         assertThat(getOrderUseCase).isNotNull();
         assertThat(listOrdersUseCase).isNotNull();
+        assertThat(getAdminOrderUseCase).isNotNull();
+        assertThat(listAdminOrdersUseCase).isNotNull();
         assertThat(updateOrderStatusUseCase).isNotNull();
         assertThat(autoConfirmPendingOrdersUseCase).isNotNull();
         assertThat(applicationContext.getBeanNamesForType(

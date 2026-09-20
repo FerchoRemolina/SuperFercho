@@ -209,7 +209,7 @@ class CheckoutUseCaseTest {
     void shouldNotCompleteOrderWhenPaymentIsDeclined() {
         givenReadyCartAndCatalog();
         when(paymentPort.processPayment(any()))
-                .thenReturn(new PaymentResult(PAYMENT_ID, PaymentStatus.DECLINED, "sim-declined"));
+                .thenReturn(paymentResult(PaymentStatus.DECLINED, "sim-declined"));
 
         assertThrows(PaymentDeclinedException.class, () -> checkout.execute(cardCommand()));
         verify(inventoryPort, never()).decreaseStockAtomically(any());
@@ -394,14 +394,14 @@ class CheckoutUseCaseTest {
 
     private void givenApprovedCardPayment() {
         lenient().when(paymentPort.processPayment(any()))
-                .thenReturn(new PaymentResult(PAYMENT_ID, PaymentStatus.APPROVED, "sim-approved"));
+                .thenReturn(paymentResult(PaymentStatus.APPROVED, "sim-approved"));
         lenient().when(inventoryPort.decreaseStockAtomically(any())).thenReturn(StockDecrementResult.success());
         lenient().when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     private void givenPendingCashPayment() {
         lenient().when(paymentPort.processPayment(any()))
-                .thenReturn(new PaymentResult(PAYMENT_ID, PaymentStatus.PENDING, "cod-pending"));
+                .thenReturn(paymentResult(PaymentStatus.PENDING, "cod-pending"));
         lenient().when(inventoryPort.decreaseStockAtomically(any())).thenReturn(StockDecrementResult.success());
         lenient().when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
@@ -440,6 +440,18 @@ class CheckoutUseCaseTest {
 
     private static ProductCatalogInfo product(boolean active, boolean available) {
         return new ProductCatalogInfo(PRODUCT_ID, "Leche entera", PRICE, available, active);
+    }
+
+    private static PaymentResult paymentResult(PaymentStatus status, String providerReference) {
+        return new PaymentResult(
+                PAYMENT_ID,
+                PRICE,
+                status == PaymentStatus.PENDING ? PaymentMethod.CASH_ON_DELIVERY : PaymentMethod.SIMULATED_CARD,
+                status,
+                providerReference,
+                null,
+                NOW,
+                NOW);
     }
 
     private static final class InMemoryIdempotencyPort implements IdempotencyPort {

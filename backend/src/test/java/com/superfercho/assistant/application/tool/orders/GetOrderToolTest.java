@@ -36,6 +36,7 @@ class GetOrderToolTest {
                 .thenReturn(new OrderResult(
                         ORDER_ID,
                         "SF-1",
+                        UUID.fromString("11111111-1111-1111-1111-111111111111"),
                         OrderStatus.PENDING,
                         List.of(),
                         Money.cop(new BigDecimal("10.50")),
@@ -45,7 +46,8 @@ class GetOrderToolTest {
                         now,
                         null,
                         null,
-                        now));
+                        now,
+                        null));
 
         assertEquals(
                 true,

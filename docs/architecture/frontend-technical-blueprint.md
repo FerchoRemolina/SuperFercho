@@ -112,6 +112,7 @@ Las features siguen los módulos del backend, no los duplican:
 | `cart` | Shopping | `/api/v1/cart` |
 | `lists` | Shopping | `/api/v1/shopping-lists` |
 | `checkout` / `orders` | Orders | `/api/v1/orders` |
+| `admin-orders` | Orders | `GET /api/v1/admin/orders`, `GET /api/v1/admin/orders/{orderId}` |
 | `admin-catalog` | Catalog | mutaciones + `view=ADMIN` |
 | `admin-knowledge` | Knowledge | `/api/v1/knowledge/**` |
 | `admin-payments` | Payments | `GET /api/v1/payments/{paymentId}` |
@@ -155,7 +156,7 @@ frontend/
 │           ├── page.tsx
 │           ├── categories/
 │           ├── products/
-│           ├── orders/[orderId]/
+│           ├── orders/
 │           ├── payments/[paymentId]/
 │           └── knowledge/
 ├── features/
@@ -223,7 +224,7 @@ Sin `tailwind.config.js`: Tailwind 4 es CSS-first.
 | `/cart` | `GET/POST/PUT/DELETE /api/v1/cart` |
 | `/checkout` | `GET /api/v1/addresses`, `GET /api/v1/cart`, `POST /api/v1/orders` |
 | `/orders` | `GET /api/v1/orders?page&size` |
-| `/orders/[orderId]` | `GET /api/v1/orders/{id}`, `POST .../cancel` |
+| `/orders/[orderId]` | `GET /api/v1/orders/{id}` (incluye `payment` para comprobante de UI), `POST .../cancel` |
 | `/lists` | `GET/POST /api/v1/shopping-lists` |
 | `/lists/[shoppingListId]` | GET/PATCH/items |
 | `/addresses` | `/api/v1/addresses` |
@@ -239,11 +240,12 @@ No hay REST para “añadir lista completa al carrito”. Esa capacidad existe c
 | `/admin/categories` | GET `view=ADMIN` + POST/PUT/activate/deactivate |
 | `/admin/products` | GET `view=ADMIN` + mutaciones + `POST .../price` |
 | `/admin/products/[productId]` | GET `view=ADMIN` + update |
-| `/admin/orders/[orderId]` | Solo `POST /api/v1/orders/{orderId}/status`. **No existe** GET admin de pedido ni listado admin. |
+| `/admin/orders` | `GET /api/v1/admin/orders?page&size` (todos los estados). Ventas: mismos query params + `status=CONFIRMED,PREPARING,READY,DELIVERED` (también vale `status` repetido). |
+| `/admin/orders/[orderId]` | `GET /api/v1/admin/orders/{orderId}` (incluye `payment` anidado); `POST /api/v1/orders/{orderId}/status` |
 | `/admin/payments/[paymentId]` | `GET /api/v1/payments/{paymentId}` |
 | `/admin/knowledge` | `/api/v1/knowledge/**` |
 
-**DECIDIDO:** no diseñar una tabla “todos los pedidos” en admin. `GET /api/v1/orders` es CUSTOMER (propios). Un admin no puede listar ni leer pedidos ajenos por REST.
+**DECIDIDO:** la tabla admin de pedidos usa `GET /api/v1/admin/orders`. Ventas es esa misma lista con filtro `status=CONFIRMED,PREPARING,READY,DELIVERED` (sin `PENDING` ni `CANCELLED`). No existe `/api/v1/admin/sales`. No reutilizar `GET /api/v1/orders` (CUSTOMER, propios). El detalle admin usa `GET /api/v1/admin/orders/{orderId}` (cualquier cliente). `GET /api/v1/orders/{orderId}` sigue siendo CUSTOMER con ownership (ajeno → 404 `ORDER_NOT_FOUND`). El comprobante de compra es una representación de UI del detalle de pedido enriquecido (`payment`); no hay endpoint `/receipt` ni URL pública.
 
 ### 4.4 Guards de UI
 
@@ -528,21 +530,25 @@ Los ítems deben coincidir exactamente con el carrito activo.
 
 201 `CheckoutRestResponse`: `orderId`, `orderNumber`, `status`, `paymentStatus`, `total`.
 
-`OrderRestResponse`: `id`, `orderNumber`, `status`, `items[]`, `subtotal`, `total`, `shippingAddress`, `paymentId`, `createdAt`, `confirmedAt`, `cancelledAt`, `updatedAt`.
+`OrderRestResponse`: `id`, `orderNumber`, `customerId`, `status`, `items[]`, `subtotal`, `total`, `shippingAddress`, `paymentId`, `createdAt`, `confirmedAt`, `cancelledAt`, `updatedAt`, `payment` (nullable).
+
+`payment` (detalle; no se hidrata en listados): `paymentId`, `amount`, `paymentMethod`, `status` (`PENDING`/`APPROVED`/`DECLINED`), `providerReference`, `refundedAt`, `createdAt`, `updatedAt`. Reembolso = `APPROVED` + `refundedAt`. COD puede seguir `PENDING` en un pedido `DELIVERED`. `paymentId` ausente → `payment: null` y HTTP 200.
 
 `OrderItemRestResponse`: `id`, `productId`, `productName`, `unitPrice`, `quantity`, `subtotal`.
 
 `ShippingAddressRestResponse`: snapshot (`recipientName`, `addressLine`, `additionalInfo`, `city`, `department`, `phone`).
 
-`PagedOrdersRestResponse`: `items`, `page`, `size`, `totalElements`. Query `page` default 0, `size` default 20, máximo 100 (Application).
+`PagedOrdersRestResponse`: `items`, `page`, `size`, `totalElements`. Query `page` default 0, `size` default 20, máximo 100 (Application). `GET /api/v1/admin/orders` acepta `status` repetido o separado por comas. Sin `status` = todos los estados. Ventas = `CONFIRMED,PREPARING,READY,DELIVERED`.
 
 | Método | Path | Rol |
 |---|---|---|
 | POST | `/api/v1/orders` | CUSTOMER |
 | GET | `/api/v1/orders` | CUSTOMER (propios) |
-| GET | `/api/v1/orders/{orderId}` | CUSTOMER; ajeno → 404 `ORDER_NOT_FOUND` |
+| GET | `/api/v1/orders/{orderId}` | CUSTOMER; ajeno → 404 `ORDER_NOT_FOUND`; `payment` anidado para el comprobante de UI |
 | POST | `/api/v1/orders/{orderId}/cancel` | CUSTOMER; solo `PENDING` + 15 min desde `createdAt` |
 | POST | `/api/v1/orders/{orderId}/status` | ADMIN; body `UpdateOrderStatusRequest`: `status` adyacente. No cancela. |
+| GET | `/api/v1/admin/orders` | ADMIN; paginado (`page`/`size`); `status` opcional (Ventas: `CONFIRMED,PREPARING,READY,DELIVERED`) |
+| GET | `/api/v1/admin/orders/{orderId}` | ADMIN; cualquier cliente; `payment` anidado; inexistente → 404 `ORDER_NOT_FOUND` |
 
 Errores checkout/cancel: 400 `INVALID_CHECKOUT` / `INVALID_ORDER`, 409 `IDEMPOTENCY_CONFLICT`, `PRODUCT_PRICE_CHANGED`, `STOCK_UNAVAILABLE`, `PAYMENT_DECLINED`, `CART_EMPTY`, `ADDRESS_NOT_AVAILABLE`, `PRODUCT_NOT_AVAILABLE`, `CANCELLATION_NOT_ALLOWED`, `INVALID_ORDER_TRANSITION`, 400 `INVALID_ORDER_STATUS_UPDATE`.
 
@@ -815,7 +821,7 @@ El frontend no despliega Flyway ni el JAR.
 - Storefront PUBLIC; admin `view=ADMIN`.
 - Assistant solo `POST /chat`; confirmación con token del backend.
 - ADMIN no shopper.
-- Sin listado admin de orders (no hay endpoint).
+- Tabla admin de pedidos vía `GET /api/v1/admin/orders`; Ventas = filtro `status`; detalle vía `GET /api/v1/admin/orders/{orderId}`. No reutilizar `GET /api/v1/orders` para ADMIN. Comprobante = UI del detalle enriquecido; sin `/receipt`.
 - Sin duplicar vendibilidad, stock ni checkout.
 
 ### PROPUESTO (al implementar, no bloquea el diseño)
@@ -829,7 +835,7 @@ El frontend no despliega Flyway ni el JAR.
 - Redux, Axios, GraphQL, tRPC, Prisma, WebSocket de chat.
 - Material UI, Chakra, Ant Design, Bootstrap, shadcn/ui.
 - Turborepo, Nx, `src/` directory, `tailwind.config.js` de v3.
-- Cookie HttpOnly sin cambio de API, `GET /me` inventado, REST lista→carrito inventado, tabla admin de todos los pedidos.
+- Cookie HttpOnly sin cambio de API, `GET /me` inventado, REST lista→carrito inventado, reutilizar `GET /api/v1/orders` para ADMIN.
 - TypeScript 7 y Next 16.4 canary en el arranque.
 
 ### Riesgos
@@ -842,7 +848,7 @@ El frontend no despliega Flyway ni el JAR.
 | Sin `GET /me` | UI con `role` + `userId`; nombre solo si se guardó al registrar (opcional, frágil) |
 | Assistant in-memory | avisar que el hilo muere al reiniciar el API |
 | Catálogo GET sin paginar | listas grandes; paginación es cambio de backend |
-| Admin orders ciego | solo status por UUID conocido |
+| Admin orders | listado y detalle por APIs ADMIN; snapshots históricos del pedido |
 | Traslado Maven → `backend/` | mecánico al inicializar; no mezclar con cambios de dominio |
 
 ### PENDIENTE
@@ -851,7 +857,7 @@ Solo lo que depende de implementación o de infraestructura / backend futuros:
 
 - Parche exacto de cada paquete el día de `pnpm create` (dentro de las minors cerradas).
 - El módulo Maven ya está en `backend/`. Crear `frontend/` (aún no existe).
-- Cookie HttpOnly, refresh token, CORS explícito, `GET /me`, listado admin de pedidos, REST lista→carrito (requieren backend).
+- Cookie HttpOnly, refresh token, CORS explícito, `GET /me`, REST lista→carrito (requieren backend).
 - Hosting, dominio y TLS de producción.
 - Paginación del catálogo (backend).
 
@@ -864,7 +870,7 @@ No hay contradicción en contratos inventados: este blueprint se atiene a los co
 Límites que el frontend **no** debe tapar con APIs ficticias:
 
 1. No hay `GET /api/v1/me`.
-2. No hay listado ni GET de pedidos para ADMIN.
+2. No hay REST de Sales, Invoice ni receipts; Ventas filtra `GET /api/v1/admin/orders`.
 3. No hay REST para `AddShoppingListToCart`.
 4. No hay CORS configurado.
 5. No hay refresh token.
