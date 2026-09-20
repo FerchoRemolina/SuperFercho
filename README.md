@@ -209,7 +209,7 @@ Cierre de MVP: 954 tests ejecutados, 0 failures, 0 errors, 0 skipped.
 - JDK 21
 - Docker (Testcontainers en las pruebas de integración)
 - Docker Compose (PostgreSQL/pgvector local)
-- Maven Wrapper (`mvnw` / `mvnw.cmd`)
+- Maven Wrapper (`backend/mvnw` / `backend/mvnw.cmd`)
 
 ## Configuración
 
@@ -224,7 +224,7 @@ Compose (`.env.example`):
 | `POSTGRES_PASSWORD` | Contraseña del contenedor |
 | `POSTGRES_PORT` | Puerto host (default `5432`) |
 
-Aplicación (`.env.example` y `application.yml`):
+Aplicación (`.env.example` y `backend/src/main/resources/application.yml`):
 
 | Variable | Uso |
 |---|---|
@@ -239,7 +239,7 @@ Aplicación (`.env.example` y `application.yml`):
 | `SUPERFERCHO_OPENAI_CHAT_READ_TIMEOUT` | Timeout de lectura del chat |
 | `SERVER_PORT` | Puerto HTTP (default `8080`) |
 
-`application.yml` define además `SUPERFERCHO_OPENAI_EMBEDDINGS_URL` (default `https://api.openai.com/v1/embeddings`) y el modelo de embeddings `text-embedding-3-small`. Esa URL no está en `.env.example`.
+`backend/src/main/resources/application.yml` define además `SUPERFERCHO_OPENAI_EMBEDDINGS_URL` (default `https://api.openai.com/v1/embeddings`) y el modelo de embeddings `text-embedding-3-small`. Esa URL no está en `.env.example`.
 
 ## Ejecución
 
@@ -256,12 +256,14 @@ Compose publica `pgvector/pgvector:pg16` en el puerto 5432. No arranca Spring Bo
 Windows:
 
 ```bat
+cd backend
 mvnw.cmd spring-boot:run
 ```
 
 Unix:
 
 ```bash
+cd backend
 ./mvnw spring-boot:run
 ```
 
@@ -272,12 +274,14 @@ Puerto: `SERVER_PORT` (8080). Requiere `SUPERFERCHO_JWT_SECRET`. Embeddings y ch
 Windows:
 
 ```bat
+cd backend
 mvnw.cmd test
 ```
 
 Unix:
 
 ```bash
+cd backend
 ./mvnw test
 ```
 
