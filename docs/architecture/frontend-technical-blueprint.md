@@ -212,10 +212,10 @@ Sin `tailwind.config.js`: Tailwind 4 es CSS-first.
 | `/` | Home / destacados | `GET /api/v1/categories`, `GET /api/v1/products` (sin `view` → PUBLIC) |
 | `/login` | Login | `POST /api/v1/auth/login` |
 | `/register` | Registro CUSTOMER | `POST /api/v1/customers` |
-| `/catalog` | Listado | `GET /api/v1/products` |
-| `/categories/[categoryId]` | Productos de categoría | `GET /api/v1/categories/{id}`, `GET /api/v1/products?categoryId=` |
-| `/products/[productId]` | Detalle | `GET /api/v1/products/{id}` — no vendible → 404 |
-| `/search?q=` | Búsqueda | `GET /api/v1/products/search?text=` |
+| `/catalog` | Listado completo | `GET /api/v1/products` (sin `page`/`size`; el storefront no envía `view`) |
+| `/categories/[categoryId]` | Productos de categoría | `GET /api/v1/categories/{categoryId}`, `GET /api/v1/products?categoryId=` |
+| `/products/[productId]` | Detalle | `GET /api/v1/products/{productId}` — no vendible → 404 |
+| `/search?text=` | Búsqueda | `GET /api/v1/products/search?text=` (no existe parámetro `q`) |
 
 ### 4.2 CUSTOMER
 
@@ -458,7 +458,7 @@ Errores: 404 `ADDRESS_NOT_FOUND`, 400 `INVALID_ADDRESS`, 409 `DUPLICATE_DEFAULT_
 
 ### 7.4 Catalog
 
-GET sin `view` o `view=PUBLIC`: permitAll. `view=ADMIN`: JWT ADMIN.
+GET sin `view` o `view=PUBLIC`: permitAll. `view=ADMIN`: JWT ADMIN. El storefront usa el comportamiento por defecto (PUBLIC) y **no envía** `view`.
 
 `CategoryRestResponse`: `id`, `name`, `description`, `status`, `createdAt`, `updatedAt`.
 
@@ -466,18 +466,26 @@ GET sin `view` o `view=PUBLIC`: permitAll. `view=ADMIN`: JWT ADMIN.
 
 | Método | Path | Auth | Request / query | Response |
 |---|---|---|---|---|
-| GET | `/api/v1/categories` | public / ADMIN | `view?` | lista |
+| GET | `/api/v1/categories` | public / ADMIN | `view?` | lista completa |
 | GET | `/api/v1/categories/{categoryId}` | public / ADMIN | `view?` | una; pública INACTIVE → 404 |
 | POST | `/api/v1/categories` | ADMIN | `CreateCategoryRequest`: `name`, `description` | 201 |
 | PUT | `/api/v1/categories/{categoryId}` | ADMIN | `UpdateCategoryRequest`: `name`, `description` | |
 | POST | `.../activate` `.../deactivate` | ADMIN | — | |
-| GET | `/api/v1/products` | public / ADMIN | `categoryId?`, `status?`, `view?` | lista **sin paginación** |
-| GET | `/api/v1/products/search` | public / ADMIN | `text?`, `view?` | lista; `text` blank → `[]` |
+| GET | `/api/v1/products` | public / ADMIN | `categoryId?` (UUID); `status?` y `view?` solo ADMIN | lista **completa, sin paginación** (no hay `page` ni `size`) |
+| GET | `/api/v1/products/search` | public / ADMIN | `text?`; `view?` solo ADMIN | lista completa; busca en `name`, `brand` y `barcode`; `text` blank → `[]` |
 | GET | `/api/v1/products/{productId}` | public / ADMIN | `view?` | pública no vendible → 404 |
 | POST | `/api/v1/products` | ADMIN | `CreateProductRequest`: `categoryId`, `barcode`, `name`, `brand`, `description`, `price`, `stock`, `imageUrl` | 201 |
 | PUT | `/api/v1/products/{productId}` | ADMIN | `UpdateProductRequest`: `categoryId`, `barcode`, `name`, `brand`, `description`, `imageUrl` (no precio ni stock aquí) | |
 | POST | `.../activate` `.../deactivate` | ADMIN | — | |
 | POST | `.../price` | ADMIN | `ChangeProductPriceRequest`: `price` | |
+
+Contrato del **storefront** (descubierto en la implementación; no inventar lo que no está en el controller):
+
+- `GET /products` y `GET /products/search` devuelven listas completas. **No existe paginación** de catálogo (`page`, `size`, máximo 100 no aplican aquí; esos query params son de pedidos admin, no de productos).
+- El único filtro de listado público es `categoryId` (UUID). No existen filtros `category`, `availability` ni `brand` como query params independientes.
+- `brand` no se filtra aparte: participa en la búsqueda textual `GET /products/search?text=`.
+- El parámetro de búsqueda es `text`, no `q`. La ruta UI es `/search?text=`.
+- Vista pública por defecto: el storefront no envía `view`. El backend excluye productos y categorías INACTIVE de esa vista; el frontend no vuelve a filtrarlos.
 
 Errores: 400 `INVALID_CATEGORY` / `INVALID_PRODUCT` / `INVALID_CATEGORY_REFERENCE`, 404 `CATEGORY_NOT_FOUND` / `PRODUCT_NOT_FOUND`, 409 `DUPLICATE_BARCODE`.
 
@@ -485,21 +493,27 @@ Vendibilidad (backend): `Product.status == ACTIVE` **y** `Category.status == ACT
 
 ### 7.5 Shopping (`CUSTOMER`)
 
+El carrito es del CUSTOMER autenticado. El cliente **no envía** `customerId` ni `userId`: el backend toma la identidad del JWT.
+
 `CartRestResponse`: `id`, `customerId`, `status` (`ACTIVE`), `items[]`, `createdAt`, `updatedAt`.
 
 `CartItemRestResponse`: `id`, `productId`, `quantity`, `priceAtAddition`, `addedAt`, `updatedAt`.
 
-`priceAtAddition` es informativo; el cobro usa precio vigente.
+El REST del carrito **no** incluye nombre, imagen, stock, subtotal ni total.
 
-| Método | Path | Request |
+**Precio.** `priceAtAddition` es el precio de catálogo vigente **en el momento de crear la línea** (alta). Un `PUT` de cantidad **no** lo recalcula. Es **informativo**: no es el precio garantizado de compra. Checkout valida el precio **vigente** (`expectedUnitPrice` vs catálogo).
+
+**Stock.** El carrito **no reserva inventario**. Shopping **no** rechaza `stock = 0` ni cantidades por encima del stock disponible. La disponibilidad para comprar se valida en checkout.
+
+| Método | Path | Comportamiento real |
 |---|---|---|
-| GET | `/api/v1/cart` | get-or-create |
-| POST | `/api/v1/cart/items` | `AddItemRequest`: `productId`, `quantity` > 0 |
-| PUT | `/api/v1/cart/items/{productId}` | `ChangeItemQuantityRequest`: `quantity` > 0 |
-| DELETE | `/api/v1/cart/items/{productId}` | |
-| DELETE | `/api/v1/cart` | vacía |
+| GET | `/api/v1/cart` | Obtiene o crea el carrito `ACTIVE` del CUSTOMER autenticado. No recibe `customerId`. |
+| POST | `/api/v1/cart/items` | `AddItemRequest`: `productId`, `quantity` > 0. El producto debe ser vendible (producto **y** categoría `ACTIVE`). No reserva stock. No rechaza `stock = 0`. |
+| PUT | `/api/v1/cart/items/{productId}` | `ChangeItemQuantityRequest`: `quantity` > 0. No valida stock. |
+| DELETE | `/api/v1/cart/items/{productId}` | Elimina la línea. |
+| DELETE | `/api/v1/cart` | Vacía el carrito. |
 
-Producto no vendible → 404 `PRODUCT_NOT_FOUND`.
+Producto inexistente o no vendible → 404 `PRODUCT_NOT_FOUND`. Cantidad ≤ 0 en dominio → 400 `INVALID_CART_ITEM`. Producto que no está en el carrito → 400 `INVALID_CART`.
 
 ### 7.6 Shopping lists (`CUSTOMER`)
 
@@ -522,13 +536,58 @@ No hay DELETE de la lista. No hay REST “lista → carrito”.
 
 ### 7.7 Orders
 
-Checkout **CUSTOMER**. Header `Idempotency-Key` (Spring `required = false`; Application rechaza blank).
+Checkout **CUSTOMER autenticado**. El body **no** incluye `customerId` ni `userId`. ADMIN → `403 ACCESS_DENIED`. Sin JWT → `401 UNAUTHENTICATED`.
 
-Request `CheckoutRequest`: `addressId`, `paymentMethod` (`SIMULATED_CARD` | `CASH_ON_DELIVERY`), `items[]` de `CheckoutItemRequest`: `productId`, `quantity`, `expectedUnitPrice`.
+Header `Idempotency-Key`: Spring `required = false`; Application **exige** string no vacío. El backend **no** genera la key y **no** exige formato UUID (cualquier string no vacío). Scope: `customerId` + key. Fingerprint: `addressId|paymentMethod` + líneas ordenadas por `productId` (`productId:quantity:amount:currency`). Misma key + mismo fingerprint (no expirada) → **replay** del resultado (HTTP **201** otra vez). Misma key + fingerprint distinto → `409 IDEMPOTENCY_CONFLICT`. Retención **24 h**.
 
-Los ítems deben coincidir exactamente con el carrito activo.
+Request `CheckoutRequest` (únicos campos):
 
-201 `CheckoutRestResponse`: `orderId`, `orderNumber`, `status`, `paymentStatus`, `total`.
+```json
+{
+  "addressId": "UUID",
+  "paymentMethod": "SIMULATED_CARD | CASH_ON_DELIVERY",
+  "items": [
+    {
+      "productId": "UUID",
+      "quantity": 1,
+      "expectedUnitPrice": { "amount": 10.50, "currency": "COP" }
+    }
+  ]
+}
+```
+
+`items` debe coincidir exactamente con el carrito **ACTIVE**: mismos `productId`, mismas `quantity`, sin duplicados.
+
+`expectedUnitPrice` es el precio **vigente** de catálogo (`GET /products/{id}`), **no** `priceAtAddition`. El backend lo compara con `Product.currentPrice()`. Diferencia → `409 PRODUCT_PRICE_CHANGED`. El Order persiste el precio vigente.
+
+Stock: el carrito **no** reserva inventario. Checkout valida disponibilidad y decrementa de forma atómica (`UPDATE … AND stock >= :quantity`). `stock = 0` → `409 PRODUCT_NOT_AVAILABLE`. `quantity > stock` → `409 STOCK_UNAVAILABLE`. Una falla hace **rollback** de toda la transacción.
+
+Dirección: solo `addressId`. Debe ser del CUSTOMER y `ACTIVE`. Si no es utilizable (inexistente, de otro cliente o inactiva) → `409 ADDRESS_NOT_AVAILABLE`. **No** es `ADDRESS_NOT_FOUND` (ese código es del CRUD de Identity). Snapshot congelado: `recipientName`, `addressLine`, `additionalInfo`, `city`, `department`, `phone`. Sin `label` ni `isDefault`.
+
+Pago (sin PAN/CVV):
+
+| Método | Payment | `providerReference` | Order al crear |
+|---|---|---|---|
+| `SIMULATED_CARD` | `APPROVED` | `sim-approved` | `PENDING` |
+| `CASH_ON_DELIVERY` | `PENDING` | `cod-pending` | `PENDING` |
+
+El simulador no produce `DECLINED`; el código `PAYMENT_DECLINED` igual existe.
+
+Checkout es **una** TX local PostgreSQL: idempotency → carrito → dirección → productos/precios → pago → stock → order → clear cart → idempotency result. El frontend no reproduce esa transacción: un POST y representar 201 o el Problem.
+
+Éxito: **201 Created**, `Location: /api/v1/orders/{orderId}`. Body corto `CheckoutRestResponse` (**no** trae `items`, `shippingAddress` ni objeto `payment`):
+
+```json
+{
+  "orderId": "UUID",
+  "orderNumber": "ORD-...",
+  "status": "PENDING",
+  "paymentStatus": "APPROVED | PENDING",
+  "total": { "amount": 21.00, "currency": "COP" }
+}
+```
+
+El detalle completo es `GET /api/v1/orders/{orderId}`.
 
 `OrderRestResponse`: `id`, `orderNumber`, `customerId`, `status`, `items[]`, `subtotal`, `total`, `shippingAddress`, `paymentId`, `createdAt`, `confirmedAt`, `cancelledAt`, `updatedAt`, `payment` (nullable).
 
@@ -542,17 +601,33 @@ Los ítems deben coincidir exactamente con el carrito activo.
 
 | Método | Path | Rol |
 |---|---|---|
-| POST | `/api/v1/orders` | CUSTOMER |
+| POST | `/api/v1/orders` | CUSTOMER; 201 + `Location: /api/v1/orders/{orderId}` |
 | GET | `/api/v1/orders` | CUSTOMER (propios) |
 | GET | `/api/v1/orders/{orderId}` | CUSTOMER; ajeno → 404 `ORDER_NOT_FOUND`; `payment` anidado para el comprobante de UI |
-| POST | `/api/v1/orders/{orderId}/cancel` | CUSTOMER; solo `PENDING` + 15 min desde `createdAt` |
+| POST | `/api/v1/orders/{orderId}/cancel` | CUSTOMER propietario; solo `PENDING` + 15 min desde `createdAt`; restaura stock; pago `APPROVED` → `refundedAt` (status sigue `APPROVED`); COD `PENDING` sin reembolso |
 | POST | `/api/v1/orders/{orderId}/status` | ADMIN; body `UpdateOrderStatusRequest`: `status` adyacente. No cancela. |
 | GET | `/api/v1/admin/orders` | ADMIN; paginado (`page`/`size`); `status` opcional (Ventas: `CONFIRMED,PREPARING,READY,DELIVERED`) |
 | GET | `/api/v1/admin/orders/{orderId}` | ADMIN; cualquier cliente; `payment` anidado; inexistente → 404 `ORDER_NOT_FOUND` |
 
-Errores checkout/cancel: 400 `INVALID_CHECKOUT` / `INVALID_ORDER`, 409 `IDEMPOTENCY_CONFLICT`, `PRODUCT_PRICE_CHANGED`, `STOCK_UNAVAILABLE`, `PAYMENT_DECLINED`, `CART_EMPTY`, `ADDRESS_NOT_AVAILABLE`, `PRODUCT_NOT_AVAILABLE`, `CANCELLATION_NOT_ALLOWED`, `INVALID_ORDER_TRANSITION`, 400 `INVALID_ORDER_STATUS_UPDATE`.
+Errores de **checkout** (no usar `PRODUCT_NOT_FOUND` ni `ADDRESS_NOT_FOUND` aquí):
 
-Estados: `PENDING`, `CONFIRMED`, `PREPARING`, `READY`, `DELIVERED`, `CANCELLED`.
+| Código | HTTP |
+|---|---|
+| `INVALID_CHECKOUT` | 400 |
+| `INVALID_ORDER` | 400 |
+| `UNAUTHENTICATED` | 401 |
+| `ACCESS_DENIED` | 403 |
+| `IDEMPOTENCY_CONFLICT` | 409 |
+| `PRODUCT_PRICE_CHANGED` | 409 |
+| `STOCK_UNAVAILABLE` | 409 |
+| `PRODUCT_NOT_AVAILABLE` | 409 |
+| `CART_EMPTY` | 409 |
+| `ADDRESS_NOT_AVAILABLE` | 409 |
+| `PAYMENT_DECLINED` | 409 |
+
+Cancel / transición (además): 409 `CANCELLATION_NOT_ALLOWED`, `INVALID_ORDER_TRANSITION`; 400 `INVALID_ORDER_STATUS_UPDATE`.
+
+Estados Order: `PENDING`, `CONFIRMED`, `PREPARING`, `READY`, `DELIVERED`, `CANCELLED`.
 
 ### 7.8 Payments (`ADMIN`)
 
@@ -641,18 +716,30 @@ Presentación: `ApiProblem.code` + `detail` en `shared/errors`, no if/else en ca
 
 ## 10. Catálogo y comercio
 
-**DECIDIDO:** el storefront solo usa vista PUBLIC (sin `view=ADMIN`).
+**DECIDIDO:** el storefront solo usa vista PUBLIC. No envía `view` (el default del backend ya es PUBLIC). No envía `view=ADMIN`.
+
+Consultas públicas reales:
+
+| UI | API |
+|---|---|
+| Categorías | `GET /api/v1/categories` |
+| Categoría | `GET /api/v1/categories/{categoryId}` |
+| Listado | `GET /api/v1/products` — lista completa; filtro opcional `categoryId` |
+| Búsqueda | `GET /api/v1/products/search?text=` — lista completa; `text` cubre nombre, marca y código |
+| Detalle | `GET /api/v1/products/{productId}` |
+
+No hay `page`/`size` en catálogo. No hay filtros `category`, `availability` ni `brand` independientes. `stock` viaja en el `ProductRestResponse`; la UI puede mostrar disponible/agotado, pero no existe query de disponibilidad.
 
 Estados de UI:
 
 | Situación | Cómo se refleja el backend |
 |---|---|
-| Loading / empty / error | query + listas vacías reales (no hay paginación de catálogo) |
-| `stock = 0` | producto visible si es vendible; CTA deshabilitado; no inventar “ocultar” |
-| No vendible (producto o categoría INACTIVE) | 404 en detalle público; no aparece en listados públicos |
-| Precio en carrito vs catálogo | mostrar ambos; checkout envía precio **vigente** como `expectedUnitPrice` |
+| Loading / empty / error | query + listas vacías reales (el backend ya entrega la lista completa; no hay paginación de catálogo) |
+| `stock = 0` | producto visible si es vendible; la UI de catálogo puede deshabilitar el CTA. Shopping **no** impide el alta. En checkout: `stock = 0` → `PRODUCT_NOT_AVAILABLE`; `quantity > stock` → `STOCK_UNAVAILABLE`. |
+| No vendible (producto o categoría INACTIVE) | el backend los excluye del listado público; detalle público → 404; el alta al carrito → 404 `PRODUCT_NOT_FOUND`; checkout → `PRODUCT_NOT_AVAILABLE`; el frontend no refiltra |
+| Precio en carrito vs catálogo | `priceAtAddition` es informativo (precio al crear la línea). Checkout envía `expectedUnitPrice` = precio **vigente** (`Product.currentPrice()`). No tratar `priceAtAddition` como precio de cobro. |
 | 409 `PRODUCT_PRICE_CHANGED` | recargar producto/carrito; no cobrar el precio viejo |
-| 409 `STOCK_UNAVAILABLE` / `PRODUCT_NOT_AVAILABLE` | no reintentar el mismo body a ciegas |
+| 409 `STOCK_UNAVAILABLE` / `PRODUCT_NOT_AVAILABLE` | códigos de **checkout**, no de Shopping; no reintentar el mismo body a ciegas |
 
 `AddShoppingListToCart` no tiene REST: la UI de listas permite añadir ítem a ítem al carrito (`POST /cart/items`) o usar Assistant. No hay botón que llame un endpoint inexistente.
 
@@ -668,10 +755,10 @@ Todo ocurre contra el carrito activo y `POST /api/v1/orders`.
 
 **DECIDIDO:**
 
-1. El cliente genera un `Idempotency-Key` (UUID) por intento de pago y lo reutiliza en retries del **mismo** fingerprint.
-2. `items` = líneas del `GET /cart` con `expectedUnitPrice` = `GET /products/{id}` (precio vigente), no `priceAtAddition`.
-3. `SIMULATED_CARD` → `paymentStatus` `APPROVED` en el simulador actual; `CASH_ON_DELIVERY` → `PENDING`.
-4. 201 → ir a `/orders/{orderId}`. El carrito queda vacío en servidor.
+1. El cliente genera un `Idempotency-Key` (cualquier string no vacío; el backend no exige UUID y no la genera) por intento de pago y lo reutiliza en retries del **mismo** fingerprint. Replay → 201. Fingerprint distinto → `409 IDEMPOTENCY_CONFLICT`. Retención 24 h.
+2. `items` = líneas del `GET /cart` con `expectedUnitPrice` = `GET /products/{id}` (precio vigente vs `Product.currentPrice()`). `priceAtAddition` no se cobra. Stock y precio de compra se validan en esta TX, no al escribir el carrito.
+3. `SIMULATED_CARD` → Payment `APPROVED` (`sim-approved`), Order `PENDING`. `CASH_ON_DELIVERY` → Payment `PENDING` (`cod-pending`), Order `PENDING`.
+4. 201 + `Location: /api/v1/orders/{orderId}` → ir a `/orders/{orderId}` (detalle completo por GET; el POST solo trae el DTO corto). El carrito queda vacío en servidor.
 5. El simulador **no** produce `DECLINED`; la UI igual debe manejar 409 `PAYMENT_DECLINED`.
 
 No hay wizard de tarjeta real (el API no acepta PAN/CVV).
@@ -859,7 +946,7 @@ Solo lo que depende de implementación o de infraestructura / backend futuros:
 - El módulo Maven ya está en `backend/`. Crear `frontend/` (aún no existe).
 - Cookie HttpOnly, refresh token, CORS explícito, `GET /me`, REST lista→carrito (requieren backend).
 - Hosting, dominio y TLS de producción.
-- Paginación del catálogo (backend).
+- Paginación del catálogo: **no existe hoy** (`GET /products` y `GET /products/search` son listas completas). Añadir `page`/`size` sería un cambio de backend, no de frontend.
 
 ---
 

@@ -255,6 +255,25 @@ Aplicación (`.env.example` y `backend/src/main/resources/application.yml`):
 
 `backend/src/main/resources/application.yml` define además `SUPERFERCHO_OPENAI_EMBEDDINGS_URL` (default `https://api.openai.com/v1/embeddings`) y el modelo de embeddings `text-embedding-3-small`. Esa URL no está en `.env.example`.
 
+## Desarrollo local
+
+En Windows, desde la raíz del repositorio:
+
+```powershell
+.\scripts\dev.ps1
+```
+
+El script:
+
+- levanta PostgreSQL con Docker Compose;
+- espera a que el contenedor acepte conexiones;
+- inicia Spring Boot en `:8080` y Next.js en `:3000` en ventanas aparte;
+- usa un `.env` local (no versionado);
+- genera un `SUPERFERCHO_JWT_SECRET` la primera vez y lo reutiliza después;
+- si 5432, 8080 o 3000 ya están ocupados, muestra el proceso (nombre y PID) y se detiene; no mata procesos existentes.
+
+Requisitos: Docker Desktop, JDK 21, Node.js 20.9+ (el frontend se arranca con `corepack.cmd pnpm`). Embeddings y chat del Assistant siguen necesitando `OPENAI_API_KEY` en `.env` si se usan.
+
 ## Ejecución
 
 ### PostgreSQL
