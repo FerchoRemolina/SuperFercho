@@ -1,16 +1,27 @@
 import type { ButtonHTMLAttributes } from "react";
 import { cx } from "@/shared/utils/cx";
 
-type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive";
 
 const variants: Record<ButtonVariant, string> = {
   primary:
-    "bg-sf-accent text-white hover:bg-sf-accent-hover disabled:bg-sf-border",
+    "bg-sf-primary text-white hover:bg-sf-primary-hover disabled:bg-sf-border disabled:text-sf-muted",
   secondary:
     "border border-sf-border bg-sf-surface text-sf-ink hover:bg-sf-bg",
-  ghost: "text-sf-accent hover:bg-sf-bg",
+  ghost: "text-sf-primary hover:bg-sf-bg",
   destructive: "bg-sf-error text-white hover:opacity-90",
 };
+
+export function buttonClassName(
+  variant: ButtonVariant = "primary",
+  className?: string,
+): string {
+  return cx(
+    "inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed",
+    variants[variant],
+    className,
+  );
+}
 
 export function Button({
   variant = "primary",
@@ -21,14 +32,6 @@ export function Button({
   variant?: ButtonVariant;
 }) {
   return (
-    <button
-      type={type}
-      className={cx(
-        "inline-flex min-h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed",
-        variants[variant],
-        className,
-      )}
-      {...props}
-    />
+    <button type={type} className={buttonClassName(variant, className)} {...props} />
   );
 }

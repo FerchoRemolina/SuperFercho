@@ -60,6 +60,31 @@ describe("request", () => {
     expect(init.body).toBeUndefined();
   });
 
+  it("omits Authorization when anonymous is requested", async () => {
+    configureSessionPersistence(new MemoryPersistence());
+    setSession({
+      userId: "11111111-1111-1111-1111-111111111111",
+      role: "CUSTOMER",
+      accessToken: "access-token",
+      expiresAt: "2099-01-01T00:00:00Z",
+    });
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await request("/products", { anonymous: true });
+
+    const headers = new Headers(
+      (fetchMock.mock.calls[0] as [string, RequestInit])[1].headers,
+    );
+    expect(headers.get("Authorization")).toBeNull();
+  });
+
   it("parses problem+json and clears the session only for UNAUTHENTICATED", async () => {
     configureSessionPersistence(new MemoryPersistence());
     setSession({
@@ -121,6 +146,38 @@ describe("request", () => {
       ApiError,
     );
     expect(getSession()?.accessToken).toBe("access-token");
+    expect(onUnauthenticated).not.toHaveBeenCalled();
+  });
+
+  it("clears the session on USER_INACTIVE without treating it as UNAUTHENTICATED", async () => {
+    configureSessionPersistence(new MemoryPersistence());
+    setSession({
+      userId: "11111111-1111-1111-1111-111111111111",
+      role: "CUSTOMER",
+      accessToken: "access-token",
+      expiresAt: "2099-01-01T00:00:00Z",
+    });
+    const onUnauthenticated = vi.fn();
+    setUnauthenticatedHandler(onUnauthenticated);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            status: 403,
+            code: "USER_INACTIVE",
+            detail: "User is inactive",
+          }),
+          { status: 403, headers: { "Content-Type": "application/problem+json" } },
+        ),
+      ),
+    );
+
+    await expect(request("/auth/login", { method: "POST", body: {} })).rejects.toBeInstanceOf(
+      ApiError,
+    );
+    expect(getSession()).toBeNull();
     expect(onUnauthenticated).not.toHaveBeenCalled();
   });
 

@@ -1,10 +1,10 @@
-import { PlaceholderScreen } from "@/shared/ui/placeholder-screen";
+import { ProductDetailContent } from "@/features/catalog/components/product-detail-content";
 
-export default function ProductPage() {
-  return (
-    <PlaceholderScreen
-      title="Producto"
-      description="El detalle público de producto se implementará más adelante."
-    />
-  );
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ productId: string }>;
+}) {
+  const { productId } = await params;
+  return <ProductDetailContent productId={productId} />;
 }

@@ -1,10 +1,10 @@
-import { PlaceholderScreen } from "@/shared/ui/placeholder-screen";
+import { OrderResultContent } from "@/features/orders/components/order-result-content";
 
-export default function OrderDetailPage() {
-  return (
-    <PlaceholderScreen
-      title="Detalle de pedido"
-      description="El detalle del pedido propio usará GET /api/v1/orders/{orderId}."
-    />
-  );
+export default async function OrderDetailPage({
+  params,
+}: {
+  params: Promise<{ orderId: string }>;
+}) {
+  const { orderId } = await params;
+  return <OrderResultContent orderId={orderId} />;
 }

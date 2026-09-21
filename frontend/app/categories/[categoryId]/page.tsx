@@ -1,10 +1,10 @@
-import { PlaceholderScreen } from "@/shared/ui/placeholder-screen";
+import { CategoryPageContent } from "@/features/catalog/components/category-page-content";
 
-export default function CategoryPage() {
-  return (
-    <PlaceholderScreen
-      title="Categoría"
-      description="El detalle de categoría y sus productos se implementará más adelante."
-    />
-  );
+export default async function CategoryPage({
+  params,
+}: {
+  params: Promise<{ categoryId: string }>;
+}) {
+  const { categoryId } = await params;
+  return <CategoryPageContent categoryId={categoryId} />;
 }

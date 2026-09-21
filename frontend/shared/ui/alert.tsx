@@ -22,7 +22,7 @@ export function Alert({
   return (
     <div
       role="alert"
-      className={cx("rounded-md border px-4 py-3", tones[tone])}
+      className={cx("rounded-xl border px-4 py-3", tones[tone])}
     >
       <p className="font-semibold">{title}</p>
       {children ? <div className="mt-1 text-sm">{children}</div> : null}

@@ -1,10 +1,5 @@
-import { PlaceholderScreen } from "@/shared/ui/placeholder-screen";
+import { AddressesPageContent } from "@/features/account/components/addresses-page-content";
 
 export default function AddressesPage() {
-  return (
-    <PlaceholderScreen
-      title="Direcciones"
-      description="Las direcciones del cliente usarán /api/v1/addresses."
-    />
-  );
+  return <AddressesPageContent />;
 }

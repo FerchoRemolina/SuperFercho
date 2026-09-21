@@ -15,6 +15,7 @@ export type RequestOptions = {
   body?: unknown;
   headers?: Record<string, string>;
   idempotencyKey?: string;
+  anonymous?: boolean;
 };
 
 let unauthenticatedHandler: (() => void) | null = null;
@@ -34,7 +35,7 @@ export async function request<T>(
   if (options.body !== undefined) {
     headers.set("Content-Type", "application/json");
   }
-  if (token && !headers.has("Authorization")) {
+  if (token && !options.anonymous && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${token}`);
   }
   if (options.idempotencyKey) {
@@ -88,6 +89,10 @@ async function parseFailure(response: Response): Promise<ApiProblem> {
 }
 
 function handleAuthFailure(problem: ApiProblem): void {
+  if (problem.code === "USER_INACTIVE") {
+    clearSession();
+    return;
+  }
   if (problem.status !== 401 || problem.code !== "UNAUTHENTICATED") {
     return;
   }

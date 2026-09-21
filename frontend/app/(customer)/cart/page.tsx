@@ -1,10 +1,5 @@
-import { PlaceholderScreen } from "@/shared/ui/placeholder-screen";
+import { CartPageContent } from "@/features/cart/components/cart-page-content";
 
 export default function CartPage() {
-  return (
-    <PlaceholderScreen
-      title="Carrito"
-      description="El carrito del cliente autenticado se conectará a /api/v1/cart en una fase posterior."
-    />
-  );
+  return <CartPageContent />;
 }

@@ -60,17 +60,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     clearSession();
     queryClient.removeQueries();
-  }, [queryClient]);
+    if (pathname !== "/login") {
+      router.replace("/login");
+    }
+  }, [pathname, queryClient, router]);
 
   useEffect(() => {
     setUnauthenticatedHandler(() => {
       logout();
-      if (pathname !== "/login") {
-        router.replace("/login");
-      }
     });
     return () => setUnauthenticatedHandler(null);
-  }, [logout, pathname, router]);
+  }, [logout]);
 
   const value = useMemo<SessionContextValue>(
     () => ({

@@ -27,14 +27,105 @@ describe("parseApiProblem", () => {
 });
 
 describe("messageForApiProblem", () => {
-  it("prefers the backend detail when present", () => {
+  it("prefers the backend detail when the code has no mapped message", () => {
+    expect(
+      messageForApiProblem({
+        status: 409,
+        code: "UNKNOWN_CONFLICT",
+        detail: "Detalle del backend",
+      }),
+    ).toBe("Detalle del backend");
+  });
+
+  it("uses a Spanish message for STOCK_UNAVAILABLE even if the backend detail includes an id", () => {
     expect(
       messageForApiProblem({
         status: 409,
         code: "STOCK_UNAVAILABLE",
-        detail: "No hay stock suficiente",
+        detail: "Stock unavailable for product: 33333333-3333-3333-3333-333333333333",
       }),
-    ).toBe("No hay stock suficiente");
+    ).toBe("No hay existencias suficientes. Revisa las cantidades.");
+  });
+
+  it("uses a Spanish message for PRODUCT_PRICE_CHANGED instead of the English detail", () => {
+    expect(
+      messageForApiProblem({
+        status: 409,
+        code: "PRODUCT_PRICE_CHANGED",
+        detail: "Product price changed: 33333333-3333-3333-3333-333333333333",
+      }),
+    ).toBe(
+      "El precio de uno o más productos cambió. Revisa el pedido antes de confirmar.",
+    );
+  });
+
+  it("uses a Spanish message for ADDRESS_NOT_AVAILABLE", () => {
+    expect(
+      messageForApiProblem({
+        status: 409,
+        code: "ADDRESS_NOT_AVAILABLE",
+        detail: "Address not available: 22222222-2222-2222-2222-222222222222",
+      }),
+    ).toBe("La dirección seleccionada ya no está disponible. Elige otra.");
+  });
+
+  it("uses a Spanish message for PRODUCT_NOT_FOUND even if the backend detail includes the id", () => {
+    expect(
+      messageForApiProblem({
+        status: 404,
+        code: "PRODUCT_NOT_FOUND",
+        detail: "Product not found: 33333333-3333-3333-3333-333333333333",
+      }),
+    ).toBe("No encontramos este producto.");
+  });
+
+  it("uses a Spanish message for INVALID_CREDENTIALS even if the backend detail is English", () => {
+    expect(
+      messageForApiProblem({
+        status: 401,
+        code: "INVALID_CREDENTIALS",
+        detail: "Invalid credentials",
+      }),
+    ).toBe("Correo o contraseña incorrectos.");
+  });
+
+  it("uses a Spanish message for CART_NOT_FOUND even if the backend detail includes the customer id", () => {
+    expect(
+      messageForApiProblem({
+        status: 404,
+        code: "CART_NOT_FOUND",
+        detail: "Cart not found for customer: 11111111-1111-1111-1111-111111111111",
+      }),
+    ).toBe("No encontramos tu carrito.");
+  });
+
+  it("uses a Spanish message for INVALID_CART_ITEM instead of the English detail", () => {
+    expect(
+      messageForApiProblem({
+        status: 400,
+        code: "INVALID_CART_ITEM",
+        detail: "quantity must be greater than 0",
+      }),
+    ).toBe("La cantidad debe ser mayor que cero.");
+  });
+  it("uses a Spanish message for PAYMENT_NOT_FOUND without leaking ids", () => {
+    expect(
+      messageForApiProblem({
+        status: 404,
+        code: "PAYMENT_NOT_FOUND",
+        detail: "Payment not found: 55555555-5555-5555-5555-555555555555",
+      }),
+    ).toBe("No se pudo cargar la información de pago de este pedido.");
+  });
+
+  it("uses a Spanish message for CANCELLATION_NOT_ALLOWED", () => {
+    expect(
+      messageForApiProblem({
+        status: 409,
+        code: "CANCELLATION_NOT_ALLOWED",
+        detail: "customer cancellation window has expired",
+      }),
+    ).toBe("Este pedido ya no puede cancelarse.");
   });
 
   it("uses a generic internal message for 500 without leaking a stack", () => {
@@ -43,6 +134,7 @@ describe("messageForApiProblem", () => {
         status: 500,
         code: "INTERNAL_ERROR",
         title: "Internal Server Error",
+        detail: "java.lang.IllegalStateException",
       }),
     ).toBe("Ocurrió un error interno. Inténtalo más tarde.");
   });
