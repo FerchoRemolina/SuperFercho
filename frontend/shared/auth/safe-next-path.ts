@@ -10,3 +10,8 @@ export function safeNextPath(value: string | null | undefined): string | null {
   }
   return value;
 }
+
+export function loginPathWithNext(currentPath: string): string {
+  const next = safeNextPath(currentPath);
+  return next ? `/login?next=${encodeURIComponent(next)}` : "/login";
+}

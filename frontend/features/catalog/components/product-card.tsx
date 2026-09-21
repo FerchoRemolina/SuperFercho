@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AddToCartButton } from "@/features/cart/components/add-to-cart-button";
 import { isProductAvailable, type Product } from "@/features/catalog/api";
 import { ProductImage } from "@/features/catalog/components/product-image";
+import { FavoriteToggle } from "@/features/favorites/components/favorite-toggle";
 import { Badge } from "@/shared/ui/badge";
 import { formatMoney } from "@/shared/money/money";
 import { cx } from "@/shared/utils/cx";
@@ -40,11 +41,10 @@ export function ProductCard({ product }: { product: Product }) {
           </Badge>
         </div>
       </Link>
-      <AddToCartButton
-        productId={product.id}
-        available={available}
-        className="mt-3"
-      />
+      <div className="mt-3 grid gap-2">
+        <FavoriteToggle productId={product.id} />
+        <AddToCartButton productId={product.id} available={available} />
+      </div>
     </article>
   );
 }

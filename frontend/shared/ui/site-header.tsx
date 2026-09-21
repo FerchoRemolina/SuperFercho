@@ -11,6 +11,7 @@ import { Button, buttonClassName } from "@/shared/ui/button";
 import { Container } from "@/shared/ui/container";
 import {
   CloseIcon,
+  HeartIcon,
   MenuIcon,
   SearchIcon,
   UserIcon,
@@ -102,7 +103,19 @@ export function SiteHeader() {
         <div className="hidden items-center gap-2 md:flex">
           {session ? (
             <>
-              {isCustomer ? <CartHeaderLink /> : null}
+              {isCustomer ? (
+                <>
+                  <Link
+                    href="/favorites"
+                    className={buttonClassName("ghost", "gap-2")}
+                    aria-current={isActivePath(pathname, "/favorites") ? "page" : undefined}
+                  >
+                    <HeartIcon />
+                    Favoritos
+                  </Link>
+                  <CartHeaderLink />
+                </>
+              ) : null}
               <div className="relative" ref={accountRef}>
                 <Button
                   variant="secondary"
@@ -122,6 +135,13 @@ export function SiteHeader() {
                   >
                     {isCustomer ? (
                       <>
+                        <Link
+                          href="/favorites"
+                          role="menuitem"
+                          className="flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-sf-ink hover:bg-sf-bg"
+                        >
+                          Favoritos
+                        </Link>
                         <Link
                           href="/orders"
                           role="menuitem"
@@ -179,6 +199,15 @@ export function SiteHeader() {
           >
             <SearchIcon />
           </Link>
+          {isCustomer ? (
+            <Link
+              href="/favorites"
+              aria-label="Favoritos"
+              className={buttonClassName("ghost", "px-3")}
+            >
+              <HeartIcon />
+            </Link>
+          ) : null}
           {isCustomer || !session ? <CartHeaderLink compact /> : null}
           <Button
             variant="ghost"
@@ -216,6 +245,17 @@ export function SiteHeader() {
               ))}
               {isCustomer ? (
                 <>
+                  <Link
+                    href="/favorites"
+                    className={cx(
+                      "flex min-h-12 items-center rounded-lg px-3 text-base font-semibold",
+                      isActivePath(pathname, "/favorites")
+                        ? "bg-sf-bg text-sf-primary"
+                        : "text-sf-ink hover:bg-sf-bg",
+                    )}
+                  >
+                    Favoritos
+                  </Link>
                   <Link
                     href="/cart"
                     className="flex min-h-12 items-center rounded-lg px-3 text-base font-semibold text-sf-ink hover:bg-sf-bg"

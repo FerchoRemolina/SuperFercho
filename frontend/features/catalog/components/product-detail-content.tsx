@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { AddToCartButton } from "@/features/cart/components/add-to-cart-button";
 import { isProductAvailable } from "@/features/catalog/api";
+import { FavoriteToggle } from "@/features/favorites/components/favorite-toggle";
 import { CatalogQueryError } from "@/features/catalog/components/catalog-query-error";
 import { ProductImage } from "@/features/catalog/components/product-image";
 import { useCategoryQuery, useProductQuery } from "@/features/catalog/hooks";
@@ -97,6 +98,7 @@ export function ProductDetailContent({ productId }: { productId: string }) {
             <p className="mt-6 text-base text-sf-muted">{product.description}</p>
           ) : null}
           <div className="mt-8 grid gap-3">
+            <FavoriteToggle productId={product.id} />
             <AddToCartButton
               productId={product.id}
               available={available}

@@ -110,6 +110,7 @@ Las features siguen los módulos del backend, no los duplican:
 | `auth` | Identity | `/api/v1/auth/login`, `/api/v1/customers` |
 | `account` | Identity | `/api/v1/addresses` |
 | `cart` | Shopping | `/api/v1/cart` |
+| `favorites` | Shopping | `/api/v1/favorites` |
 | `lists` | Shopping | `/api/v1/shopping-lists` |
 | `checkout` / `orders` | Orders | `/api/v1/orders` |
 | `admin-orders` | Orders | `GET /api/v1/admin/orders`, `GET /api/v1/admin/orders/{orderId}` |
@@ -124,7 +125,7 @@ Reglas:
 - Un único API client parsea `application/problem+json`.
 - Los tipos HTTP viven junto al client, copiados de los records REST (no de entidades JPA).
 - El estado de servidor vive en TanStack Query, no en un store global.
-- ADMIN no usa rutas ni hooks de carrito/checkout/assistant: el backend las deniega (`hasRole(CUSTOMER)`).
+- ADMIN no usa rutas ni hooks de carrito/checkout/assistant/favoritos: el backend las deniega (`hasRole(CUSTOMER)`).
 
 ---
 
@@ -146,6 +147,7 @@ frontend/
 │   ├── search/
 │   ├── (customer)/                # layout CUSTOMER
 │   │   ├── cart/
+│   │   ├── favorites/
 │   │   ├── checkout/
 │   │   ├── orders/
 │   │   ├── lists/
@@ -164,6 +166,7 @@ frontend/
 │   ├── auth/
 │   ├── account/
 │   ├── cart/
+│   ├── favorites/
 │   ├── lists/
 │   ├── orders/
 │   ├── assistant/
@@ -222,6 +225,7 @@ Sin `tailwind.config.js`: Tailwind 4 es CSS-first.
 | Ruta UI | API |
 |---|---|
 | `/cart` | `GET/POST/PUT/DELETE /api/v1/cart` |
+| `/favorites` | `GET /api/v1/favorites`, `POST /api/v1/favorites/{productId}` (201 nuevo / 200 existente), `DELETE /api/v1/favorites/{productId}` (204) |
 | `/checkout` | `GET /api/v1/addresses`, `GET /api/v1/cart`, `POST /api/v1/orders` |
 | `/orders` | `GET /api/v1/orders?page&size` |
 | `/orders/[orderId]` | `GET /api/v1/orders/{id}` (incluye `payment` para comprobante de UI), `POST .../cancel` |
@@ -253,7 +257,7 @@ No hay REST para “añadir lista completa al carrito”. Esa capacidad existe c
 
 - Grupo `(customer)`: si no hay sesión o `role !== CUSTOMER` → `/login`.
 - Grupo `(admin)`: si `role !== ADMIN` → `/login` o home.
-- ADMIN autenticado no ve carrito, checkout ni assistant (el API respondería `403 ACCESS_DENIED`).
+- ADMIN autenticado no ve carrito, checkout, assistant ni controles de favoritos (el API respondería `403 ACCESS_DENIED`).
 
 El middleware de Next.js **no** puede leer `sessionStorage`. Un cookie de pista (`sf_role`) sería spoofable. **DECIDIDO:** guards de cliente + 401/403 del API. Cookie HttpOnly **no** forma parte del MVP: el backend no emite `Set-Cookie`.
 
@@ -515,6 +519,28 @@ El REST del carrito **no** incluye nombre, imagen, stock, subtotal ni total.
 
 Producto inexistente o no vendible → 404 `PRODUCT_NOT_FOUND`. Cantidad ≤ 0 en dominio → 400 `INVALID_CART_ITEM`. Producto que no está en el carrito → 400 `INVALID_CART`.
 
+### 7.5.1 Favorites (`CUSTOMER`)
+
+Favoritos es del CUSTOMER autenticado. El cliente **no envía** `customerId` ni `userId`: el backend toma la identidad del JWT. Query key única: `['favorites']`. La membresía de un producto se deriva de `favorite.productId === product.id` sobre esa query; no hay store paralelo, `localStorage` ni pending-intent.
+
+`GET /api/v1/favorites` → `{ items: [{ productId, createdAt, product }] }`. El backend ya compone `product`; el frontend **no** hace N+1 contra `/products/{id}`.
+
+`product` puede ser `null` (el id ya no existe en Catalog). Si el producto existe pero no es vendible: `status = INACTIVE` y `available = false`. El frontend **no** elimina automáticamente esos favoritos.
+
+`FavoriteProduct.available` es vendibilidad de catálogo (producto y categoría ACTIVE). **No** es stock. `isProductAvailable(product)` del catálogo sigue significando `stock > 0` para compra. Un producto ACTIVE con stock 0 puede ser favorito. En `/favorites`, la acción de carrito usa `product && available && status !== INACTIVE`; no se interpreta `available` con `isProductAvailable()`.
+
+| Método | Path | Comportamiento real |
+|---|---|---|
+| GET | `/api/v1/favorites` | Lista del CUSTOMER autenticado, en el orden del backend. |
+| POST | `/api/v1/favorites/{productId}` | Sin body. 201 si es nuevo, 200 si ya existía. Body `{ id, productId, createdAt }`. El frontend no distingue 200/201 para actualizar estado: invalida `['favorites']`. |
+| DELETE | `/api/v1/favorites/{productId}` | Sin body. Siempre 204, aunque el favorito no exista. Invalida `['favorites']`. |
+
+Producto inexistente o no vendible al **añadir** → 404 `PRODUCT_NOT_FOUND`. Sin JWT → 401 `UNAUTHENTICATED`. ADMIN → 403 `ACCESS_DENIED`.
+
+**GUEST:** no ejecuta POST/DELETE. Redirige a `/login?next=<ruta-actual>` (incluye query string; p. ej. `/search?text=leche`). Tras el login vuelve a la ruta y debe pulsar de nuevo el corazón.
+
+**ADMIN:** no renderiza `FavoriteToggle` ni enlaces a `/favorites`.
+
 ### 7.6 Shopping lists (`CUSTOMER`)
 
 `ShoppingListRestResponse`: `id`, `customerId`, `name`, `items[]`, `createdAt`, `updatedAt`.
@@ -677,11 +703,11 @@ Conversaciones y tokens viven en memoria de proceso: se pierden al reiniciar el 
 
 ### Server state (red)
 
-Productos, categorías, carrito, listas, pedidos, direcciones, documentos Knowledge, mensajes de Assistant.
+Productos, categorías, carrito, favoritos, listas, pedidos, direcciones, documentos Knowledge, mensajes de Assistant.
 
-**DECIDIDO:** TanStack Query (`@tanstack/react-query` 5.x). Cache e invalidación tras mutar carrito/checkout. **Rechazado:** Redux para este estado.
+**DECIDIDO:** TanStack Query (`@tanstack/react-query` 5.x). Cache e invalidación tras mutar carrito/checkout/favoritos. **Rechazado:** Redux para este estado.
 
-Invalidaciones mínimas: add-to-cart → `['cart']`; checkout 201 → `['cart']` + `['orders']`; activate product → `['products']`.
+Invalidaciones mínimas: add-to-cart → `['cart']`; POST/DELETE favorites → `['favorites']`; checkout 201 → `['cart']` + `['orders']`; activate product → `['products']`.
 
 ### Client/UI state
 
@@ -735,8 +761,9 @@ Estados de UI:
 | Situación | Cómo se refleja el backend |
 |---|---|
 | Loading / empty / error | query + listas vacías reales (el backend ya entrega la lista completa; no hay paginación de catálogo) |
-| `stock = 0` | producto visible si es vendible; la UI de catálogo puede deshabilitar el CTA. Shopping **no** impide el alta. En checkout: `stock = 0` → `PRODUCT_NOT_AVAILABLE`; `quantity > stock` → `STOCK_UNAVAILABLE`. |
-| No vendible (producto o categoría INACTIVE) | el backend los excluye del listado público; detalle público → 404; el alta al carrito → 404 `PRODUCT_NOT_FOUND`; checkout → `PRODUCT_NOT_AVAILABLE`; el frontend no refiltra |
+| `stock = 0` | producto visible si es vendible; la UI de catálogo puede deshabilitar el CTA. Shopping **no** impide el alta. En checkout: `stock = 0` → `PRODUCT_NOT_AVAILABLE`; `quantity > stock` → `STOCK_UNAVAILABLE`. Un ACTIVE con stock 0 **puede** ser favorito. |
+| No vendible (producto o categoría INACTIVE) | el backend los excluye del listado público; detalle público → 404; el alta al carrito o a favoritos → 404 `PRODUCT_NOT_FOUND`; checkout → `PRODUCT_NOT_AVAILABLE`; el frontend no refiltra. Un favorito ya guardado puede devolver `product: null` o `status=INACTIVE` / `available=false`; no se borra solo. |
+| `FavoriteProduct.available` vs stock | `available` en Favoritos es vendibilidad, no inventario. No usar `isProductAvailable()` (stock del catálogo) para interpretarlo. |
 | Precio en carrito vs catálogo | `priceAtAddition` es informativo (precio al crear la línea). Checkout envía `expectedUnitPrice` = precio **vigente** (`Product.currentPrice()`). No tratar `priceAtAddition` como precio de cobro. |
 | 409 `PRODUCT_PRICE_CHANGED` | recargar producto/carrito; no cobrar el precio viejo |
 | 409 `STOCK_UNAVAILABLE` / `PRODUCT_NOT_AVAILABLE` | códigos de **checkout**, no de Shopping; no reintentar el mismo body a ciegas |
@@ -961,7 +988,7 @@ Límites que el frontend **no** debe tapar con APIs ficticias:
 3. No hay REST para `AddShoppingListToCart`.
 4. No hay CORS configurado.
 5. No hay refresh token.
-6. ADMIN no puede usar cart/checkout/assistant.
+6. ADMIN no puede usar cart/checkout/assistant/favorites.
 7. El simulador CARD no declina; el código `PAYMENT_DECLINED` igual existe.
 8. Conversaciones Assistant no son durables.
 
