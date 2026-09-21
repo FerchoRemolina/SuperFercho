@@ -229,6 +229,9 @@ class HttpAuthorizationSecurityTest {
     void shouldRejectShoppingCustomerRoutesWithoutJwt() throws Exception {
         mockMvc.perform(get("/api/v1/cart")).andExpect(unauthenticated());
         mockMvc.perform(get("/api/v1/shopping-lists")).andExpect(unauthenticated());
+        mockMvc.perform(get("/api/v1/favorites")).andExpect(unauthenticated());
+        mockMvc.perform(post("/api/v1/favorites/cccccccc-cccc-cccc-cccc-cccccccccccc"))
+                .andExpect(unauthenticated());
     }
 
     @Test
@@ -237,6 +240,8 @@ class HttpAuthorizationSecurityTest {
                 .andExpect(notBlockedBySecurity());
         mockMvc.perform(get("/api/v1/shopping-lists").header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
                 .andExpect(notBlockedBySecurity());
+        mockMvc.perform(get("/api/v1/favorites").header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(notBlockedBySecurity());
     }
 
     @Test
@@ -244,6 +249,8 @@ class HttpAuthorizationSecurityTest {
         mockMvc.perform(get("/api/v1/cart").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
                 .andExpect(accessDenied());
         mockMvc.perform(get("/api/v1/shopping-lists").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(accessDenied());
+        mockMvc.perform(get("/api/v1/favorites").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
                 .andExpect(accessDenied());
     }
 

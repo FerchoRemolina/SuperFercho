@@ -18,7 +18,7 @@
 | Database | One PostgreSQL database |
 | Knowledge vectors | pgvector in that same PostgreSQL database |
 | Persistence | Spring Data JPA / Hibernate; `ddl-auto: none`; `open-in-view: false`; Hibernate JDBC timezone UTC |
-| Schema evolution | Flyway (`V1`–`V9`) |
+| Schema evolution | Flyway (`V1`–`V10`) |
 | API | REST under `/api/v1` |
 | Security | Spring Security, JWT Bearer access tokens (~15 minutes) |
 | Tests | JUnit 5, Mockito, Spring Boot Test, MockMvc, Testcontainers PostgreSQL |
@@ -143,6 +143,7 @@ and call the provider module through its application API
 | Consumer | Provider | Port / mechanism | Forbidden |
 |---|---|---|---|
 | Shopping → Catalog | Current sellable price | Shopping `ProductCatalogPort` → Catalog `ProductQueryPort` (`FindProductPriceUseCase`) | Catalog JPA/repositories; `CategoryRepository` |
+| Shopping → Catalog | Favorite card composition | Shopping `ProductCardCatalogPort` → Catalog `ProductCardQueryPort` (`FindProductCardsUseCase`) | Catalog JPA/repositories; `CategoryRepository` |
 | Orders → Catalog | Sale snapshot + availability | Orders `ProductCatalogPort` → Catalog `ProductRepository` (name/stock) and `ProductQueryPort` (sellable) | Catalog JPA; `CategoryRepository` |
 | Orders → Catalog | Atomic decrement / restore | Catalog `InventoryPort` (provider-owned) | Catalog JPA from Orders |
 | Orders → Shopping | Load / clear active cart | Orders `ShoppingCartPort` | Shopping persistence |
@@ -153,7 +154,7 @@ and call the provider module through its application API
 
 Provider modules do not depend on their consumers. Catalog, Identity, Payments, and Knowledge do not depend on Orders, Shopping, or Assistant.
 
-No module uses another module’s JPA entities or Spring Data repositories. Adapter wiring is mixed: Shopping and Payments are consumed through application use cases. Orders’ catalog adapter currently loads Catalog `Product` through Catalog `ProductRepository` (application port) for name and stock, and asks Catalog `ProductQueryPort` whether the product is sellable; it does not call `CategoryRepository`. Orders’ address adapter currently calls Identity `AddressRepository` (application port). Assistant tools call use cases only. Shopping does not call `CategoryRepository`.
+No module uses another module’s JPA entities or Spring Data repositories. Adapter wiring is mixed: Shopping and Payments are consumed through application use cases. Orders’ catalog adapter currently loads Catalog `Product` through Catalog `ProductRepository` (application port) for name and stock, and asks Catalog `ProductQueryPort` whether the product is sellable; it does not call `CategoryRepository`. Orders’ address adapter currently calls Identity `AddressRepository` (application port). Assistant tools call use cases only. Shopping does not call `CategoryRepository` or Catalog persistence; favorite listing uses Catalog `ProductCardQueryPort`.
 
 `InventoryPort` is owned by **Catalog**. Orders imports that application port and calls it from checkout and cancel.
 
@@ -173,7 +174,7 @@ There is no separate Customer or Admin aggregate. A user has exactly one role: `
 
 Public registration (`RegisterCustomerUseCase`) creates `CUSTOMER` only. Users cannot self-register as `ADMIN`. There is no public profile endpoint and no bootstrap-admin use case in the runtime API.
 
-`ADMIN` is not a shopper: cart, lists, checkout, and assistant chat require `CUSTOMER`.
+`ADMIN` is not a shopper: cart, lists, favorites, checkout, and assistant chat require `CUSTOMER`.
 
 | Kind | Name |
 |---|---|
@@ -217,7 +218,7 @@ Rules:
 - `price >= 0`, `stock >= 0`
 - `stock = 0` means unavailable
 - a product is commercially sellable only when `Product.status == ACTIVE` **and** `Category.status == ACTIVE`
-- Catalog owns that rule (`CatalogVisibility`). Public catalog reads (`GetProductUseCase`, `ListProductsUseCase`, `SearchProductsUseCase`) and `FindProductPriceUseCase` apply it
+- Catalog owns that rule (`CatalogVisibility`). Public catalog reads (`GetProductUseCase`, `ListProductsUseCase`, `SearchProductsUseCase`), `FindProductPriceUseCase`, and `FindProductCardsUseCase` (`sellable`) apply it
 - a product that is not sellable is not publicly visible (public GET → 404) and cannot be added to a cart or sold, even if `Product.status` is `ACTIVE`
 - inactive categories cannot be used publicly (`GetCategoryUseCase` / public list)
 - Catalog owns stock
@@ -234,6 +235,7 @@ Public catalog reads default to `CatalogView.PUBLIC`. Admin listing uses `view=A
 | Entity | `CartItem` |
 | Aggregate | `ShoppingList` |
 | Entity | `ShoppingListItem` |
+| Aggregate | `Favorite` |
 | Enum | `CartStatus` (`ACTIVE` only) |
 
 - one cart per customer (`UNIQUE` on `customer_id`)
@@ -243,6 +245,10 @@ Public catalog reads default to `CatalogView.PUBLIC`. Admin listing uses `view=A
 - cart stored price (`price_at_addition`) is informational; Catalog current price is authoritative at checkout
 - adding a product to cart or shopping list, and `AddShoppingListToCart`, require a sellable product via `ProductQueryPort`; missing, `INACTIVE` product, or `INACTIVE` category → not found
 - `AddShoppingListToCart` is an application/tool capability; there is no dedicated REST path
+- `Favorite` is an independent aggregate (`id`, `customerId`, `productId`, `createdAt`); one favorite per customer+product (`UNIQUE (customer_id, product_id)`)
+- adding a favorite requires a sellable product via `ProductQueryPort`; stock 0 does not block; `INACTIVE` product or category cannot be added again
+- listing favorites composes Catalog cards via `ProductCardQueryPort` (batch); missing catalog products remain as favorites with `product = null`; `INACTIVE` products stay listed with `available = false`
+- Assistant has no favorite tools in this phase
 
 ### 3.4 Orders
 
@@ -361,6 +367,7 @@ There is no `GetCurrentUser` use case and no public admin-provisioning use case.
 - `CreateProductUseCase`, `UpdateProductUseCase`, `ActivateProductUseCase`, `DeactivateProductUseCase`, `ChangeProductPriceUseCase`
 - `GetProductUseCase`, `ListProductsUseCase`, `SearchProductsUseCase`
 - `FindProductPriceUseCase` — implements `ProductQueryPort` (sellable: product `ACTIVE` and category `ACTIVE`)
+- `FindProductCardsUseCase` — implements `ProductCardQueryPort` (batch card projection; includes `INACTIVE`; `sellable` follows `CatalogVisibility`)
 - `InventoryPort.decreaseStockAtomically` / `restoreStock`
 
 ### Shopping
@@ -369,6 +376,7 @@ There is no `GetCurrentUser` use case and no public admin-provisioning use case.
 - `CreateShoppingListUseCase`, `RenameShoppingListUseCase`, `ListShoppingListsUseCase`, `GetShoppingListUseCase`
 - `AddProductToShoppingListUseCase`, `ChangeShoppingListItemQuantityUseCase`, `RemoveProductFromShoppingListUseCase`, `ClearShoppingListUseCase`
 - `AddShoppingListToCartUseCase` — application/tool; same cart validation as `AddProductToCartUseCase`
+- `AddFavoriteUseCase`, `RemoveFavoriteUseCase`, `ListFavoritesUseCase` — identity from Shopping `CurrentUserProvider`; no Assistant tools in this phase
 
 There is no REST delete of a shopping list.
 
@@ -419,10 +427,20 @@ No business use cases. No operational tools.
 
 Shopping and Orders consume this contract. They do not query `CategoryRepository`. Assistant does not reimplement the rule: catalog tools use public Catalog use cases; cart/list tools use Shopping use cases.
 
+### Catalog `ProductCardQueryPort`
+
+- **Owner:** Catalog
+- **Implementation:** `FindProductCardsUseCase`
+- **Purpose:** Batch public-card projection for other modules (favorites list)
+- **Output:** one `ProductCardInfo` per found id (`id`, `name`, `brand`, `price`, `imageUrl`, `categoryId`, `status`, `sellable`). Missing ids are omitted. `INACTIVE` products are returned. `sellable` is true only when product and category are both `ACTIVE` (stock is not part of the rule)
+- **Adapter (Shopping):** `shopping.infrastructure.catalog.ProductCardCatalogAdapter` → maps `sellable` to favorite `available`
+
+Shopping does not import Catalog JPA, Catalog repositories, or Catalog infrastructure.
+
 ### Shopping `ProductCatalogPort`
 
 - **Owner:** Shopping
-- **Purpose:** Current price for cart/list writes
+- **Purpose:** Current price for cart/list writes and sellable check when adding a favorite
 - **Adapter:** `shopping.infrastructure.catalog.ProductCatalogAdapter` → `ProductQueryPort`
 
 ### Orders `ProductCatalogPort`
@@ -705,6 +723,17 @@ Retention in Application is 24 hours (`CheckoutUseCase.IDEMPOTENCY_RETENTION`). 
 - `embedding vector(1536)` NOT NULL
 - HNSW index `idx_knowledge_document_embeddings_vector` using `vector_cosine_ops`
 
+### 6.10 V10 — Favorites
+
+**`shopping.favorites`**
+
+- `id` UUID PK
+- `customer_id` UUID NOT NULL (logical; no FK to `identity.users`)
+- `product_id` UUID NOT NULL (logical; no FK to `catalog.products`)
+- `created_at` TIMESTAMPTZ NOT NULL
+- UNIQUE (`customer_id`, `product_id`) — `uk_shopping_favorites_customer_product`
+- INDEX (`customer_id`, `created_at` DESC) — `idx_shopping_favorites_customer_created_at`
+
 ---
 
 ## 7. Fronteras transaccionales
@@ -715,6 +744,7 @@ Transactions are started in Infrastructure wrappers via `TransactionTemplate`, n
 |---|---|
 | Register / address mutations | One TX; unique and partial-unique constraints enforce invariants |
 | Cart / shopping-list writes | One TX on shopping tables; catalog is read via port; no stock write |
+| Favorite writes | One TX on `shopping.favorites`; catalog is read via port; UNIQUE (`customer_id`, `product_id`) is the concurrency backstop |
 | **Checkout** | `TransactionalCheckoutUseCase` wraps `CheckoutUseCase.execute` in one local TX (idempotency, stock, payment, order, cart clear) |
 | `ProcessPaymentUseCase` | Joins the caller TX |
 | **Cancel** | `TransactionalCancelOrderUseCase` wraps cancel. Stock restore and optional refund run only after `saveIfPending` succeeds |
@@ -793,7 +823,7 @@ Source: `IdentitySecurityConfiguration`.
 - Password hashing: BCrypt via `PasswordEncoder` / `BCryptPasswordHasher`.
 - JWT secret from `SUPERFERCHO_JWT_SECRET`. Not hard-coded.
 - Domain never accesses `SecurityContext`.
-- Personalized operations use the authenticated principal. Clients do not send `userId` / `customerId` for ownership. Ownership is enforced in Application (`GetOrderUseCase`, address use cases, cart/lists).
+- Personalized operations use the authenticated principal. Clients do not send `userId` / `customerId` for ownership. Ownership is enforced in Application (`GetOrderUseCase`, address use cases, cart/lists/favorites).
 - `ADMIN` is not required to shop and is denied customer shopping/assistant routes.
 
 ### 9.1 Public
@@ -824,6 +854,7 @@ Source: `IdentitySecurityConfiguration`.
 | `/api/v1/addresses`, `/api/v1/addresses/**` | CUSTOMER |
 | `/api/v1/cart`, `/api/v1/cart/**` | CUSTOMER |
 | `/api/v1/shopping-lists`, `/api/v1/shopping-lists/**` | CUSTOMER |
+| `/api/v1/favorites`, `/api/v1/favorites/**` | CUSTOMER |
 | `POST /api/v1/orders` | CUSTOMER |
 | `GET /api/v1/orders`, `GET /api/v1/orders/{orderId}` | CUSTOMER |
 | `POST /api/v1/orders/{orderId}/cancel` | CUSTOMER |
@@ -906,8 +937,11 @@ GET defaults to public view. `view=ADMIN` requires `ADMIN`.
 | PATCH | `/api/v1/shopping-lists/{id}/items/{productId}` | Change item quantity |
 | DELETE | `/api/v1/shopping-lists/{id}/items/{productId}` | Remove item |
 | DELETE | `/api/v1/shopping-lists/{id}/items` | Clear items |
+| GET | `/api/v1/favorites` | List current user’s favorites (`items[]` of `productId`, `createdAt`, `product`). `product` may be `null` if Catalog no longer has the id. `INACTIVE` products stay listed with `available: false` |
+| POST | `/api/v1/favorites/{productId}` | Idempotent add. **201** if created, **200** if already present. Missing/unsellable product → **404** `PRODUCT_NOT_FOUND`. Stock 0 does not block |
+| DELETE | `/api/v1/favorites/{productId}` | Idempotent remove. Always **204** |
 
-There is no HTTP delete of a shopping list.
+There is no HTTP delete of a shopping list. Favorites are identified by `productId`, not by favorite id. Identity comes from the JWT. ADMIN cannot use these routes.
 
 ### 10.5 Orders
 
@@ -982,7 +1016,7 @@ Never: Assistant or MCP → JPA / repository / SQL of another module.
 | Retrieved knowledge snippets | Cart, orders, payments |
 | Tool results from this turn | Authenticated identity (never from the model) |
 
-**Allowlisted tools:** `search_products`, `get_product`, `list_products`, `list_categories`, `get_cart`, `add_cart_item`, `change_cart_item_quantity`, `remove_cart_item`, `clear_cart`, shopping-list tools including `add_shopping_list_to_cart`, `list_orders`, `get_order`, `checkout`, `cancel_order`, `list_addresses`, `search_knowledge`.
+**Allowlisted tools:** `search_products`, `get_product`, `list_products`, `list_categories`, `get_cart`, `add_cart_item`, `change_cart_item_quantity`, `remove_cart_item`, `clear_cart`, shopping-list tools including `add_shopping_list_to_cart`, `list_orders`, `get_order`, `checkout`, `cancel_order`, `list_addresses`, `search_knowledge`. There are no favorite tools in this phase.
 
 Catalog and shopping tools reuse existing Catalog public use cases and Shopping cart/list use cases. Assistant does not implement product sellability itself.
 
@@ -1018,7 +1052,7 @@ Knowledge HTTP is ADMIN ingest/search. Assistant search is the same `SearchKnowl
 | `Address` | Separate | Default-address invariant, deactivate |
 | `Product` | Separate | Stock invariants + atomic SQL |
 | `Category` | Separate adapter | Status; no JPA on domain |
-| `Cart` / `ShoppingList` | Separate | Collection invariants, one cart per customer |
+| `Cart` / `ShoppingList` / `Favorite` | Separate | Collection invariants, one cart per customer; favorites UNIQUE `(customer_id, product_id)` |
 | `Order` | Separate | Lifecycle, snapshots, cancellation |
 | `Payment` | Separate | Status, `refundedAt`; no JPA on domain |
 | Knowledge document/chunk | JPA document + JDBC/pgvector embeddings | `VECTOR` is infrastructure |
@@ -1050,7 +1084,7 @@ No H2. Tests do not call real payment providers. LLM and embedding ports are fak
 - public non-sellable product 404 (inactive product or inactive category)
 - non-sellable products cannot enter cart/list via `ProductQueryPort` (inactive product or inactive category)
 - checkout rejects a product whose category is `INACTIVE` even if the product is `ACTIVE`
-- ownership: customer cannot read another user’s order/cart/address
+- ownership: customer cannot read another user’s order/cart/address/favorites
 - ADMIN cannot be obtained via public register
 - Knowledge REST requires ADMIN
 - Assistant chat requires CUSTOMER; tools do not accept a target user id

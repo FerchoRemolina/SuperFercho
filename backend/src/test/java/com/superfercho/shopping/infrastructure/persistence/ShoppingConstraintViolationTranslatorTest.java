@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.superfercho.shopping.application.exception.DuplicateCustomerCartException;
+import com.superfercho.shopping.application.exception.DuplicateFavoriteException;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 
@@ -16,6 +17,16 @@ class ShoppingConstraintViolationTranslatorTest {
         RuntimeException translated = ShoppingConstraintViolationTranslator.translate(violation);
 
         assertTrue(translated instanceof DuplicateCustomerCartException);
+        assertSame(violation, translated.getCause());
+    }
+
+    @Test
+    void shouldTranslateDuplicateFavoriteConstraint() {
+        DataIntegrityViolationException violation = violation("uk_shopping_favorites_customer_product");
+
+        RuntimeException translated = ShoppingConstraintViolationTranslator.translate(violation);
+
+        assertTrue(translated instanceof DuplicateFavoriteException);
         assertSame(violation, translated.getCause());
     }
 

@@ -6,9 +6,12 @@ import com.superfercho.platform.time.ClockConfiguration;
 import com.superfercho.shopping.application.port.CurrentUserProvider;
 import com.superfercho.shopping.application.port.out.CartRepositoryPort;
 import com.superfercho.shopping.application.port.out.ClockPort;
+import com.superfercho.shopping.application.port.out.FavoriteRepositoryPort;
+import com.superfercho.shopping.application.port.out.ProductCardCatalogPort;
 import com.superfercho.shopping.application.port.out.ProductCatalogPort;
 import com.superfercho.shopping.application.port.out.ShoppingListRepositoryPort;
 import com.superfercho.shopping.application.service.CartApplicationService;
+import com.superfercho.shopping.application.service.FavoriteApplicationService;
 import com.superfercho.shopping.application.service.ShoppingListApplicationService;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -46,6 +49,16 @@ class ShoppingApplicationWiringTest {
         ProductCatalogPort productCatalogPort() {
             return Mockito.mock(ProductCatalogPort.class);
         }
+
+        @Bean
+        FavoriteRepositoryPort favoriteRepositoryPort() {
+            return Mockito.mock(FavoriteRepositoryPort.class);
+        }
+
+        @Bean
+        ProductCardCatalogPort productCardCatalogPort() {
+            return Mockito.mock(ProductCardCatalogPort.class);
+        }
     }
 
     @Autowired
@@ -53,6 +66,9 @@ class ShoppingApplicationWiringTest {
 
     @Autowired
     private ShoppingListApplicationService shoppingListApplicationService;
+
+    @Autowired
+    private FavoriteApplicationService favoriteApplicationService;
 
     @Autowired
     private CartRepositoryPort cartRepositoryPort;
@@ -70,6 +86,7 @@ class ShoppingApplicationWiringTest {
     void shouldWireShoppingApplicationServices() {
         assertThat(cartApplicationService).isNotNull();
         assertThat(shoppingListApplicationService).isNotNull();
+        assertThat(favoriteApplicationService).isNotNull();
         assertThat(cartRepositoryPort).isNotNull();
         assertThat(shoppingListRepositoryPort).isNotNull();
         assertThat(productCatalogPort).isNotNull();

@@ -5,6 +5,7 @@ import com.superfercho.catalog.domain.model.Product;
 import com.superfercho.catalog.domain.model.ProductStatus;
 import com.superfercho.catalog.infrastructure.persistence.mapper.ProductPersistenceMapper;
 import com.superfercho.catalog.infrastructure.persistence.repository.ProductJpaRepository;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -38,6 +39,16 @@ public class ProductPersistenceAdapter implements ProductRepository {
     @Override
     public Optional<Product> findById(UUID id) {
         return productJpaRepository.findById(id).map(productPersistenceMapper::toDomain);
+    }
+
+    @Override
+    public List<Product> findByIds(Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return productJpaRepository.findAllById(ids).stream()
+                .map(productPersistenceMapper::toDomain)
+                .toList();
     }
 
     @Override

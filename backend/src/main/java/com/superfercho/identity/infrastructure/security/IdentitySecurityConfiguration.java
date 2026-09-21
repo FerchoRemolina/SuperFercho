@@ -114,6 +114,8 @@ public class IdentitySecurityConfiguration {
                         .hasRole("CUSTOMER")
                         .requestMatchers("/api/v1/shopping-lists", "/api/v1/shopping-lists/**")
                         .hasRole("CUSTOMER")
+                        .requestMatchers("/api/v1/favorites", "/api/v1/favorites/**")
+                        .hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.POST, "/api/v1/orders")
                         .hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.GET, "/api/v1/orders")

@@ -1,6 +1,7 @@
 package com.superfercho.catalog.infrastructure.configuration;
 
 import com.superfercho.catalog.application.port.CategoryRepository;
+import com.superfercho.catalog.application.port.ProductCardQueryPort;
 import com.superfercho.catalog.application.port.ProductQueryPort;
 import com.superfercho.catalog.application.port.ProductRepository;
 import com.superfercho.catalog.application.usecase.ActivateCategoryUseCase;
@@ -10,6 +11,7 @@ import com.superfercho.catalog.application.usecase.CreateCategoryUseCase;
 import com.superfercho.catalog.application.usecase.CreateProductUseCase;
 import com.superfercho.catalog.application.usecase.DeactivateCategoryUseCase;
 import com.superfercho.catalog.application.usecase.DeactivateProductUseCase;
+import com.superfercho.catalog.application.usecase.FindProductCardsUseCase;
 import com.superfercho.catalog.application.usecase.FindProductPriceUseCase;
 import com.superfercho.catalog.application.usecase.GetCategoryUseCase;
 import com.superfercho.catalog.application.usecase.GetProductUseCase;
@@ -30,6 +32,12 @@ public class CatalogUseCaseConfiguration {
     @Bean
     ProductQueryPort productQueryPort(ProductRepository productRepository, CategoryRepository categoryRepository) {
         return new FindProductPriceUseCase(productRepository, categoryRepository);
+    }
+
+    @Bean
+    ProductCardQueryPort productCardQueryPort(
+            ProductRepository productRepository, CategoryRepository categoryRepository) {
+        return new FindProductCardsUseCase(productRepository, categoryRepository);
     }
 
     @Bean

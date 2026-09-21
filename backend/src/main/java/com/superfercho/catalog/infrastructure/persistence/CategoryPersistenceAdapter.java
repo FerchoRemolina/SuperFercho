@@ -5,6 +5,7 @@ import com.superfercho.catalog.domain.model.Category;
 import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.infrastructure.persistence.mapper.CategoryPersistenceMapper;
 import com.superfercho.catalog.infrastructure.persistence.repository.CategoryJpaRepository;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,6 +40,16 @@ public class CategoryPersistenceAdapter implements CategoryRepository {
     @Override
     public Optional<Category> findById(UUID id) {
         return categoryJpaRepository.findById(id).map(categoryPersistenceMapper::toDomain);
+    }
+
+    @Override
+    public List<Category> findByIds(Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return categoryJpaRepository.findAllById(ids).stream()
+                .map(categoryPersistenceMapper::toDomain)
+                .toList();
     }
 
     @Override

@@ -3,9 +3,12 @@ package com.superfercho.shopping.infrastructure.configuration;
 import com.superfercho.shopping.application.port.CurrentUserProvider;
 import com.superfercho.shopping.application.port.out.CartRepositoryPort;
 import com.superfercho.shopping.application.port.out.ClockPort;
+import com.superfercho.shopping.application.port.out.FavoriteRepositoryPort;
+import com.superfercho.shopping.application.port.out.ProductCardCatalogPort;
 import com.superfercho.shopping.application.port.out.ProductCatalogPort;
 import com.superfercho.shopping.application.port.out.ShoppingListRepositoryPort;
 import com.superfercho.shopping.application.service.CartApplicationService;
+import com.superfercho.shopping.application.service.FavoriteApplicationService;
 import com.superfercho.shopping.application.service.ShoppingListApplicationService;
 import com.superfercho.shopping.infrastructure.clock.SystemClockAdapter;
 import java.time.Clock;
@@ -41,5 +44,20 @@ public class ShoppingUseCaseConfiguration {
             ClockPort clockPort) {
         return new ShoppingListApplicationService(
                 currentUserProvider, shoppingListRepository, productCatalogPort, clockPort);
+    }
+
+    @Bean
+    FavoriteApplicationService favoriteApplicationService(
+            CurrentUserProvider currentUserProvider,
+            FavoriteRepositoryPort favoriteRepository,
+            ProductCatalogPort productCatalogPort,
+            ProductCardCatalogPort productCardCatalogPort,
+            ClockPort clockPort) {
+        return new FavoriteApplicationService(
+                currentUserProvider,
+                favoriteRepository,
+                productCatalogPort,
+                productCardCatalogPort,
+                clockPort);
     }
 }
