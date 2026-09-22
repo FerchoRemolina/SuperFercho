@@ -239,6 +239,19 @@ class CatalogPersistenceAdapterTest {
         assertThat(productRepository.findById(available.id()).orElseThrow().stock()).isEqualTo(2);
     }
 
+    @Test
+    void shouldAdjustStockAtomicallyWithCas() {
+        Category category = categoryRepository.save(newCategory("Ajuste", CategoryStatus.ACTIVE));
+        Product product = productRepository.save(
+                newProduct(category.id(), "770401", "Ajustable", ProductStatus.ACTIVE, 5, "1000.00"));
+
+        assertThat(productRepository.adjustStockIfUnchanged(product.id(), 5, 12, NOW)).isTrue();
+        assertThat(productRepository.findById(product.id()).orElseThrow().stock()).isEqualTo(12);
+
+        assertThat(productRepository.adjustStockIfUnchanged(product.id(), 5, 20, NOW)).isFalse();
+        assertThat(productRepository.findById(product.id()).orElseThrow().stock()).isEqualTo(12);
+    }
+
     private void insertProductBypassingDomain(UUID categoryId, BigDecimal price, int stock) {
         jdbcTemplate.update(
                 connection -> {

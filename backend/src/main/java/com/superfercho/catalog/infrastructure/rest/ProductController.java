@@ -1,6 +1,7 @@
 package com.superfercho.catalog.infrastructure.rest;
 
 import com.superfercho.catalog.application.dto.ActivateProductCommand;
+import com.superfercho.catalog.application.dto.AdjustProductStockCommand;
 import com.superfercho.catalog.application.dto.CatalogView;
 import com.superfercho.catalog.application.dto.ChangeProductPriceCommand;
 import com.superfercho.catalog.application.dto.CreateProductCommand;
@@ -10,6 +11,7 @@ import com.superfercho.catalog.application.dto.ListProductsCommand;
 import com.superfercho.catalog.application.dto.SearchProductsCommand;
 import com.superfercho.catalog.application.dto.UpdateProductCommand;
 import com.superfercho.catalog.application.usecase.ActivateProductUseCase;
+import com.superfercho.catalog.application.usecase.AdjustProductStockUseCase;
 import com.superfercho.catalog.application.usecase.ChangeProductPriceUseCase;
 import com.superfercho.catalog.application.usecase.CreateProductUseCase;
 import com.superfercho.catalog.application.usecase.DeactivateProductUseCase;
@@ -18,6 +20,7 @@ import com.superfercho.catalog.application.usecase.ListProductsUseCase;
 import com.superfercho.catalog.application.usecase.SearchProductsUseCase;
 import com.superfercho.catalog.application.usecase.UpdateProductUseCase;
 import com.superfercho.catalog.domain.model.ProductStatus;
+import com.superfercho.catalog.infrastructure.rest.dto.AdjustProductStockRequest;
 import com.superfercho.catalog.infrastructure.rest.dto.ChangeProductPriceRequest;
 import com.superfercho.catalog.infrastructure.rest.dto.CreateProductRequest;
 import com.superfercho.catalog.infrastructure.rest.dto.ProductRestResponse;
@@ -49,6 +52,7 @@ public class ProductController {
     private final ActivateProductUseCase activateProductUseCase;
     private final DeactivateProductUseCase deactivateProductUseCase;
     private final ChangeProductPriceUseCase changeProductPriceUseCase;
+    private final AdjustProductStockUseCase adjustProductStockUseCase;
 
     public ProductController(
             CreateProductUseCase createProductUseCase,
@@ -58,7 +62,8 @@ public class ProductController {
             UpdateProductUseCase updateProductUseCase,
             ActivateProductUseCase activateProductUseCase,
             DeactivateProductUseCase deactivateProductUseCase,
-            ChangeProductPriceUseCase changeProductPriceUseCase) {
+            ChangeProductPriceUseCase changeProductPriceUseCase,
+            AdjustProductStockUseCase adjustProductStockUseCase) {
         this.createProductUseCase = createProductUseCase;
         this.getProductUseCase = getProductUseCase;
         this.listProductsUseCase = listProductsUseCase;
@@ -67,6 +72,7 @@ public class ProductController {
         this.activateProductUseCase = activateProductUseCase;
         this.deactivateProductUseCase = deactivateProductUseCase;
         this.changeProductPriceUseCase = changeProductPriceUseCase;
+        this.adjustProductStockUseCase = adjustProductStockUseCase;
     }
 
     @PostMapping
@@ -143,6 +149,13 @@ public class ProductController {
             @PathVariable UUID productId, @RequestBody ChangeProductPriceRequest request) {
         return ProductRestResponse.from(
                 changeProductPriceUseCase.execute(new ChangeProductPriceCommand(productId, request.price())));
+    }
+
+    @PostMapping("/{productId}/stock")
+    public ProductRestResponse adjustStock(
+            @PathVariable UUID productId, @RequestBody AdjustProductStockRequest request) {
+        return ProductRestResponse.from(adjustProductStockUseCase.execute(
+                new AdjustProductStockCommand(productId, request.stock())));
     }
 
     private static CatalogView catalogView(CatalogView view) {

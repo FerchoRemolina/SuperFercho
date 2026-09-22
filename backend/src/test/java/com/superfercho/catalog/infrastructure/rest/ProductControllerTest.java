@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.superfercho.catalog.application.dto.ActivateProductCommand;
+import com.superfercho.catalog.application.dto.AdjustProductStockCommand;
 import com.superfercho.catalog.application.dto.CatalogView;
 import com.superfercho.catalog.application.dto.ChangeProductPriceCommand;
 import com.superfercho.catalog.application.dto.CreateProductCommand;
@@ -25,7 +26,9 @@ import com.superfercho.catalog.application.dto.UpdateProductCommand;
 import com.superfercho.catalog.application.exception.DuplicateBarcodeException;
 import com.superfercho.catalog.application.exception.InvalidCategoryReferenceException;
 import com.superfercho.catalog.application.exception.ProductNotFoundException;
+import com.superfercho.catalog.application.exception.ProductStockConflictException;
 import com.superfercho.catalog.application.usecase.ActivateProductUseCase;
+import com.superfercho.catalog.application.usecase.AdjustProductStockUseCase;
 import com.superfercho.catalog.application.usecase.ChangeProductPriceUseCase;
 import com.superfercho.catalog.application.usecase.CreateProductUseCase;
 import com.superfercho.catalog.application.usecase.DeactivateProductUseCase;
@@ -87,6 +90,9 @@ class ProductControllerTest {
 
     @MockitoBean
     private ChangeProductPriceUseCase changeProductPriceUseCase;
+
+    @MockitoBean
+    private AdjustProductStockUseCase adjustProductStockUseCase;
 
     @Test
     void shouldCreateProduct() throws Exception {
@@ -309,6 +315,37 @@ class ProductControllerTest {
     }
 
     @Test
+    void shouldAdjustProductStock() throws Exception {
+        when(adjustProductStockUseCase.execute(any()))
+                .thenReturn(productResult(ProductStatus.ACTIVE, PRICE, 25));
+
+        mockMvc.perform(post("/api/v1/products/{productId}/stock", PRODUCT_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"stock": 25}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stock").value(25));
+
+        verify(adjustProductStockUseCase).execute(new AdjustProductStockCommand(PRODUCT_ID, 25));
+        verifyNoInteractions(updateProductUseCase, changeProductPriceUseCase);
+    }
+
+    @Test
+    void shouldMapProductStockConflictToConflict() throws Exception {
+        when(adjustProductStockUseCase.execute(any()))
+                .thenThrow(new ProductStockConflictException(PRODUCT_ID));
+
+        mockMvc.perform(post("/api/v1/products/{productId}/stock", PRODUCT_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"stock": 25}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PRODUCT_STOCK_CONFLICT"));
+    }
+
+    @Test
     void shouldMapProductNotFoundToNotFound() throws Exception {
         when(getProductUseCase.execute(any())).thenThrow(new ProductNotFoundException(PRODUCT_ID));
 
@@ -399,6 +436,10 @@ class ProductControllerTest {
     }
 
     private static ProductResult productResult(ProductStatus status, Money price) {
+        return productResult(status, price, 20);
+    }
+
+    private static ProductResult productResult(ProductStatus status, Money price, int stock) {
         return new ProductResult(
                 PRODUCT_ID,
                 CATEGORY_ID,
@@ -407,7 +448,7 @@ class ProductControllerTest {
                 "Alquería",
                 "Bolsa 1L",
                 price,
-                20,
+                stock,
                 "https://img.test/leche.png",
                 status,
                 CREATED_AT,

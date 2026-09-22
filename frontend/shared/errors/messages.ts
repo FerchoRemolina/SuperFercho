@@ -12,6 +12,8 @@ export function messageForApiProblem(problem: ApiProblem): string {
       return "Ya existe una cuenta con ese documento.";
     case "PRODUCT_NOT_FOUND":
       return "No encontramos este producto.";
+    case "PRODUCT_STOCK_CONFLICT":
+      return "El stock cambió mientras lo actualizabas. Revisa el valor actual e inténtalo de nuevo.";
     case "CATEGORY_NOT_FOUND":
       return "No encontramos esta categoría.";
     case "CART_NOT_FOUND":

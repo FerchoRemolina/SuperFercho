@@ -2,6 +2,7 @@ package com.superfercho.catalog.application.port;
 
 import com.superfercho.catalog.domain.model.Product;
 import com.superfercho.catalog.domain.model.ProductStatus;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -24,4 +25,10 @@ public interface ProductRepository {
     List<Product> findByCategoryIdAndStatus(UUID categoryId, ProductStatus status);
 
     List<Product> searchByNameBrandOrBarcode(String text);
+
+    /**
+     * Atomically sets stock when the current value still matches {@code expectedStock}.
+     * Returns {@code true} when one row was updated.
+     */
+    boolean adjustStockIfUnchanged(UUID id, int expectedStock, int newStock, Instant updatedAt);
 }

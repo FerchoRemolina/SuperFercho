@@ -86,8 +86,8 @@ export function AdminProductsPageContent() {
             Productos
           </h1>
           <p className="mt-2 max-w-2xl text-base text-sf-muted">
-            El stock se define al crear el producto. Después de crearlo solo se
-            consulta; no hay ajuste de inventario en esta fase.
+            El stock se define al crear el producto y también puede ajustarse
+            desde el detalle.
           </p>
         </div>
         <Link href="/admin/products/new" className={buttonClassName("primary")}>

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   activateAdminCategory,
   activateAdminProduct,
+  adjustAdminProductStock,
   adminKeys,
   ADMIN_SALES_ORDER_STATUSES,
   changeAdminProductPrice,
@@ -195,6 +196,25 @@ describe("admin catalog api", () => {
     expect((fetchMock.mock.calls[0]?.[1] as RequestInit).method).toBe("POST");
     expect((fetchMock.mock.calls[0]?.[1] as RequestInit).body).toBe(
       JSON.stringify({ price: { amount: 12, currency: "COP" } }),
+    );
+  });
+
+  it("adjusts stock with POST /stock only", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ ...product, stock: 25 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      adjustAdminProductStock(product.id, { stock: 25 }),
+    ).resolves.toMatchObject({ stock: 25 });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      `http://localhost:8080/api/v1/products/${product.id}/stock`,
+    );
+    expect((fetchMock.mock.calls[0]?.[1] as RequestInit).method).toBe("POST");
+    expect((fetchMock.mock.calls[0]?.[1] as RequestInit).body).toBe(
+      JSON.stringify({ stock: 25 }),
     );
   });
 

@@ -6,6 +6,7 @@ import com.superfercho.catalog.application.port.ProductQueryPort;
 import com.superfercho.catalog.application.port.ProductRepository;
 import com.superfercho.catalog.application.usecase.ActivateCategoryUseCase;
 import com.superfercho.catalog.application.usecase.ActivateProductUseCase;
+import com.superfercho.catalog.application.usecase.AdjustProductStockUseCase;
 import com.superfercho.catalog.application.usecase.ChangeProductPriceUseCase;
 import com.superfercho.catalog.application.usecase.CreateCategoryUseCase;
 import com.superfercho.catalog.application.usecase.CreateProductUseCase;
@@ -113,5 +114,10 @@ public class CatalogUseCaseConfiguration {
     @Bean
     ChangeProductPriceUseCase changeProductPriceUseCase(ProductRepository productRepository, Clock clock) {
         return new ChangeProductPriceUseCase(productRepository, clock);
+    }
+
+    @Bean
+    AdjustProductStockUseCase adjustProductStockUseCase(ProductRepository productRepository, Clock clock) {
+        return new AdjustProductStockUseCase(productRepository, clock);
     }
 }

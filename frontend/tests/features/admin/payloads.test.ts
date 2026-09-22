@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  adjustAdminProductStockRequestFromValue,
   changeAdminProductPriceRequestFromAmount,
   createAdminKnowledgeDocumentRequestFromValues,
   createAdminProductRequestFromValues,
@@ -10,6 +11,7 @@ import {
   updateAdminProductRequestFromValues,
   validateAdminKnowledgeDocument,
   validateAdminKnowledgeDocumentContent,
+  validateAdminProductStock,
   validateCreateAdminProduct,
   validateUpdateAdminProduct,
 } from "@/features/admin/payloads";
@@ -66,6 +68,13 @@ describe("admin product payloads", () => {
     expect(changeAdminProductPriceRequestFromAmount("15")).toEqual({
       price: { amount: 15, currency: "COP" },
     });
+  });
+
+  it("builds stock adjust payload and validates stock", () => {
+    expect(adjustAdminProductStockRequestFromValue("25")).toEqual({ stock: 25 });
+    expect(validateAdminProductStock("0")).toBeUndefined();
+    expect(validateAdminProductStock("-1")).toMatch(/stock/i);
+    expect(validateAdminProductStock("1.5")).toMatch(/stock/i);
   });
 
   it("validates create requires name, category, price, and stock", () => {

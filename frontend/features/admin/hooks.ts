@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   activateAdminCategory,
   activateAdminProduct,
+  adjustAdminProductStock,
   adminKeys,
   changeAdminProductPrice,
   createAdminCategory,
@@ -29,6 +30,7 @@ import {
   updateAdminCategory,
   updateAdminOrderStatus,
   updateAdminProduct,
+  type AdjustAdminProductStockRequest,
   type ChangeAdminProductPriceRequest,
   type CreateAdminCategoryRequest,
   type CreateAdminKnowledgeDocumentRequest,
@@ -199,6 +201,25 @@ export function useChangeAdminProductPriceMutation() {
       productId: string;
       body: ChangeAdminProductPriceRequest;
     }) => changeAdminProductPrice(productId, body),
+    onSuccess: (product) => {
+      queryClient.setQueryData(keys.product(product.id), product);
+      void queryClient.invalidateQueries({ queryKey: keys.productsRoot() });
+      void queryClient.invalidateQueries({ queryKey: keys.product(product.id) });
+    },
+  });
+}
+
+export function useAdjustAdminProductStockMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      productId,
+      body,
+    }: {
+      productId: string;
+      body: AdjustAdminProductStockRequest;
+    }) => adjustAdminProductStock(productId, body),
     onSuccess: (product) => {
       queryClient.setQueryData(keys.product(product.id), product);
       void queryClient.invalidateQueries({ queryKey: keys.productsRoot() });

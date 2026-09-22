@@ -45,8 +45,8 @@ export function AdminCreateProductPageContent() {
         Nuevo producto
       </h1>
       <p className="mt-2 max-w-2xl text-base text-sf-muted">
-        El stock inicial se define aquí. Después de crear el producto no podrás
-        modificarlo desde el panel.
+        El stock inicial se define aquí. Después también puedes ajustarlo desde
+        el detalle del producto.
       </p>
 
       {categoriesQuery.isPending ? (

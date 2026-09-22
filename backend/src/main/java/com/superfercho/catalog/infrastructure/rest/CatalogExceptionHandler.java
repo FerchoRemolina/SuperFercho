@@ -4,6 +4,7 @@ import com.superfercho.catalog.application.exception.CategoryNotFoundException;
 import com.superfercho.catalog.application.exception.DuplicateBarcodeException;
 import com.superfercho.catalog.application.exception.InvalidCategoryReferenceException;
 import com.superfercho.catalog.application.exception.ProductNotFoundException;
+import com.superfercho.catalog.application.exception.ProductStockConflictException;
 import com.superfercho.catalog.domain.exception.InvalidCategoryException;
 import com.superfercho.catalog.domain.exception.InvalidProductException;
 import org.springframework.context.annotation.Profile;
@@ -47,6 +48,11 @@ public class CatalogExceptionHandler {
     @ExceptionHandler(ProductNotFoundException.class)
     ProblemDetail handleProductNotFound(ProductNotFoundException exception) {
         return problem(HttpStatus.NOT_FOUND, "PRODUCT_NOT_FOUND", exception.getMessage());
+    }
+
+    @ExceptionHandler(ProductStockConflictException.class)
+    ProblemDetail handleProductStockConflict(ProductStockConflictException exception) {
+        return problem(HttpStatus.CONFLICT, "PRODUCT_STOCK_CONFLICT", exception.getMessage());
     }
 
     private static ProblemDetail problem(HttpStatus status, String code, String detail) {

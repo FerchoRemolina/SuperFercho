@@ -79,6 +79,19 @@ describe("messageForApiProblem", () => {
     ).toBe("No encontramos este producto.");
   });
 
+  it("uses a Spanish message for PRODUCT_STOCK_CONFLICT", () => {
+    expect(
+      messageForApiProblem({
+        status: 409,
+        code: "PRODUCT_STOCK_CONFLICT",
+        detail:
+          "Product stock changed concurrently: 33333333-3333-3333-3333-333333333333",
+      }),
+    ).toBe(
+      "El stock cambió mientras lo actualizabas. Revisa el valor actual e inténtalo de nuevo.",
+    );
+  });
+
   it("uses a Spanish message for INVALID_CREDENTIALS even if the backend detail is English", () => {
     expect(
       messageForApiProblem({

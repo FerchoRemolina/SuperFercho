@@ -5,6 +5,7 @@ import com.superfercho.catalog.domain.model.Product;
 import com.superfercho.catalog.domain.model.ProductStatus;
 import com.superfercho.catalog.infrastructure.persistence.mapper.ProductPersistenceMapper;
 import com.superfercho.catalog.infrastructure.persistence.repository.ProductJpaRepository;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -12,6 +13,8 @@ import java.util.UUID;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Component
 @Profile("!test")
@@ -19,11 +22,15 @@ public class ProductPersistenceAdapter implements ProductRepository {
 
     private final ProductJpaRepository productJpaRepository;
     private final ProductPersistenceMapper productPersistenceMapper;
+    private final TransactionTemplate transactionTemplate;
 
     public ProductPersistenceAdapter(
-            ProductJpaRepository productJpaRepository, ProductPersistenceMapper productPersistenceMapper) {
+            ProductJpaRepository productJpaRepository,
+            ProductPersistenceMapper productPersistenceMapper,
+            PlatformTransactionManager transactionManager) {
         this.productJpaRepository = productJpaRepository;
         this.productPersistenceMapper = productPersistenceMapper;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     @Override
@@ -84,5 +91,12 @@ public class ProductPersistenceAdapter implements ProductRepository {
         return productJpaRepository.searchByNameBrandOrBarcode(text).stream()
                 .map(productPersistenceMapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    public boolean adjustStockIfUnchanged(UUID id, int expectedStock, int newStock, Instant updatedAt) {
+        Boolean updated = transactionTemplate.execute(
+                status -> productJpaRepository.adjustStockIfUnchanged(id, expectedStock, newStock, updatedAt) == 1);
+        return Boolean.TRUE.equals(updated);
     }
 }

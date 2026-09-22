@@ -88,6 +88,11 @@ export type ChangeAdminProductPriceRequest = {
   price: Money;
 };
 
+/** Mirrors AdjustProductStockRequest. */
+export type AdjustAdminProductStockRequest = {
+  stock: number;
+};
+
 export type ListAdminProductsQuery = {
   categoryId?: string;
   status?: ProductStatus;
@@ -274,6 +279,17 @@ export async function changeAdminProductPrice(
   body: ChangeAdminProductPriceRequest,
 ): Promise<Product> {
   return request<Product>(`/products/${encodeURIComponent(productId)}/price`, {
+    method: "POST",
+    body,
+  });
+}
+
+/** POST /api/v1/products/{productId}/stock — ADMIN. */
+export async function adjustAdminProductStock(
+  productId: string,
+  body: AdjustAdminProductStockRequest,
+): Promise<Product> {
+  return request<Product>(`/products/${encodeURIComponent(productId)}/stock`, {
     method: "POST",
     body,
   });

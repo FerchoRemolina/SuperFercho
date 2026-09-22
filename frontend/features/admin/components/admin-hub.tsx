@@ -7,7 +7,7 @@ const sections = [
     href: "/admin/products",
     title: "Productos",
     description:
-      "Consulta, crea y actualiza el catálogo. El stock inicial se define al crear el producto.",
+      "Consulta, crea y actualiza el catálogo. Puedes ajustar el stock desde el detalle del producto.",
   },
   {
     href: "/admin/categories",

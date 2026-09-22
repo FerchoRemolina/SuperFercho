@@ -1,4 +1,5 @@
 import type {
+  AdjustAdminProductStockRequest,
   ChangeAdminProductPriceRequest,
   CreateAdminCategoryRequest,
   CreateAdminKnowledgeDocumentRequest,
@@ -162,6 +163,13 @@ export function validateAdminProductPrice(raw: string): string | undefined {
   return undefined;
 }
 
+export function validateAdminProductStock(raw: string): string | undefined {
+  if (parseNonNegativeInt(raw) === null) {
+    return "Indica el stock con un número entero mayor o igual a 0.";
+  }
+  return undefined;
+}
+
 export function createAdminProductRequestFromValues(
   values: AdminProductFormValues,
 ): CreateAdminProductRequest {
@@ -203,6 +211,16 @@ export function changeAdminProductPriceRequestFromAmount(
     throw new Error("changeAdminProductPriceRequestFromAmount requires a valid price");
   }
   return { price: copMoney(amount) };
+}
+
+export function adjustAdminProductStockRequestFromValue(
+  raw: string,
+): AdjustAdminProductStockRequest {
+  const stock = parseNonNegativeInt(raw);
+  if (stock === null) {
+    throw new Error("adjustAdminProductStockRequestFromValue requires a valid stock");
+  }
+  return { stock };
 }
 
 export function adminProductFormValuesFromProduct(

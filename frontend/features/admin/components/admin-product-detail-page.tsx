@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AdminProductForm } from "@/features/admin/components/admin-product-form";
 import { ProductPricePanel } from "@/features/admin/components/product-price-panel";
+import { ProductStockPanel } from "@/features/admin/components/product-stock-panel";
 import { ProductStatusActions } from "@/features/admin/components/product-status-actions";
 import { ProductStatusBadge } from "@/features/admin/components/product-status-badge";
 import {
@@ -189,6 +190,8 @@ export function AdminProductDetailPageContent({
           </Card>
 
           <ProductPricePanel product={product} />
+
+          <ProductStockPanel product={product} />
 
           <Card className="grid gap-4">
             <h2 className="text-xl font-semibold text-sf-ink">Ficha</h2>

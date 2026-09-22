@@ -3,11 +3,13 @@ package com.superfercho.catalog.application.usecase;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.superfercho.catalog.application.dto.ActivateProductCommand;
+import com.superfercho.catalog.application.dto.AdjustProductStockCommand;
 import com.superfercho.catalog.application.dto.CatalogView;
 import com.superfercho.catalog.application.dto.ChangeProductPriceCommand;
 import com.superfercho.catalog.application.dto.CreateProductCommand;
@@ -19,8 +21,10 @@ import com.superfercho.catalog.application.dto.SearchProductsCommand;
 import com.superfercho.catalog.application.dto.UpdateProductCommand;
 import com.superfercho.catalog.application.exception.InvalidCategoryReferenceException;
 import com.superfercho.catalog.application.exception.ProductNotFoundException;
+import com.superfercho.catalog.application.exception.ProductStockConflictException;
 import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.application.port.ProductRepository;
+import com.superfercho.catalog.domain.exception.InvalidProductException;
 import com.superfercho.catalog.domain.model.Category;
 import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.domain.model.Product;
@@ -63,6 +67,7 @@ class ProductUseCasesTest {
     private ActivateProductUseCase activateProduct;
     private DeactivateProductUseCase deactivateProduct;
     private ChangeProductPriceUseCase changeProductPrice;
+    private AdjustProductStockUseCase adjustProductStock;
 
     @BeforeEach
     void setUp() {
@@ -75,6 +80,7 @@ class ProductUseCasesTest {
         activateProduct = new ActivateProductUseCase(productRepository, clock);
         deactivateProduct = new DeactivateProductUseCase(productRepository, clock);
         changeProductPrice = new ChangeProductPriceUseCase(productRepository, clock);
+        adjustProductStock = new AdjustProductStockUseCase(productRepository, clock);
     }
 
     @Test
@@ -226,6 +232,51 @@ class ProductUseCasesTest {
         assertEquals(newPrice, result.price());
         assertEquals(10, result.stock());
         assertEquals(NOW, result.updatedAt());
+    }
+
+    @Test
+    void shouldAdjustProductStockWithCas() {
+        Product existing = product(PRODUCT_ID, CATEGORY_ID, ProductStatus.ACTIVE, 10, PRICE);
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(existing));
+        when(productRepository.adjustStockIfUnchanged(PRODUCT_ID, 10, 25, NOW)).thenReturn(true);
+
+        ProductResult result = adjustProductStock.execute(new AdjustProductStockCommand(PRODUCT_ID, 25));
+
+        assertEquals(25, result.stock());
+        assertEquals(NOW, result.updatedAt());
+        verify(productRepository).adjustStockIfUnchanged(PRODUCT_ID, 10, 25, NOW);
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectNegativeStockAdjustment() {
+        Product existing = product(PRODUCT_ID, CATEGORY_ID, ProductStatus.ACTIVE, 10, PRICE);
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(existing));
+
+        assertThrows(
+                InvalidProductException.class,
+                () -> adjustProductStock.execute(new AdjustProductStockCommand(PRODUCT_ID, -1)));
+        verify(productRepository, never()).adjustStockIfUnchanged(any(), anyInt(), anyInt(), any());
+    }
+
+    @Test
+    void shouldRejectStockAdjustmentWhenProductIsMissing() {
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.empty());
+
+        assertThrows(
+                ProductNotFoundException.class,
+                () -> adjustProductStock.execute(new AdjustProductStockCommand(PRODUCT_ID, 25)));
+    }
+
+    @Test
+    void shouldRejectStockAdjustmentWhenConcurrentChangeWins() {
+        Product existing = product(PRODUCT_ID, CATEGORY_ID, ProductStatus.ACTIVE, 10, PRICE);
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(existing));
+        when(productRepository.adjustStockIfUnchanged(PRODUCT_ID, 10, 25, NOW)).thenReturn(false);
+
+        assertThrows(
+                ProductStockConflictException.class,
+                () -> adjustProductStock.execute(new AdjustProductStockCommand(PRODUCT_ID, 25)));
     }
 
     @Test

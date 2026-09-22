@@ -58,4 +58,22 @@ public interface ProductJpaRepository extends JpaRepository<ProductJpaEntity, UU
             nativeQuery = true)
     int incrementStock(
             @Param("id") UUID id, @Param("quantity") int quantity, @Param("updatedAt") Instant updatedAt);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+            value =
+                    """
+                    update catalog.products
+                       set stock = :newStock,
+                           updated_at = :updatedAt
+                     where id = :id
+                       and stock = :expectedStock
+                       and :newStock >= 0
+                    """,
+            nativeQuery = true)
+    int adjustStockIfUnchanged(
+            @Param("id") UUID id,
+            @Param("expectedStock") int expectedStock,
+            @Param("newStock") int newStock,
+            @Param("updatedAt") Instant updatedAt);
 }
