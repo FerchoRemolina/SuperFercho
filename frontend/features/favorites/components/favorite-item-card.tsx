@@ -26,7 +26,7 @@ export function FavoriteItemCard({ item }: { item: FavoriteItem }) {
           <Badge tone="danger" className="w-fit">
             No disponible
           </Badge>
-          <FavoriteToggle productId={item.productId} />
+          <FavoriteToggle productId={item.productId} variant="action" />
         </div>
       </Card>
     );
@@ -57,7 +57,7 @@ export function FavoriteItemCard({ item }: { item: FavoriteItem }) {
           </p>
         ) : null}
         <div className="mt-auto grid gap-3 md:grid-cols-2">
-          <FavoriteToggle productId={item.productId} />
+          <FavoriteToggle productId={item.productId} variant="action" />
           {purchasable ? (
             <AddToCartButton productId={product.id} available={true} />
           ) : null}
