@@ -5,6 +5,7 @@ import { AdminOrderStatusActions } from "@/features/admin/components/admin-order
 import { useAdminOrderQuery } from "@/features/admin/hooks";
 import {
   adminOrderDetailErrorKind,
+  adminPaymentHref,
   formatAdminInstant,
 } from "@/features/admin/presentation";
 import {
@@ -242,7 +243,12 @@ export function AdminOrderDetailPageContent({
               <div>
                 <dt className="text-sf-muted">Id de pago</dt>
                 <dd className="mt-1 break-all font-semibold text-sf-ink">
-                  {payment.paymentId}
+                  <Link
+                    href={adminPaymentHref(payment.paymentId)}
+                    className="text-sf-primary underline-offset-2 hover:underline"
+                  >
+                    {payment.paymentId}
+                  </Link>
                 </dd>
               </div>
               <div>

@@ -15,6 +15,7 @@ import {
   getAdminCategory,
   getAdminKnowledgeDocument,
   getAdminOrder,
+  getAdminPayment,
   getAdminProduct,
   listAdminCategories,
   listAdminKnowledgeDocuments,
@@ -358,6 +359,16 @@ export function useReactivateAdminKnowledgeDocumentMutation() {
       });
       void queryClient.invalidateQueries({ queryKey: keys.knowledgeRoot() });
     },
+  });
+}
+
+export function useAdminPaymentQuery(paymentId: string) {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.payment(paymentId),
+    queryFn: () => getAdminPayment(paymentId),
+    enabled: isAdminRole(session?.role) && paymentId.length > 0,
   });
 }
 

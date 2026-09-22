@@ -13,6 +13,7 @@ import {
   getAdminCategory,
   getAdminKnowledgeDocument,
   getAdminOrder,
+  getAdminPayment,
   getAdminProduct,
   listAdminCategories,
   listAdminKnowledgeDocuments,
@@ -25,6 +26,7 @@ import {
   updateAdminCategory,
   updateAdminOrderStatus,
   updateAdminProduct,
+  type AdminPayment,
   type KnowledgeDocument,
 } from "@/features/admin/api";
 import type { Order, PagedOrders } from "@/features/orders/api";
@@ -840,6 +842,78 @@ describe("admin knowledge api", () => {
       processAdminKnowledgeDocument(knowledgeDocument.id),
     ).rejects.toMatchObject({
       problem: { status: 409, code: "KNOWLEDGE_PROCESSING_FAILED" },
+    });
+  });
+});
+
+const adminPayment: AdminPayment = {
+  id: "55555555-5555-5555-5555-555555555555",
+  orderId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  amount: { amount: 42.5, currency: "COP" },
+  paymentMethod: "SIMULATED_CARD",
+  status: "APPROVED",
+  providerReference: "sim-approved",
+  createdAt: "2026-03-01T10:00:00Z",
+  updatedAt: "2026-03-01T10:00:00Z",
+  refundedAt: null,
+};
+
+describe("admin payment api", () => {
+  it("gets a payment by encoded id with JWT", async () => {
+    configureSessionPersistence(new MemoryPersistence());
+    setSession({
+      userId: "99999999-9999-9999-9999-999999999999",
+      role: "ADMIN",
+      accessToken: "admin-token",
+      expiresAt: "2099-01-01T00:00:00Z",
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(adminPayment))
+      .mockResolvedValueOnce(jsonResponse(adminPayment));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getAdminPayment(adminPayment.id)).resolves.toEqual(adminPayment);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      `http://localhost:8080/api/v1/payments/${adminPayment.id}`,
+    );
+    expect(init.method ?? "GET").toBe("GET");
+    expect(new Headers(init.headers).get("Authorization")).toBe(
+      "Bearer admin-token",
+    );
+
+    await getAdminPayment("id with spaces");
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      "http://localhost:8080/api/v1/payments/id%20with%20spaces",
+    );
+  });
+
+  it("maps payment query keys", () => {
+    expect(adminKeys().paymentsRoot()).toEqual(["admin", "payments"]);
+    expect(adminKeys().payment(adminPayment.id)).toEqual([
+      "admin",
+      "payment",
+      adminPayment.id,
+    ]);
+  });
+
+  it("propagates PAYMENT_NOT_FOUND", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(
+        {
+          status: 404,
+          code: "PAYMENT_NOT_FOUND",
+          title: "Not Found",
+          detail: "Payment not found",
+        },
+        404,
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getAdminPayment(adminPayment.id)).rejects.toMatchObject({
+      problem: { status: 404, code: "PAYMENT_NOT_FOUND" },
     });
   });
 });

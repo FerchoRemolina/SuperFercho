@@ -1,10 +1,13 @@
-import { PlaceholderScreen } from "@/shared/ui/placeholder-screen";
+import { AdminPaymentDetailPage } from "@/features/admin/components/admin-payment-detail-page";
 
-export default function AdminPaymentPage() {
+export default async function AdminPaymentPage({
+  params,
+}: {
+  params: Promise<{ paymentId: string }>;
+}) {
+  const { paymentId } = await params;
+
   return (
-    <PlaceholderScreen
-      title="Pago (admin)"
-      description="La consulta de pago usará GET /api/v1/payments/{paymentId}. Solo ADMIN."
-    />
+    <AdminPaymentDetailPage key={paymentId} paymentId={paymentId} />
   );
 }

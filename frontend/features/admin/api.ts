@@ -8,6 +8,8 @@ import type {
   Order,
   OrderStatus,
   PagedOrders,
+  PaymentMethod,
+  PaymentStatus,
 } from "@/features/orders/api";
 import { COP, type Money } from "@/shared/money/money";
 import { request } from "@/shared/api/client";
@@ -18,6 +20,8 @@ export type {
   Order,
   OrderStatus,
   PagedOrders,
+  PaymentMethod,
+  PaymentStatus,
   Product,
   ProductStatus,
 };
@@ -118,6 +122,8 @@ export function adminKeys() {
     knowledgeDocuments: () => ["admin", "knowledge", "documents"] as const,
     knowledgeDocument: (documentId: string) =>
       ["admin", "knowledge", "document", documentId] as const,
+    paymentsRoot: () => ["admin", "payments"] as const,
+    payment: (paymentId: string) => ["admin", "payment", paymentId] as const,
   };
 }
 
@@ -389,6 +395,30 @@ export async function reactivateAdminKnowledgeDocument(
     `/knowledge/documents/${encodeURIComponent(documentId)}/reactivate`,
     { method: "POST" },
   );
+}
+
+/** Mirrors PaymentRestResponse from GET /api/v1/payments/{paymentId}. */
+export type AdminPayment = {
+  id: string;
+  orderId: string;
+  amount: Money;
+  paymentMethod: PaymentMethod;
+  status: PaymentStatus;
+  providerReference: string | null;
+  createdAt: string;
+  updatedAt: string;
+  refundedAt: string | null;
+};
+
+export const ADMIN_PAYMENT_STATUSES: readonly PaymentStatus[] = [
+  "PENDING",
+  "APPROVED",
+  "DECLINED",
+] as const;
+
+/** GET /api/v1/payments/{paymentId} — ADMIN. */
+export async function getAdminPayment(paymentId: string): Promise<AdminPayment> {
+  return request<AdminPayment>(`/payments/${encodeURIComponent(paymentId)}`);
 }
 
 export function copMoney(amount: number): Money {

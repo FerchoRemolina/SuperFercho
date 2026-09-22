@@ -10,7 +10,11 @@ import {
   ADMIN_ORDERS_DEFAULT_SIZE,
 } from "@/features/admin/api";
 import type { CategoryStatus, ProductStatus } from "@/features/catalog/api";
-import { orderStatusLabel, type OrderStatus } from "@/features/orders/api";
+import {
+  orderStatusLabel,
+  type OrderStatus,
+  type PaymentStatus,
+} from "@/features/orders/api";
 import { isApiError } from "@/shared/errors/api-problem";
 import type { Role } from "@/shared/session/session";
 
@@ -324,6 +328,34 @@ export function adminKnowledgeNewHref(): string {
 
 export function adminKnowledgeDocumentHref(documentId: string): string {
   return `/admin/knowledge/${encodeURIComponent(documentId)}`;
+}
+
+export function adminPaymentHref(paymentId: string): string {
+  return `/admin/payments/${encodeURIComponent(paymentId)}`;
+}
+
+export type AdminPaymentDetailErrorKind = "payment_not_found" | "error";
+
+export function adminPaymentDetailErrorKind(
+  error: unknown,
+): AdminPaymentDetailErrorKind {
+  if (isApiError(error) && error.problem.code === "PAYMENT_NOT_FOUND") {
+    return "payment_not_found";
+  }
+  return "error";
+}
+
+export type PaymentStatusTone = "neutral" | "primary" | "accent" | "danger";
+
+export function paymentStatusTone(status: PaymentStatus): PaymentStatusTone {
+  switch (status) {
+    case "APPROVED":
+      return "primary";
+    case "PENDING":
+      return "accent";
+    case "DECLINED":
+      return "danger";
+  }
 }
 
 export type DocumentStatusTone = "neutral" | "primary" | "accent" | "danger";

@@ -11,6 +11,8 @@ import {
   adminOrderStatusAdvanceConfirmation,
   adminOrderStatusAdvanceLabel,
   adminOrderStatusPanelState,
+  adminPaymentDetailErrorKind,
+  adminPaymentHref,
   adminProductsHref,
   canAdvanceAdminOrderStatus,
   canDeactivateKnowledgeDocument,
@@ -32,6 +34,7 @@ import {
   nextAdminOrderStatus,
   parseAdminOrderStatus,
   parseAdminOrdersPage,
+  paymentStatusTone,
   shouldSearchAdminProducts,
 } from "@/features/admin/presentation";
 import { ADMIN_DOCUMENT_STATUSES } from "@/features/admin/api";
@@ -343,5 +346,34 @@ describe("admin knowledge presentation", () => {
     expect(documentStatusTone("INACTIVE")).toBe("neutral");
     expect(documentStatusTone("RECEIVED")).toBe("accent");
     expect(documentStatusTone("CHUNKED")).toBe("accent");
+  });
+
+  it("builds payment detail hrefs", () => {
+    expect(
+      adminPaymentHref("55555555-5555-5555-5555-555555555555"),
+    ).toBe("/admin/payments/55555555-5555-5555-5555-555555555555");
+    expect(adminPaymentHref("id with spaces")).toBe(
+      "/admin/payments/id%20with%20spaces",
+    );
+  });
+
+  it("classifies payment detail errors", () => {
+    expect(
+      adminPaymentDetailErrorKind(
+        new ApiError({ status: 404, code: "PAYMENT_NOT_FOUND" }),
+      ),
+    ).toBe("payment_not_found");
+    expect(
+      adminPaymentDetailErrorKind(
+        new ApiError({ status: 500, code: "INTERNAL_ERROR" }),
+      ),
+    ).toBe("error");
+    expect(adminPaymentDetailErrorKind(new Error("boom"))).toBe("error");
+  });
+
+  it("maps payment status tones without inventing REFUNDED", () => {
+    expect(paymentStatusTone("APPROVED")).toBe("primary");
+    expect(paymentStatusTone("PENDING")).toBe("accent");
+    expect(paymentStatusTone("DECLINED")).toBe("danger");
   });
 });
