@@ -113,6 +113,7 @@ export function adminKeys() {
         query.size,
         query.status ?? "all",
       ] as const,
+    order: (orderId: string) => ["admin", "order", orderId] as const,
   };
 }
 
@@ -242,6 +243,11 @@ export async function listAdminOrders(
       status: query.status,
     })}`,
   );
+}
+
+/** GET /api/v1/admin/orders/{orderId} — ADMIN; no reutilizar GET /api/v1/orders/{orderId}. */
+export async function getAdminOrder(orderId: string): Promise<Order> {
+  return request<Order>(`/admin/orders/${encodeURIComponent(orderId)}`);
 }
 
 export function copMoney(amount: number): Money {

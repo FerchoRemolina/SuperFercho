@@ -15,6 +15,7 @@ import {
   listAdminCategories,
   listAdminOrders,
   listAdminProducts,
+  getAdminOrder,
   searchAdminProducts,
   updateAdminCategory,
   updateAdminProduct,
@@ -221,6 +222,16 @@ export function useAdminOrdersQuery(query: ListAdminOrdersQuery) {
     queryKey: keys.orders(query),
     queryFn: () => listAdminOrders(query),
     enabled: isAdminRole(session?.role),
+  });
+}
+
+export function useAdminOrderQuery(orderId: string) {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.order(orderId),
+    queryFn: () => getAdminOrder(orderId),
+    enabled: isAdminRole(session?.role) && orderId.length > 0,
   });
 }
 

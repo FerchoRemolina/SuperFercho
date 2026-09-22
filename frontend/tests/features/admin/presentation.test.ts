@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  adminOrderDetailErrorKind,
   adminOrderDetailHref,
   adminOrdersHref,
   adminOrdersListQueryFromSearchParams,
@@ -7,12 +8,15 @@ import {
   adminProductsHref,
   canGoToNextAdminOrdersPage,
   canGoToPreviousAdminOrdersPage,
+  formatAdminInstant,
   isAdminRole,
   listQueryFromSearchParams,
   parseAdminOrderStatus,
   parseAdminOrdersPage,
   shouldSearchAdminProducts,
 } from "@/features/admin/presentation";
+import { ApiError } from "@/shared/errors/api-problem";
+import { formatMoney } from "@/shared/money/money";
 
 describe("admin presentation", () => {
   it("detects admin role", () => {
@@ -116,5 +120,32 @@ describe("admin orders presentation", () => {
     expect(
       adminOrderDetailHref("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
     ).toBe("/admin/orders/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+  });
+
+  it("classifies detail errors without collapsing PAYMENT_NOT_FOUND", () => {
+    expect(
+      adminOrderDetailErrorKind(
+        new ApiError({
+          status: 404,
+          code: "ORDER_NOT_FOUND",
+          title: "Not Found",
+        }),
+      ),
+    ).toBe("order_not_found");
+    expect(
+      adminOrderDetailErrorKind(
+        new ApiError({
+          status: 404,
+          code: "PAYMENT_NOT_FOUND",
+          title: "Not Found",
+        }),
+      ),
+    ).toBe("payment_not_found");
+    expect(adminOrderDetailErrorKind(new Error("boom"))).toBe("error");
+  });
+
+  it("formats money and admin instants for detail display", () => {
+    expect(formatMoney({ amount: 9000, currency: "COP" })).toMatch(/9\.000/);
+    expect(formatAdminInstant("2026-03-01T15:00:00Z")).toMatch(/2026/);
   });
 });

@@ -9,6 +9,7 @@ import {
 } from "@/features/admin/api";
 import type { CategoryStatus, ProductStatus } from "@/features/catalog/api";
 import type { OrderStatus } from "@/features/orders/api";
+import { isApiError } from "@/shared/errors/api-problem";
 import type { Role } from "@/shared/session/session";
 
 export function isAdminRole(role: Role | undefined): boolean {
@@ -145,6 +146,26 @@ export function canGoToNextAdminOrdersPage(
 
 export function adminOrderDetailHref(orderId: string): string {
   return `/admin/orders/${encodeURIComponent(orderId)}`;
+}
+
+export type AdminOrderDetailErrorKind =
+  | "order_not_found"
+  | "payment_not_found"
+  | "error";
+
+export function adminOrderDetailErrorKind(
+  error: unknown,
+): AdminOrderDetailErrorKind {
+  if (!isApiError(error)) {
+    return "error";
+  }
+  if (error.problem.code === "ORDER_NOT_FOUND") {
+    return "order_not_found";
+  }
+  if (error.problem.code === "PAYMENT_NOT_FOUND") {
+    return "payment_not_found";
+  }
+  return "error";
 }
 
 export const ADMIN_NAV_LINKS = [

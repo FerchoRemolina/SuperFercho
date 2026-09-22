@@ -1,10 +1,11 @@
-import { PlaceholderScreen } from "@/shared/ui/placeholder-screen";
+import { AdminOrderDetailPageContent } from "@/features/admin/components/admin-order-detail-page";
 
-export default function AdminOrderDetailPage() {
-  return (
-    <PlaceholderScreen
-      title="Pedido (admin)"
-      description="El detalle admin usará GET /api/v1/admin/orders/{orderId}, con payment anidado cuando exista."
-    />
-  );
+export default async function AdminOrderDetailPage({
+  params,
+}: {
+  params: Promise<{ orderId: string }>;
+}) {
+  const { orderId } = await params;
+
+  return <AdminOrderDetailPageContent key={orderId} orderId={orderId} />;
 }

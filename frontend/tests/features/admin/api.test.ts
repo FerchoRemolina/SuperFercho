@@ -9,6 +9,7 @@ import {
   deactivateAdminCategory,
   deactivateAdminProduct,
   getAdminCategory,
+  getAdminOrder,
   getAdminProduct,
   listAdminCategories,
   listAdminOrders,
@@ -435,6 +436,97 @@ describe("admin orders api", () => {
       listAdminOrders({ page: 0, size: 20, status: "PENDING" }),
     ).rejects.toMatchObject({
       problem: { status: 400, code: "INVALID_ORDER" },
+    });
+  });
+
+  it("gets admin order detail by id with JWT and nested payment", async () => {
+    configureSessionPersistence(new MemoryPersistence());
+    setSession({
+      userId: "99999999-9999-9999-9999-999999999999",
+      role: "ADMIN",
+      accessToken: "admin-token",
+      expiresAt: "2099-01-01T00:00:00Z",
+    });
+    const detailOrder: Order = {
+      ...listedAdminOrder,
+      payment: {
+        paymentId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+        amount: { amount: 9000, currency: "COP" },
+        paymentMethod: "SIMULATED_CARD",
+        status: "APPROVED",
+        providerReference: "sim-1",
+        refundedAt: null,
+        createdAt: "2026-03-01T10:00:00Z",
+        updatedAt: "2026-03-01T10:00:00Z",
+      },
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(detailOrder));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getAdminOrder(detailOrder.id)).resolves.toEqual(detailOrder);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      `http://localhost:8080/api/v1/admin/orders/${detailOrder.id}`,
+    );
+    expect(url).not.toContain("/api/v1/orders/");
+    expect(init.method ?? "GET").toBe("GET");
+    expect(new Headers(init.headers).get("Authorization")).toBe(
+      "Bearer admin-token",
+    );
+  });
+
+  it("parses admin order detail when payment is null", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(listedAdminOrder));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getAdminOrder(listedAdminOrder.id)).resolves.toEqual(
+      listedAdminOrder,
+    );
+    expect(listedAdminOrder.payment).toBeNull();
+  });
+
+  it("uses admin order detail query key", () => {
+    expect(
+      adminKeys().order("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+    ).toEqual(["admin", "order", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]);
+  });
+
+  it("propagates ORDER_NOT_FOUND from GET /admin/orders/{id}", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(
+        {
+          status: 404,
+          code: "ORDER_NOT_FOUND",
+          title: "Not Found",
+          detail: "Order not found",
+        },
+        404,
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getAdminOrder(listedAdminOrder.id)).rejects.toMatchObject({
+      problem: { status: 404, code: "ORDER_NOT_FOUND" },
+    });
+  });
+
+  it("propagates PAYMENT_NOT_FOUND without treating it as payment null", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(
+        {
+          status: 404,
+          code: "PAYMENT_NOT_FOUND",
+          title: "Not Found",
+          detail: "Payment not found",
+        },
+        404,
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getAdminOrder(listedAdminOrder.id)).rejects.toMatchObject({
+      problem: { status: 404, code: "PAYMENT_NOT_FOUND" },
     });
   });
 });
