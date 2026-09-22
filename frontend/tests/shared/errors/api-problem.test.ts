@@ -128,6 +128,26 @@ describe("messageForApiProblem", () => {
     ).toBe("Este pedido ya no puede cancelarse.");
   });
 
+  it("uses a neutral Spanish message for INVALID_ORDER_TRANSITION", () => {
+    expect(
+      messageForApiProblem({
+        status: 409,
+        code: "INVALID_ORDER_TRANSITION",
+        detail: "Invalid order state transition: PENDING -> PREPARING",
+      }),
+    ).toBe("El pedido ya no está en un estado que permita esta acción.");
+  });
+
+  it("uses a Spanish message for INVALID_ORDER_STATUS_UPDATE", () => {
+    expect(
+      messageForApiProblem({
+        status: 400,
+        code: "INVALID_ORDER_STATUS_UPDATE",
+        detail: "Order status cannot be updated to: CANCELLED",
+      }),
+    ).toBe("No se puede establecer ese estado desde esta acción.");
+  });
+
   it("uses a generic internal message for 500 without leaking a stack", () => {
     expect(
       messageForApiProblem({

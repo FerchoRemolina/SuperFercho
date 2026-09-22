@@ -51,7 +51,9 @@ export function messageForApiProblem(problem: ApiProblem): string {
     case "CANCELLATION_NOT_ALLOWED":
       return "Este pedido ya no puede cancelarse.";
     case "INVALID_ORDER_TRANSITION":
-      return "El pedido ya no está en un estado que permita cancelarlo.";
+      return "El pedido ya no está en un estado que permita esta acción.";
+    case "INVALID_ORDER_STATUS_UPDATE":
+      return "No se puede establecer ese estado desde esta acción.";
     case "PAYMENT_NOT_FOUND":
       return "No se pudo cargar la información de pago de este pedido.";
     case "ACCESS_DENIED":

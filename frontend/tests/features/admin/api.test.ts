@@ -16,6 +16,7 @@ import {
   listAdminProducts,
   searchAdminProducts,
   updateAdminCategory,
+  updateAdminOrderStatus,
   updateAdminProduct,
 } from "@/features/admin/api";
 import type { Order, PagedOrders } from "@/features/orders/api";
@@ -490,6 +491,7 @@ describe("admin orders api", () => {
     expect(
       adminKeys().order("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
     ).toEqual(["admin", "order", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]);
+    expect(adminKeys().ordersRoot()).toEqual(["admin", "orders"]);
   });
 
   it("propagates ORDER_NOT_FOUND from GET /admin/orders/{id}", async () => {
@@ -527,6 +529,106 @@ describe("admin orders api", () => {
 
     await expect(getAdminOrder(listedAdminOrder.id)).rejects.toMatchObject({
       problem: { status: 404, code: "PAYMENT_NOT_FOUND" },
+    });
+  });
+
+  it("posts admin order status update to /orders/{id}/status", async () => {
+    configureSessionPersistence(new MemoryPersistence());
+    setSession({
+      userId: "99999999-9999-9999-9999-999999999999",
+      role: "ADMIN",
+      accessToken: "admin-token",
+      expiresAt: "2099-01-01T00:00:00Z",
+    });
+    const updated: Order = {
+      ...listedAdminOrder,
+      status: "CONFIRMED",
+      confirmedAt: "2026-03-01T10:20:00Z",
+      payment: null,
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(updated));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      updateAdminOrderStatus(listedAdminOrder.id, { status: "CONFIRMED" }),
+    ).resolves.toEqual(updated);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      `http://localhost:8080/api/v1/orders/${listedAdminOrder.id}/status`,
+    );
+    expect(url).not.toContain("/admin/orders/");
+    expect(init.method).toBe("POST");
+    expect(new Headers(init.headers).get("Authorization")).toBe(
+      "Bearer admin-token",
+    );
+    expect(init.body).toBe(JSON.stringify({ status: "CONFIRMED" }));
+    expect(updated.payment).toBeNull();
+  });
+
+  it("encodes order id in status update path", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(listedAdminOrder));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await updateAdminOrderStatus("id with spaces", { status: "PREPARING" });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "http://localhost:8080/api/v1/orders/id%20with%20spaces/status",
+    );
+  });
+
+  it("propagates status update RFC7807 errors", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            status: 404,
+            code: "ORDER_NOT_FOUND",
+            title: "Not Found",
+            detail: "missing",
+          },
+          404,
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            status: 409,
+            code: "INVALID_ORDER_TRANSITION",
+            title: "Conflict",
+            detail: "Invalid order state transition: PENDING -> PREPARING",
+          },
+          409,
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            status: 400,
+            code: "INVALID_ORDER_STATUS_UPDATE",
+            title: "Bad Request",
+            detail: "Order status cannot be updated to: CANCELLED",
+          },
+          400,
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      updateAdminOrderStatus(listedAdminOrder.id, { status: "CONFIRMED" }),
+    ).rejects.toMatchObject({
+      problem: { status: 404, code: "ORDER_NOT_FOUND" },
+    });
+    await expect(
+      updateAdminOrderStatus(listedAdminOrder.id, { status: "PREPARING" }),
+    ).rejects.toMatchObject({
+      problem: { status: 409, code: "INVALID_ORDER_TRANSITION" },
+    });
+    await expect(
+      updateAdminOrderStatus(listedAdminOrder.id, { status: "CANCELLED" }),
+    ).rejects.toMatchObject({
+      problem: { status: 400, code: "INVALID_ORDER_STATUS_UPDATE" },
     });
   });
 });

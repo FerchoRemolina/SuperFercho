@@ -5,18 +5,25 @@ import {
   adminOrdersHref,
   adminOrdersListQueryFromSearchParams,
   adminOrdersPageCount,
+  adminOrderStatusAdvanceConfirmation,
+  adminOrderStatusAdvanceLabel,
+  adminOrderStatusPanelState,
   adminProductsHref,
+  canAdvanceAdminOrderStatus,
   canGoToNextAdminOrdersPage,
   canGoToPreviousAdminOrdersPage,
   formatAdminInstant,
+  isAdminOrderStatusSubmitLocked,
   isAdminRole,
   listQueryFromSearchParams,
+  nextAdminOrderStatus,
   parseAdminOrderStatus,
   parseAdminOrdersPage,
   shouldSearchAdminProducts,
 } from "@/features/admin/presentation";
 import { ApiError } from "@/shared/errors/api-problem";
 import { formatMoney } from "@/shared/money/money";
+import { messageForApiProblem } from "@/shared/errors/messages";
 
 describe("admin presentation", () => {
   it("detects admin role", () => {
@@ -147,5 +154,108 @@ describe("admin orders presentation", () => {
   it("formats money and admin instants for detail display", () => {
     expect(formatMoney({ amount: 9000, currency: "COP" })).toMatch(/9\.000/);
     expect(formatAdminInstant("2026-03-01T15:00:00Z")).toMatch(/2026/);
+  });
+});
+
+describe("admin order status advance", () => {
+  it("maps only the linear ADMIN transitions", () => {
+    expect(nextAdminOrderStatus("PENDING")).toBe("CONFIRMED");
+    expect(nextAdminOrderStatus("CONFIRMED")).toBe("PREPARING");
+    expect(nextAdminOrderStatus("PREPARING")).toBe("READY");
+    expect(nextAdminOrderStatus("READY")).toBe("DELIVERED");
+    expect(nextAdminOrderStatus("DELIVERED")).toBeNull();
+    expect(nextAdminOrderStatus("CANCELLED")).toBeNull();
+  });
+
+  it("exposes advance labels only when an action exists", () => {
+    expect(adminOrderStatusAdvanceLabel("PENDING")).toBe("Confirmar pedido");
+    expect(adminOrderStatusAdvanceLabel("CONFIRMED")).toBe(
+      "Pasar a preparación",
+    );
+    expect(adminOrderStatusAdvanceLabel("PREPARING")).toBe("Marcar como listo");
+    expect(adminOrderStatusAdvanceLabel("READY")).toBe(
+      "Marcar como entregado",
+    );
+    expect(adminOrderStatusAdvanceLabel("DELIVERED")).toBeNull();
+    expect(adminOrderStatusAdvanceLabel("CANCELLED")).toBeNull();
+    expect(canAdvanceAdminOrderStatus("PENDING")).toBe(true);
+    expect(canAdvanceAdminOrderStatus("DELIVERED")).toBe(false);
+    expect(canAdvanceAdminOrderStatus("CANCELLED")).toBe(false);
+  });
+
+  it("requires confirmation before submit and locks while pending", () => {
+    expect(
+      adminOrderStatusPanelState({
+        status: "PENDING",
+        confirming: false,
+        isPending: false,
+      }),
+    ).toBe("idle");
+    expect(
+      adminOrderStatusPanelState({
+        status: "PENDING",
+        confirming: true,
+        isPending: false,
+      }),
+    ).toBe("confirming");
+    expect(
+      adminOrderStatusPanelState({
+        status: "PENDING",
+        confirming: true,
+        isPending: true,
+      }),
+    ).toBe("pending");
+    expect(
+      adminOrderStatusPanelState({
+        status: "DELIVERED",
+        confirming: false,
+        isPending: false,
+      }),
+    ).toBe("hidden");
+    expect(
+      adminOrderStatusPanelState({
+        status: "CANCELLED",
+        confirming: true,
+        isPending: false,
+      }),
+    ).toBe("hidden");
+    expect(isAdminOrderStatusSubmitLocked(true)).toBe(true);
+    expect(isAdminOrderStatusSubmitLocked(false)).toBe(false);
+  });
+
+  it("builds confirmation copy with order number and statuses", () => {
+    const copy = adminOrderStatusAdvanceConfirmation({
+      orderNumber: "ORD-P-1001",
+      currentStatus: "PENDING",
+      nextStatus: "CONFIRMED",
+    });
+    expect(copy.title).toMatch(/estado/i);
+    expect(copy.body).toContain("ORD-P-1001");
+    expect(copy.body).toContain("Pendiente");
+    expect(copy.body).toContain("Confirmado");
+  });
+
+  it("maps status-update problem codes without cancel-oriented wording", () => {
+    expect(
+      messageForApiProblem({
+        status: 404,
+        code: "ORDER_NOT_FOUND",
+        detail: "Order not found",
+      }),
+    ).toBe("No encontramos ese pedido.");
+    expect(
+      messageForApiProblem({
+        status: 409,
+        code: "INVALID_ORDER_TRANSITION",
+        detail: "Invalid order state transition: PENDING -> PREPARING",
+      }),
+    ).toBe("El pedido ya no está en un estado que permita esta acción.");
+    expect(
+      messageForApiProblem({
+        status: 400,
+        code: "INVALID_ORDER_STATUS_UPDATE",
+        detail: "Order status cannot be updated to: CANCELLED",
+      }),
+    ).toBe("No se puede establecer ese estado desde esta acción.");
   });
 });

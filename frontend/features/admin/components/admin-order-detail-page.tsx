@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { AdminOrderStatusActions } from "@/features/admin/components/admin-order-status-actions";
 import { useAdminOrderQuery } from "@/features/admin/hooks";
 import {
   adminOrderDetailErrorKind,
@@ -122,6 +123,11 @@ export function AdminOrderDetailPageContent({
       </div>
 
       <div className="mt-8 grid gap-6">
+        <Card className="grid gap-4">
+          <h2 className="text-xl font-semibold text-sf-ink">Estado</h2>
+          <AdminOrderStatusActions order={order} />
+        </Card>
+
         <Card className="grid gap-4">
           <h2 className="text-xl font-semibold text-sf-ink">Cabecera</h2>
           <dl className="grid gap-3 text-sm md:grid-cols-2">

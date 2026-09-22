@@ -250,6 +250,25 @@ export async function getAdminOrder(orderId: string): Promise<Order> {
   return request<Order>(`/admin/orders/${encodeURIComponent(orderId)}`);
 }
 
+/** Mirrors UpdateOrderStatusRequest for POST /api/v1/orders/{orderId}/status (ADMIN). */
+export type UpdateAdminOrderStatusRequest = {
+  status: OrderStatus;
+};
+
+/**
+ * POST /api/v1/orders/{orderId}/status — ADMIN.
+ * Response may include payment=null; prefer refreshing GET /admin/orders/{id}.
+ */
+export async function updateAdminOrderStatus(
+  orderId: string,
+  body: UpdateAdminOrderStatusRequest,
+): Promise<Order> {
+  return request<Order>(`/orders/${encodeURIComponent(orderId)}/status`, {
+    method: "POST",
+    body,
+  });
+}
+
 export function copMoney(amount: number): Money {
   return { amount, currency: COP };
 }
