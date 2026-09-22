@@ -83,6 +83,7 @@ class CartControllerTest {
                 .andExpect(jsonPath("$.items[0].quantity").value(2))
                 .andExpect(jsonPath("$.items[0].priceAtAddition.amount").value(10.50))
                 .andExpect(jsonPath("$.items[0].priceAtAddition.currency").value("COP"))
+                .andExpect(jsonPath("$.items[0].stock").doesNotExist())
                 .andExpect(jsonPath("$.createdAt").value(CREATED_AT.toString()))
                 .andExpect(jsonPath("$.updatedAt").value(UPDATED_AT.toString()));
 

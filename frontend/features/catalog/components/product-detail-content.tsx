@@ -6,6 +6,7 @@ import { isProductAvailable } from "@/features/catalog/api";
 import { FavoriteToggle } from "@/features/favorites/components/favorite-toggle";
 import { CatalogQueryError } from "@/features/catalog/components/catalog-query-error";
 import { ProductImage } from "@/features/catalog/components/product-image";
+import { productStockLabel } from "@/features/catalog/quantity";
 import { useCategoryQuery, useProductQuery } from "@/features/catalog/hooks";
 import { isApiError } from "@/shared/errors/api-problem";
 import { formatMoney } from "@/shared/money/money";
@@ -72,7 +73,12 @@ export function ProductDetailContent({ productId }: { productId: string }) {
   return (
     <Container as="main" className="py-10 md:py-16">
       <div className="grid gap-8 md:grid-cols-2 md:items-start">
-        <ProductImage src={product.imageUrl} alt={product.name} />
+        <ProductImage src={product.imageUrl} alt={product.name}>
+          <FavoriteToggle
+            productId={product.id}
+            className="absolute right-2 top-2 z-10"
+          />
+        </ProductImage>
         <div>
           {category ? (
             <Link
@@ -92,16 +98,16 @@ export function ProductDetailContent({ productId }: { productId: string }) {
             {formatMoney(product.price)}
           </p>
           <Badge tone={available ? "primary" : "danger"} className="mt-4">
-            {available ? "Disponible" : "Agotado"}
+            {productStockLabel(product.stock)}
           </Badge>
           {product.description ? (
             <p className="mt-6 text-base text-sf-muted">{product.description}</p>
           ) : null}
           <div className="mt-8 grid gap-3">
-            <FavoriteToggle productId={product.id} />
             <AddToCartButton
               productId={product.id}
               available={available}
+              stock={product.stock}
             />
             <Link href="/catalog" className={buttonClassName("secondary")}>
               Seguir viendo productos

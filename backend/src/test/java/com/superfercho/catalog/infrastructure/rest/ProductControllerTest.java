@@ -140,7 +140,8 @@ class ProductControllerTest {
         mockMvc.perform(get("/api/v1/products"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(PRODUCT_ID.toString()))
-                .andExpect(jsonPath("$[0].name").value("Leche entera"));
+                .andExpect(jsonPath("$[0].name").value("Leche entera"))
+                .andExpect(jsonPath("$[0].stock").value(20));
 
         verify(listProductsUseCase).execute(new ListProductsCommand(null, null, CatalogView.PUBLIC));
         verifyNoInteractions(
@@ -179,7 +180,8 @@ class ProductControllerTest {
         mockMvc.perform(get("/api/v1/products/search").param("text", "leche"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(PRODUCT_ID.toString()))
-                .andExpect(jsonPath("$[0].name").value("Leche entera"));
+                .andExpect(jsonPath("$[0].name").value("Leche entera"))
+                .andExpect(jsonPath("$[0].stock").value(20));
 
         verify(searchProductsUseCase).execute(new SearchProductsCommand("leche", CatalogView.PUBLIC));
         verifyNoInteractions(getProductUseCase, listProductsUseCase);
@@ -219,7 +221,8 @@ class ProductControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(PRODUCT_ID.toString()))
                 .andExpect(jsonPath("$.barcode").value("7701234567890"))
-                .andExpect(jsonPath("$.price.amount").value(10.50));
+                .andExpect(jsonPath("$.price.amount").value(10.50))
+                .andExpect(jsonPath("$.stock").value(20));
 
         verify(getProductUseCase).execute(new GetProductCommand(PRODUCT_ID, CatalogView.PUBLIC));
         verifyNoInteractions(searchProductsUseCase, listProductsUseCase);

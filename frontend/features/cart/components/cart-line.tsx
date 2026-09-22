@@ -5,6 +5,7 @@ import type { CartItem } from "@/features/cart/api";
 import { lineDisplayAmount } from "@/features/cart/api";
 import { QuantityStepper } from "@/features/cart/components/quantity-stepper";
 import { useRemoveCartItemMutation } from "@/features/cart/hooks";
+import { cartStockWarning } from "@/features/cart/stock";
 import type { Product } from "@/features/catalog/api";
 import { ProductImage } from "@/features/catalog/components/product-image";
 import { isApiError } from "@/shared/errors/api-problem";
@@ -37,6 +38,7 @@ export function CartLine({
       : removeMutation.isError
         ? "No se pudo quitar el producto."
         : null;
+  const stockWarning = cartStockWarning(item.quantity, product?.stock);
 
   return (
     <li
@@ -80,6 +82,11 @@ export function CartLine({
         {errorMessage ? (
           <p className="mt-2 text-sm text-sf-error">{errorMessage}</p>
         ) : null}
+        {stockWarning ? (
+          <p className="mt-2 text-sm text-sf-error" role="status">
+            {stockWarning}
+          </p>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-3 md:items-end">
@@ -89,6 +96,7 @@ export function CartLine({
         <QuantityStepper
           productId={item.productId}
           quantity={item.quantity}
+          maxStock={product?.stock}
           disabled={busy}
         />
         <Button

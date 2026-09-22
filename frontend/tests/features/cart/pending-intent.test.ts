@@ -45,6 +45,18 @@ describe("pending add-to-cart intent", () => {
     expect(readPendingAddToCart()).toBeNull();
   });
 
+  it("stores the selected quantity, not always one unit", () => {
+    savePendingAddToCart({
+      productId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+      quantity: 3,
+    });
+
+    expect(readPendingAddToCart()).toEqual({
+      productId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+      quantity: 3,
+    });
+  });
+
   it("discards invalid stored JSON", () => {
     window.sessionStorage.setItem(
       "superfercho.pending-add-to-cart",

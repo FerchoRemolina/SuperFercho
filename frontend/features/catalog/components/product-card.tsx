@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AddToCartButton } from "@/features/cart/components/add-to-cart-button";
 import { isProductAvailable, type Product } from "@/features/catalog/api";
 import { ProductImage } from "@/features/catalog/components/product-image";
+import { productStockLabel } from "@/features/catalog/quantity";
 import { FavoriteToggle } from "@/features/favorites/components/favorite-toggle";
 import { Badge } from "@/shared/ui/badge";
 import { formatMoney } from "@/shared/money/money";
@@ -17,13 +18,22 @@ export function ProductCard({ product }: { product: Product }) {
         "transition-colors hover:border-sf-primary/30",
       )}
     >
+      <ProductImage src={product.imageUrl} alt="">
+        <Link
+          href={`/products/${product.id}`}
+          className="absolute inset-0 z-0 rounded-xl"
+          aria-label={product.name}
+        />
+        <FavoriteToggle
+          productId={product.id}
+          className="absolute right-2 top-2 z-10"
+        />
+      </ProductImage>
       <Link
         href={`/products/${product.id}`}
-        className="group flex min-w-0 flex-1 flex-col"
-        aria-label={product.name}
+        className="group mt-3 flex min-w-0 flex-1 flex-col"
       >
-        <ProductImage src={product.imageUrl} alt="" />
-        <div className="mt-3 flex flex-1 flex-col gap-1">
+        <div className="flex flex-1 flex-col gap-1">
           {product.brand ? (
             <p className="text-sm text-sf-muted">{product.brand}</p>
           ) : null}
@@ -37,14 +47,16 @@ export function ProductCard({ product }: { product: Product }) {
             {formatMoney(product.price)}
           </p>
           <Badge tone={available ? "primary" : "danger"} className="mt-2 w-fit">
-            {available ? "Disponible" : "Agotado"}
+            {productStockLabel(product.stock)}
           </Badge>
         </div>
       </Link>
-      <div className="mt-3 grid gap-2">
-        <FavoriteToggle productId={product.id} />
-        <AddToCartButton productId={product.id} available={available} />
-      </div>
+      <AddToCartButton
+        productId={product.id}
+        available={available}
+        stock={product.stock}
+        className="mt-3"
+      />
     </article>
   );
 }

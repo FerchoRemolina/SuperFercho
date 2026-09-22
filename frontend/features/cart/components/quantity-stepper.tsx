@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { canIncreaseCartQuantity } from "@/features/cart/stock";
 import { useChangeCartItemQuantityMutation } from "@/features/cart/hooks";
 import { Button } from "@/shared/ui/button";
 import { cx } from "@/shared/utils/cx";
@@ -8,10 +9,12 @@ import { cx } from "@/shared/utils/cx";
 export function QuantityStepper({
   productId,
   quantity,
+  maxStock,
   disabled,
 }: {
   productId: string;
   quantity: number;
+  maxStock?: number;
   disabled?: boolean;
 }) {
   const changeMutation = useChangeCartItemQuantityMutation();
@@ -26,6 +29,10 @@ export function QuantityStepper({
 
   async function commit(next: number) {
     if (busy || next < 1 || next === quantity) {
+      setDraft(String(quantity));
+      return;
+    }
+    if (maxStock !== undefined && next > maxStock) {
       setDraft(String(quantity));
       return;
     }
@@ -75,7 +82,7 @@ export function QuantityStepper({
         variant="secondary"
         className="min-h-11 w-11 px-0"
         aria-label="Aumentar cantidad"
-        disabled={busy}
+        disabled={busy || !canIncreaseCartQuantity(quantity, maxStock)}
         onClick={() => void commit(quantity + 1)}
       >
         +
