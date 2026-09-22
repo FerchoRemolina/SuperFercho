@@ -4,10 +4,36 @@ import type {
   Product,
   ProductStatus,
 } from "@/features/catalog/api";
+import type {
+  Order,
+  OrderStatus,
+  PagedOrders,
+} from "@/features/orders/api";
 import { COP, type Money } from "@/shared/money/money";
 import { request } from "@/shared/api/client";
 
-export type { Category, CategoryStatus, Product, ProductStatus };
+export type {
+  Category,
+  CategoryStatus,
+  Order,
+  OrderStatus,
+  PagedOrders,
+  Product,
+  ProductStatus,
+};
+
+/** Defaults mirrored from Orders PageRequest (Application). */
+export const ADMIN_ORDERS_DEFAULT_PAGE = 0;
+export const ADMIN_ORDERS_DEFAULT_SIZE = 20;
+
+export const ADMIN_ORDER_STATUSES: readonly OrderStatus[] = [
+  "PENDING",
+  "CONFIRMED",
+  "PREPARING",
+  "READY",
+  "DELIVERED",
+  "CANCELLED",
+] as const;
 
 export const ADMIN_CATALOG_VIEW = "ADMIN";
 
@@ -59,6 +85,13 @@ export type SearchAdminProductsQuery = {
   text: string;
 };
 
+/** Query for GET /api/v1/admin/orders. */
+export type ListAdminOrdersQuery = {
+  page: number;
+  size: number;
+  status?: OrderStatus;
+};
+
 export function adminKeys() {
   return {
     all: ["admin"] as const,
@@ -70,6 +103,16 @@ export function adminKeys() {
       ["admin", "products", "list", query.categoryId ?? "all", query.status ?? "all"] as const,
     search: (text: string) => ["admin", "products", "search", text] as const,
     product: (productId: string) => ["admin", "product", productId] as const,
+    ordersRoot: () => ["admin", "orders"] as const,
+    orders: (query: ListAdminOrdersQuery) =>
+      [
+        "admin",
+        "orders",
+        "list",
+        query.page,
+        query.size,
+        query.status ?? "all",
+      ] as const,
   };
 }
 
@@ -185,6 +228,19 @@ export async function deactivateAdminProduct(productId: string): Promise<Product
   return request<Product>(
     `/products/${encodeURIComponent(productId)}/deactivate`,
     { method: "POST" },
+  );
+}
+
+/** GET /api/v1/admin/orders — ADMIN; no reutilizar GET /api/v1/orders. */
+export async function listAdminOrders(
+  query: ListAdminOrdersQuery,
+): Promise<PagedOrders> {
+  return request<PagedOrders>(
+    `/admin/orders${toQuery({
+      page: String(query.page),
+      size: String(query.size),
+      status: query.status,
+    })}`,
   );
 }
 

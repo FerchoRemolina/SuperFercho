@@ -1,5 +1,14 @@
-import type { ListAdminProductsQuery } from "@/features/admin/api";
+import type {
+  ListAdminOrdersQuery,
+  ListAdminProductsQuery,
+} from "@/features/admin/api";
+import {
+  ADMIN_ORDER_STATUSES,
+  ADMIN_ORDERS_DEFAULT_PAGE,
+  ADMIN_ORDERS_DEFAULT_SIZE,
+} from "@/features/admin/api";
 import type { CategoryStatus, ProductStatus } from "@/features/catalog/api";
+import type { OrderStatus } from "@/features/orders/api";
 import type { Role } from "@/shared/session/session";
 
 export function isAdminRole(role: Role | undefined): boolean {
@@ -62,10 +71,87 @@ export function listQueryFromSearchParams(params: {
   };
 }
 
+export function parseAdminOrderStatus(
+  value: string | null | undefined,
+): OrderStatus | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  return (ADMIN_ORDER_STATUSES as readonly string[]).includes(trimmed)
+    ? (trimmed as OrderStatus)
+    : undefined;
+}
+
+export function parseAdminOrdersPage(value: string | null | undefined): number {
+  if (value == null || value.trim() === "") {
+    return ADMIN_ORDERS_DEFAULT_PAGE;
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return ADMIN_ORDERS_DEFAULT_PAGE;
+  }
+  return parsed;
+}
+
+export function adminOrdersListQueryFromSearchParams(params: {
+  page?: string | null;
+  status?: string | null;
+}): ListAdminOrdersQuery {
+  return {
+    page: parseAdminOrdersPage(params.page),
+    size: ADMIN_ORDERS_DEFAULT_SIZE,
+    status: parseAdminOrderStatus(params.status),
+  };
+}
+
+export function adminOrdersHref(query: {
+  page?: number;
+  status?: OrderStatus | "";
+}): string {
+  const search = new URLSearchParams();
+  const page = query.page ?? ADMIN_ORDERS_DEFAULT_PAGE;
+  if (page > ADMIN_ORDERS_DEFAULT_PAGE) {
+    search.set("page", String(page));
+  }
+  if (query.status && parseAdminOrderStatus(query.status)) {
+    search.set("status", query.status);
+  }
+  const encoded = search.toString();
+  return encoded ? `/admin/orders?${encoded}` : "/admin/orders";
+}
+
+export function adminOrdersPageCount(totalElements: number, size: number): number {
+  if (size <= 0 || totalElements <= 0) {
+    return 0;
+  }
+  return Math.ceil(totalElements / size);
+}
+
+export function canGoToPreviousAdminOrdersPage(page: number): boolean {
+  return page > 0;
+}
+
+export function canGoToNextAdminOrdersPage(
+  page: number,
+  size: number,
+  totalElements: number,
+): boolean {
+  if (size <= 0) {
+    return false;
+  }
+  return (page + 1) * size < totalElements;
+}
+
+export function adminOrderDetailHref(orderId: string): string {
+  return `/admin/orders/${encodeURIComponent(orderId)}`;
+}
+
 export const ADMIN_NAV_LINKS = [
   { href: "/admin", label: "Inicio", match: "exact" as const },
   { href: "/admin/products", label: "Productos", match: "prefix" as const },
   { href: "/admin/categories", label: "Categorías", match: "prefix" as const },
+  { href: "/admin/orders", label: "Pedidos", match: "prefix" as const },
 ];
 
 export function isAdminNavActive(

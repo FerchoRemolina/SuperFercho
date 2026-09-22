@@ -13,6 +13,7 @@ import {
   getAdminCategory,
   getAdminProduct,
   listAdminCategories,
+  listAdminOrders,
   listAdminProducts,
   searchAdminProducts,
   updateAdminCategory,
@@ -20,6 +21,7 @@ import {
   type ChangeAdminProductPriceRequest,
   type CreateAdminCategoryRequest,
   type CreateAdminProductRequest,
+  type ListAdminOrdersQuery,
   type ListAdminProductsQuery,
   type UpdateAdminCategoryRequest,
   type UpdateAdminProductRequest,
@@ -209,6 +211,16 @@ export function useDeactivateAdminProductMutation() {
       void queryClient.invalidateQueries({ queryKey: keys.productsRoot() });
       void queryClient.invalidateQueries({ queryKey: keys.product(product.id) });
     },
+  });
+}
+
+export function useAdminOrdersQuery(query: ListAdminOrdersQuery) {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.orders(query),
+    queryFn: () => listAdminOrders(query),
+    enabled: isAdminRole(session?.role),
   });
 }
 

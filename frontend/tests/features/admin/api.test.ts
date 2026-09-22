@@ -11,11 +11,13 @@ import {
   getAdminCategory,
   getAdminProduct,
   listAdminCategories,
+  listAdminOrders,
   listAdminProducts,
   searchAdminProducts,
   updateAdminCategory,
   updateAdminProduct,
 } from "@/features/admin/api";
+import type { Order, PagedOrders } from "@/features/orders/api";
 import {
   clearSession,
   configureSessionPersistence,
@@ -300,5 +302,139 @@ describe("admin catalog api", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
       `http://localhost:8080/api/v1/categories/${category.id}?view=ADMIN`,
     );
+  });
+});
+
+const listedAdminOrder: Order = {
+  id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  orderNumber: "ORD-P-1001",
+  customerId: "11111111-1111-1111-1111-111111111111",
+  status: "PENDING",
+  items: [
+    {
+      id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      productId: "33333333-3333-3333-3333-333333333333",
+      productName: "Leche",
+      unitPrice: { amount: 4500, currency: "COP" },
+      quantity: 2,
+      subtotal: { amount: 9000, currency: "COP" },
+    },
+  ],
+  subtotal: { amount: 9000, currency: "COP" },
+  total: { amount: 9000, currency: "COP" },
+  shippingAddress: {
+    recipientName: "Ana",
+    addressLine: "Calle 1",
+    additionalInfo: null,
+    city: "Bogotá",
+    department: "Cundinamarca",
+    phone: "3001234567",
+  },
+  paymentId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+  createdAt: "2026-03-01T10:00:00Z",
+  confirmedAt: null,
+  cancelledAt: null,
+  updatedAt: "2026-03-01T10:00:00Z",
+  payment: null,
+};
+
+const pagedAdminOrders: PagedOrders = {
+  items: [listedAdminOrder],
+  page: 0,
+  size: 20,
+  totalElements: 1,
+};
+
+describe("admin orders api", () => {
+  it("lists admin orders with JWT, page, size and without customer ownership params", async () => {
+    configureSessionPersistence(new MemoryPersistence());
+    setSession({
+      userId: "99999999-9999-9999-9999-999999999999",
+      role: "ADMIN",
+      accessToken: "admin-token",
+      expiresAt: "2099-01-01T00:00:00Z",
+    });
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(pagedAdminOrders));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      listAdminOrders({ page: 0, size: 20 }),
+    ).resolves.toEqual(pagedAdminOrders);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      "http://localhost:8080/api/v1/admin/orders?page=0&size=20",
+    );
+    expect(init.method ?? "GET").toBe("GET");
+    expect(new Headers(init.headers).get("Authorization")).toBe(
+      "Bearer admin-token",
+    );
+    expect(url).not.toContain("customerId");
+    expect(pagedAdminOrders.items[0]?.payment).toBeNull();
+  });
+
+  it("sends status filter with page and size", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ items: [], page: 1, size: 20, totalElements: 0 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      listAdminOrders({ page: 1, size: 20, status: "CONFIRMED" }),
+    ).resolves.toEqual({
+      items: [],
+      page: 1,
+      size: 20,
+      totalElements: 0,
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "http://localhost:8080/api/v1/admin/orders?page=1&size=20&status=CONFIRMED",
+    );
+  });
+
+  it("omits status when listing all admin orders", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(pagedAdminOrders));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listAdminOrders({ page: 0, size: 20 });
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).not.toContain("status=");
+  });
+
+  it("uses admin orders query keys with page size and status", () => {
+    expect(adminKeys().ordersRoot()).toEqual(["admin", "orders"]);
+    expect(
+      adminKeys().orders({ page: 0, size: 20, status: "READY" }),
+    ).toEqual(["admin", "orders", "list", 0, 20, "READY"]);
+    expect(adminKeys().orders({ page: 2, size: 20 })).toEqual([
+      "admin",
+      "orders",
+      "list",
+      2,
+      20,
+      "all",
+    ]);
+  });
+
+  it("propagates RFC7807 errors from GET /admin/orders", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(
+        {
+          status: 400,
+          code: "INVALID_ORDER",
+          title: "Bad Request",
+          detail: "invalid order status: SOLD",
+        },
+        400,
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      listAdminOrders({ page: 0, size: 20, status: "PENDING" }),
+    ).rejects.toMatchObject({
+      problem: { status: 400, code: "INVALID_ORDER" },
+    });
   });
 });
