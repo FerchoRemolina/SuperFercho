@@ -1,16 +1,16 @@
 import { Suspense } from "react";
-import { AdminProductDetailPageContent } from "@/features/admin/components/admin-product-detail-page";
+import { AdminCategoryDetailPageContent } from "@/features/admin/components/admin-category-detail-page";
 import { Container } from "@/shared/ui/container";
 import { Skeleton } from "@/shared/ui/skeleton";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminProductDetailPage({
+export default async function AdminCategoryDetailPage({
   params,
 }: {
-  params: Promise<{ productId: string }>;
+  params: Promise<{ categoryId: string }>;
 }) {
-  const { productId } = await params;
+  const { categoryId } = await params;
 
   return (
     <Suspense
@@ -21,7 +21,10 @@ export default async function AdminProductDetailPage({
         </Container>
       }
     >
-      <AdminProductDetailPageContent key={productId} productId={productId} />
+      <AdminCategoryDetailPageContent
+        key={categoryId}
+        categoryId={categoryId}
+      />
     </Suspense>
   );
 }
