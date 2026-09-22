@@ -7,24 +7,33 @@ import {
   adminKeys,
   changeAdminProductPrice,
   createAdminCategory,
+  createAdminKnowledgeDocument,
   createAdminProduct,
   deactivateAdminCategory,
+  deactivateAdminKnowledgeDocument,
   deactivateAdminProduct,
   getAdminCategory,
+  getAdminKnowledgeDocument,
   getAdminOrder,
   getAdminProduct,
   listAdminCategories,
+  listAdminKnowledgeDocuments,
   listAdminOrders,
   listAdminProducts,
+  processAdminKnowledgeDocument,
+  reactivateAdminKnowledgeDocument,
+  replaceAdminKnowledgeDocumentContent,
   searchAdminProducts,
   updateAdminCategory,
   updateAdminOrderStatus,
   updateAdminProduct,
   type ChangeAdminProductPriceRequest,
   type CreateAdminCategoryRequest,
+  type CreateAdminKnowledgeDocumentRequest,
   type CreateAdminProductRequest,
   type ListAdminOrdersQuery,
   type ListAdminProductsQuery,
+  type ReplaceAdminKnowledgeDocumentContentRequest,
   type UpdateAdminCategoryRequest,
   type UpdateAdminOrderStatusRequest,
   type UpdateAdminProductRequest,
@@ -252,6 +261,102 @@ export function useUpdateAdminOrderStatusMutation() {
       // Do not setQueryData from POST: payment may be null without OrderPaymentComposer.
       void queryClient.invalidateQueries({ queryKey: keys.order(variables.orderId) });
       void queryClient.invalidateQueries({ queryKey: keys.ordersRoot() });
+    },
+  });
+}
+
+export function useAdminKnowledgeDocumentsQuery() {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.knowledgeDocuments(),
+    queryFn: listAdminKnowledgeDocuments,
+    enabled: isAdminRole(session?.role),
+  });
+}
+
+export function useAdminKnowledgeDocumentQuery(documentId: string) {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.knowledgeDocument(documentId),
+    queryFn: () => getAdminKnowledgeDocument(documentId),
+    enabled: isAdminRole(session?.role) && documentId.length > 0,
+  });
+}
+
+export function useCreateAdminKnowledgeDocumentMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: CreateAdminKnowledgeDocumentRequest) =>
+      createAdminKnowledgeDocument(body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: keys.knowledgeRoot() });
+    },
+  });
+}
+
+export function useReplaceAdminKnowledgeDocumentContentMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      documentId,
+      body,
+    }: {
+      documentId: string;
+      body: ReplaceAdminKnowledgeDocumentContentRequest;
+    }) => replaceAdminKnowledgeDocumentContent(documentId, body),
+    onSuccess: (_document, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: keys.knowledgeDocument(variables.documentId),
+      });
+      void queryClient.invalidateQueries({ queryKey: keys.knowledgeRoot() });
+    },
+  });
+}
+
+export function useProcessAdminKnowledgeDocumentMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (documentId: string) => processAdminKnowledgeDocument(documentId),
+    onSuccess: (_document, documentId) => {
+      void queryClient.invalidateQueries({
+        queryKey: keys.knowledgeDocument(documentId),
+      });
+      void queryClient.invalidateQueries({ queryKey: keys.knowledgeRoot() });
+    },
+  });
+}
+
+export function useDeactivateAdminKnowledgeDocumentMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (documentId: string) =>
+      deactivateAdminKnowledgeDocument(documentId),
+    onSuccess: (_document, documentId) => {
+      void queryClient.invalidateQueries({
+        queryKey: keys.knowledgeDocument(documentId),
+      });
+      void queryClient.invalidateQueries({ queryKey: keys.knowledgeRoot() });
+    },
+  });
+}
+
+export function useReactivateAdminKnowledgeDocumentMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (documentId: string) =>
+      reactivateAdminKnowledgeDocument(documentId),
+    onSuccess: (_document, documentId) => {
+      void queryClient.invalidateQueries({
+        queryKey: keys.knowledgeDocument(documentId),
+      });
+      void queryClient.invalidateQueries({ queryKey: keys.knowledgeRoot() });
     },
   });
 }

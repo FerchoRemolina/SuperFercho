@@ -148,6 +148,30 @@ describe("messageForApiProblem", () => {
     ).toBe("No se puede establecer ese estado desde esta acción.");
   });
 
+  it("uses Spanish messages for Knowledge problem codes", () => {
+    expect(
+      messageForApiProblem({
+        status: 400,
+        code: "INVALID_DOCUMENT",
+        detail: "document can only be deactivated when READY",
+      }),
+    ).toBe("El documento no es válido para esta operación.");
+    expect(
+      messageForApiProblem({
+        status: 404,
+        code: "DOCUMENT_NOT_FOUND",
+        detail: "Document not found: dddddddd-dddd-dddd-dddd-dddddddddddd",
+      }),
+    ).toBe("No encontramos ese documento.");
+    expect(
+      messageForApiProblem({
+        status: 409,
+        code: "KNOWLEDGE_PROCESSING_FAILED",
+        detail: "document processing failed",
+      }),
+    ).toBe("No se pudo procesar el documento. Inténtalo de nuevo.");
+  });
+
   it("uses a generic internal message for 500 without leaking a stack", () => {
     expect(
       messageForApiProblem({

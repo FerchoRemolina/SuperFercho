@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   changeAdminProductPriceRequestFromAmount,
+  createAdminKnowledgeDocumentRequestFromValues,
   createAdminProductRequestFromValues,
+  emptyAdminKnowledgeDocumentContentFormValues,
+  emptyAdminKnowledgeDocumentFormValues,
   emptyAdminProductFormValues,
+  replaceAdminKnowledgeDocumentContentRequestFromValues,
   updateAdminProductRequestFromValues,
+  validateAdminKnowledgeDocument,
+  validateAdminKnowledgeDocumentContent,
   validateCreateAdminProduct,
   validateUpdateAdminProduct,
 } from "@/features/admin/payloads";
@@ -80,5 +86,44 @@ describe("admin product payloads", () => {
       stock: "",
     });
     expect(errors).toEqual({});
+  });
+});
+
+describe("admin knowledge payloads", () => {
+  it("rejects blank title source and content", () => {
+    expect(
+      validateAdminKnowledgeDocument(emptyAdminKnowledgeDocumentFormValues()),
+    ).toEqual({
+      title: expect.any(String),
+      source: expect.any(String),
+      content: expect.any(String),
+    });
+  });
+
+  it("maps valid create values to request body", () => {
+    expect(
+      createAdminKnowledgeDocumentRequestFromValues({
+        title: "  Horarios ",
+        source: " manual ",
+        content: " Texto ",
+      }),
+    ).toEqual({
+      title: "Horarios",
+      source: "manual",
+      content: "Texto",
+    });
+  });
+
+  it("rejects blank replace content and maps valid content", () => {
+    expect(
+      validateAdminKnowledgeDocumentContent(
+        emptyAdminKnowledgeDocumentContentFormValues(),
+      ),
+    ).toEqual({ content: expect.any(String) });
+    expect(
+      replaceAdminKnowledgeDocumentContentRequestFromValues({
+        content: "  Nuevo contenido ",
+      }),
+    ).toEqual({ content: "Nuevo contenido" });
   });
 });

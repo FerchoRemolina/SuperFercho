@@ -1,8 +1,10 @@
 import type {
+  DocumentStatus,
   ListAdminOrdersQuery,
   ListAdminProductsQuery,
 } from "@/features/admin/api";
 import {
+  ADMIN_DOCUMENT_STATUSES,
   ADMIN_ORDER_STATUSES,
   ADMIN_ORDERS_DEFAULT_PAGE,
   ADMIN_ORDERS_DEFAULT_SIZE,
@@ -247,11 +249,105 @@ export function adminOrderDetailErrorKind(
   return "error";
 }
 
+export function documentStatusLabel(status: DocumentStatus): string {
+  switch (status) {
+    case "RECEIVED":
+      return "Recibido";
+    case "CHUNKED":
+      return "Fragmentado";
+    case "READY":
+      return "Listo";
+    case "FAILED":
+      return "Fallido";
+    case "INACTIVE":
+      return "Inactivo";
+  }
+}
+
+export function canProcessKnowledgeDocument(status: DocumentStatus): boolean {
+  return status === "RECEIVED" || status === "CHUNKED" || status === "FAILED";
+}
+
+export function canDeactivateKnowledgeDocument(status: DocumentStatus): boolean {
+  return status === "READY";
+}
+
+export function canReactivateKnowledgeDocument(status: DocumentStatus): boolean {
+  return status === "INACTIVE";
+}
+
+/** Backend replaceContent does not restrict by status; all statuses are allowed. */
+export function canReplaceKnowledgeDocumentContent(
+  status: DocumentStatus,
+): boolean {
+  return (ADMIN_DOCUMENT_STATUSES as readonly DocumentStatus[]).includes(status);
+}
+
+export function knowledgeDocumentProcessConfirmation(args: {
+  title: string;
+}): { title: string; body: string } {
+  return {
+    title: "¿Procesar este documento?",
+    body: `Se fragmentará e indexará «${args.title}». La operación puede tardar porque se ejecuta de forma síncrona.`,
+  };
+}
+
+export function knowledgeDocumentDeactivateConfirmation(args: {
+  title: string;
+}): { title: string; body: string } {
+  return {
+    title: "¿Desactivar este documento?",
+    body: `«${args.title}» dejará de estar disponible para la búsqueda de conocimiento hasta que lo reactives.`,
+  };
+}
+
+export function knowledgeDocumentReactivateConfirmation(args: {
+  title: string;
+}): { title: string; body: string } {
+  return {
+    title: "¿Reactivar este documento?",
+    body: `«${args.title}» volverá al estado Listo y podrá usarse de nuevo en la búsqueda.`,
+  };
+}
+
+export function knowledgeDocumentReplaceContentWarning(): string {
+  return "Al reemplazar el contenido, el documento volverá a Recibido, se eliminarán sus fragmentos e índices, y deberás procesarlo de nuevo.";
+}
+
+export function adminKnowledgeHref(): string {
+  return "/admin/knowledge";
+}
+
+export function adminKnowledgeNewHref(): string {
+  return "/admin/knowledge/new";
+}
+
+export function adminKnowledgeDocumentHref(documentId: string): string {
+  return `/admin/knowledge/${encodeURIComponent(documentId)}`;
+}
+
+export type DocumentStatusTone = "neutral" | "primary" | "accent" | "danger";
+
+export function documentStatusTone(status: DocumentStatus): DocumentStatusTone {
+  switch (status) {
+    case "READY":
+      return "primary";
+    case "RECEIVED":
+    case "CHUNKED":
+      return "accent";
+    case "FAILED":
+      return "danger";
+    case "INACTIVE":
+      return "neutral";
+  }
+}
+
 export const ADMIN_NAV_LINKS = [
   { href: "/admin", label: "Inicio", match: "exact" as const },
   { href: "/admin/products", label: "Productos", match: "prefix" as const },
   { href: "/admin/categories", label: "Categorías", match: "prefix" as const },
   { href: "/admin/orders", label: "Pedidos", match: "prefix" as const },
+  { href: "/admin/knowledge", label: "Knowledge", match: "prefix" as const },
 ];
 
 export function isAdminNavActive(

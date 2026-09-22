@@ -56,6 +56,12 @@ export function messageForApiProblem(problem: ApiProblem): string {
       return "No se puede establecer ese estado desde esta acción.";
     case "PAYMENT_NOT_FOUND":
       return "No se pudo cargar la información de pago de este pedido.";
+    case "INVALID_DOCUMENT":
+      return "El documento no es válido para esta operación.";
+    case "DOCUMENT_NOT_FOUND":
+      return "No encontramos ese documento.";
+    case "KNOWLEDGE_PROCESSING_FAILED":
+      return "No se pudo procesar el documento. Inténtalo de nuevo.";
     case "ACCESS_DENIED":
       return "No tienes permiso para esta acción.";
     case "UNAUTHENTICATED":

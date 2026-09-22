@@ -1,10 +1,5 @@
-import { PlaceholderScreen } from "@/shared/ui/placeholder-screen";
+import { AdminKnowledgePageContent } from "@/features/admin/components/admin-knowledge-page";
 
 export default function AdminKnowledgePage() {
-  return (
-    <PlaceholderScreen
-      title="Knowledge (admin)"
-      description="Los documentos de Knowledge usarán /api/v1/knowledge. El Assistant no consume este HTTP."
-    />
-  );
+  return <AdminKnowledgePageContent />;
 }

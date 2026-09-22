@@ -1,7 +1,9 @@
 import type {
   ChangeAdminProductPriceRequest,
   CreateAdminCategoryRequest,
+  CreateAdminKnowledgeDocumentRequest,
   CreateAdminProductRequest,
+  ReplaceAdminKnowledgeDocumentContentRequest,
   UpdateAdminCategoryRequest,
   UpdateAdminProductRequest,
 } from "@/features/admin/api";
@@ -216,6 +218,84 @@ export function adminProductFormValuesFromProduct(
     stock: String(product.stock),
     imageUrl: product.imageUrl ?? "",
   };
+}
+
+export type AdminKnowledgeDocumentFormValues = {
+  title: string;
+  source: string;
+  content: string;
+};
+
+export type AdminKnowledgeDocumentFieldErrors = Partial<
+  Record<keyof AdminKnowledgeDocumentFormValues, string>
+>;
+
+export function emptyAdminKnowledgeDocumentFormValues(): AdminKnowledgeDocumentFormValues {
+  return {
+    title: "",
+    source: "",
+    content: "",
+  };
+}
+
+export function validateAdminKnowledgeDocument(
+  values: AdminKnowledgeDocumentFormValues,
+): AdminKnowledgeDocumentFieldErrors {
+  const errors: AdminKnowledgeDocumentFieldErrors = {};
+  if (values.title.trim().length === 0) {
+    errors.title = "Escribe el título del documento.";
+  }
+  if (values.source.trim().length === 0) {
+    errors.source = "Escribe la fuente del documento.";
+  }
+  if (values.content.trim().length === 0) {
+    errors.content = "Escribe el contenido del documento.";
+  }
+  return errors;
+}
+
+export function createAdminKnowledgeDocumentRequestFromValues(
+  values: AdminKnowledgeDocumentFormValues,
+): CreateAdminKnowledgeDocumentRequest {
+  return {
+    title: values.title.trim(),
+    source: values.source.trim(),
+    content: values.content.trim(),
+  };
+}
+
+export type AdminKnowledgeDocumentContentFormValues = {
+  content: string;
+};
+
+export type AdminKnowledgeDocumentContentFieldErrors = Partial<
+  Record<keyof AdminKnowledgeDocumentContentFormValues, string>
+>;
+
+export function emptyAdminKnowledgeDocumentContentFormValues(): AdminKnowledgeDocumentContentFormValues {
+  return { content: "" };
+}
+
+export function adminKnowledgeDocumentContentFormValuesFromDocument(args: {
+  content: string;
+}): AdminKnowledgeDocumentContentFormValues {
+  return { content: args.content };
+}
+
+export function validateAdminKnowledgeDocumentContent(
+  values: AdminKnowledgeDocumentContentFormValues,
+): AdminKnowledgeDocumentContentFieldErrors {
+  const errors: AdminKnowledgeDocumentContentFieldErrors = {};
+  if (values.content.trim().length === 0) {
+    errors.content = "Escribe el contenido del documento.";
+  }
+  return errors;
+}
+
+export function replaceAdminKnowledgeDocumentContentRequestFromValues(
+  values: AdminKnowledgeDocumentContentFormValues,
+): ReplaceAdminKnowledgeDocumentContentRequest {
+  return { content: values.content.trim() };
 }
 
 function formatAmountInput(amount: number): string {

@@ -21,6 +21,12 @@ const sections = [
     description:
       "Consulta los pedidos de todos los clientes y filtra por estado.",
   },
+  {
+    href: "/admin/knowledge",
+    title: "Knowledge",
+    description:
+      "Consulta los documentos de conocimiento del supermercado.",
+  },
 ];
 
 export function AdminHub() {
@@ -30,8 +36,8 @@ export function AdminHub() {
         Administración
       </h1>
       <p className="mt-3 max-w-2xl text-base text-sf-muted">
-        Gestiona el catálogo y los pedidos de SuperFercho. No hay métricas ni
-        tablero de ventas en esta pantalla.
+        Gestiona el catálogo, los pedidos y el conocimiento de SuperFercho. No
+        hay métricas ni tablero de ventas en esta pantalla.
       </p>
       <ul className="mt-8 grid gap-4 md:grid-cols-2">
         {sections.map((section) => (

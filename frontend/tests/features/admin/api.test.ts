@@ -5,19 +5,27 @@ import {
   adminKeys,
   changeAdminProductPrice,
   createAdminCategory,
+  createAdminKnowledgeDocument,
   createAdminProduct,
   deactivateAdminCategory,
+  deactivateAdminKnowledgeDocument,
   deactivateAdminProduct,
   getAdminCategory,
+  getAdminKnowledgeDocument,
   getAdminOrder,
   getAdminProduct,
   listAdminCategories,
+  listAdminKnowledgeDocuments,
   listAdminOrders,
   listAdminProducts,
+  processAdminKnowledgeDocument,
+  reactivateAdminKnowledgeDocument,
+  replaceAdminKnowledgeDocumentContent,
   searchAdminProducts,
   updateAdminCategory,
   updateAdminOrderStatus,
   updateAdminProduct,
+  type KnowledgeDocument,
 } from "@/features/admin/api";
 import type { Order, PagedOrders } from "@/features/orders/api";
 import {
@@ -629,6 +637,209 @@ describe("admin orders api", () => {
       updateAdminOrderStatus(listedAdminOrder.id, { status: "CANCELLED" }),
     ).rejects.toMatchObject({
       problem: { status: 400, code: "INVALID_ORDER_STATUS_UPDATE" },
+    });
+  });
+});
+
+const knowledgeDocument: KnowledgeDocument = {
+  id: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+  title: "Horarios",
+  source: "manual-interno",
+  content: "Abrimos de 8 a 20.",
+  status: "RECEIVED",
+  chunks: [],
+  createdAt: "2026-03-01T10:00:00Z",
+  updatedAt: "2026-03-01T10:00:00Z",
+};
+
+describe("admin knowledge api", () => {
+  it("lists knowledge documents with JWT", async () => {
+    configureSessionPersistence(new MemoryPersistence());
+    setSession({
+      userId: "99999999-9999-9999-9999-999999999999",
+      role: "ADMIN",
+      accessToken: "admin-token",
+      expiresAt: "2099-01-01T00:00:00Z",
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse([knowledgeDocument]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(listAdminKnowledgeDocuments()).resolves.toEqual([
+      knowledgeDocument,
+    ]);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://localhost:8080/api/v1/knowledge/documents");
+    expect(init.method ?? "GET").toBe("GET");
+    expect(new Headers(init.headers).get("Authorization")).toBe(
+      "Bearer admin-token",
+    );
+  });
+
+  it("gets a knowledge document by encoded id", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(knowledgeDocument))
+      .mockResolvedValueOnce(jsonResponse(knowledgeDocument));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      getAdminKnowledgeDocument(knowledgeDocument.id),
+    ).resolves.toEqual(knowledgeDocument);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      `http://localhost:8080/api/v1/knowledge/documents/${knowledgeDocument.id}`,
+    );
+
+    await getAdminKnowledgeDocument("id with spaces");
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      "http://localhost:8080/api/v1/knowledge/documents/id%20with%20spaces",
+    );
+  });
+
+  it("creates a knowledge document with title source and content", async () => {
+    configureSessionPersistence(new MemoryPersistence());
+    setSession({
+      userId: "99999999-9999-9999-9999-999999999999",
+      role: "ADMIN",
+      accessToken: "admin-token",
+      expiresAt: "2099-01-01T00:00:00Z",
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(knowledgeDocument, 201));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const body = {
+      title: "Horarios",
+      source: "manual-interno",
+      content: "Abrimos de 8 a 20.",
+    };
+    await expect(createAdminKnowledgeDocument(body)).resolves.toEqual(
+      knowledgeDocument,
+    );
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://localhost:8080/api/v1/knowledge/documents");
+    expect(init.method).toBe("POST");
+    expect(new Headers(init.headers).get("Authorization")).toBe(
+      "Bearer admin-token",
+    );
+    expect(init.body).toBe(JSON.stringify(body));
+  });
+
+  it("replaces knowledge document content with PUT body", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ ...knowledgeDocument, content: "Nuevo", status: "RECEIVED" }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await replaceAdminKnowledgeDocumentContent(knowledgeDocument.id, {
+      content: "Nuevo",
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      `http://localhost:8080/api/v1/knowledge/documents/${knowledgeDocument.id}/content`,
+    );
+    expect(init.method).toBe("PUT");
+    expect(init.body).toBe(JSON.stringify({ content: "Nuevo" }));
+  });
+
+  it("posts process deactivate and reactivate endpoints", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ ...knowledgeDocument, status: "READY" }))
+      .mockResolvedValueOnce(
+        jsonResponse({ ...knowledgeDocument, status: "INACTIVE" }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ ...knowledgeDocument, status: "READY" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await processAdminKnowledgeDocument(knowledgeDocument.id);
+    await deactivateAdminKnowledgeDocument(knowledgeDocument.id);
+    await reactivateAdminKnowledgeDocument(knowledgeDocument.id);
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      `http://localhost:8080/api/v1/knowledge/documents/${knowledgeDocument.id}/process`,
+    );
+    expect((fetchMock.mock.calls[0]?.[1] as RequestInit).method).toBe("POST");
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      `http://localhost:8080/api/v1/knowledge/documents/${knowledgeDocument.id}/deactivate`,
+    );
+    expect(fetchMock.mock.calls[2]?.[0]).toBe(
+      `http://localhost:8080/api/v1/knowledge/documents/${knowledgeDocument.id}/reactivate`,
+    );
+  });
+
+  it("uses knowledge query keys", () => {
+    expect(adminKeys().knowledgeRoot()).toEqual(["admin", "knowledge"]);
+    expect(adminKeys().knowledgeDocuments()).toEqual([
+      "admin",
+      "knowledge",
+      "documents",
+    ]);
+    expect(adminKeys().knowledgeDocument(knowledgeDocument.id)).toEqual([
+      "admin",
+      "knowledge",
+      "document",
+      knowledgeDocument.id,
+    ]);
+  });
+
+  it("propagates knowledge RFC7807 errors", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            status: 404,
+            code: "DOCUMENT_NOT_FOUND",
+            title: "Not Found",
+            detail: "missing",
+          },
+          404,
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            status: 400,
+            code: "INVALID_DOCUMENT",
+            title: "Bad Request",
+            detail: "document can only be processed when RECEIVED, CHUNKED or FAILED",
+          },
+          400,
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            status: 409,
+            code: "KNOWLEDGE_PROCESSING_FAILED",
+            title: "Conflict",
+            detail: "document processing failed",
+          },
+          409,
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      getAdminKnowledgeDocument(knowledgeDocument.id),
+    ).rejects.toMatchObject({
+      problem: { status: 404, code: "DOCUMENT_NOT_FOUND" },
+    });
+    await expect(
+      processAdminKnowledgeDocument(knowledgeDocument.id),
+    ).rejects.toMatchObject({
+      problem: { status: 400, code: "INVALID_DOCUMENT" },
+    });
+    await expect(
+      processAdminKnowledgeDocument(knowledgeDocument.id),
+    ).rejects.toMatchObject({
+      problem: { status: 409, code: "KNOWLEDGE_PROCESSING_FAILED" },
     });
   });
 });

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  adminKnowledgeDocumentHref,
+  adminKnowledgeHref,
+  adminKnowledgeNewHref,
   adminOrderDetailErrorKind,
   adminOrderDetailHref,
   adminOrdersHref,
@@ -10,17 +13,28 @@ import {
   adminOrderStatusPanelState,
   adminProductsHref,
   canAdvanceAdminOrderStatus,
+  canDeactivateKnowledgeDocument,
   canGoToNextAdminOrdersPage,
   canGoToPreviousAdminOrdersPage,
+  canProcessKnowledgeDocument,
+  canReactivateKnowledgeDocument,
+  canReplaceKnowledgeDocumentContent,
+  documentStatusLabel,
+  documentStatusTone,
   formatAdminInstant,
   isAdminOrderStatusSubmitLocked,
   isAdminRole,
+  knowledgeDocumentDeactivateConfirmation,
+  knowledgeDocumentProcessConfirmation,
+  knowledgeDocumentReactivateConfirmation,
+  knowledgeDocumentReplaceContentWarning,
   listQueryFromSearchParams,
   nextAdminOrderStatus,
   parseAdminOrderStatus,
   parseAdminOrdersPage,
   shouldSearchAdminProducts,
 } from "@/features/admin/presentation";
+import { ADMIN_DOCUMENT_STATUSES } from "@/features/admin/api";
 import { ApiError } from "@/shared/errors/api-problem";
 import { formatMoney } from "@/shared/money/money";
 import { messageForApiProblem } from "@/shared/errors/messages";
@@ -257,5 +271,77 @@ describe("admin order status advance", () => {
         detail: "Order status cannot be updated to: CANCELLED",
       }),
     ).toBe("No se puede establecer ese estado desde esta acción.");
+  });
+});
+
+describe("admin knowledge presentation", () => {
+  it("labels every document status", () => {
+    expect(documentStatusLabel("RECEIVED")).toBe("Recibido");
+    expect(documentStatusLabel("CHUNKED")).toBe("Fragmentado");
+    expect(documentStatusLabel("READY")).toBe("Listo");
+    expect(documentStatusLabel("FAILED")).toBe("Fallido");
+    expect(documentStatusLabel("INACTIVE")).toBe("Inactivo");
+  });
+
+  it("allows process only for RECEIVED CHUNKED and FAILED", () => {
+    expect(canProcessKnowledgeDocument("RECEIVED")).toBe(true);
+    expect(canProcessKnowledgeDocument("CHUNKED")).toBe(true);
+    expect(canProcessKnowledgeDocument("FAILED")).toBe(true);
+    expect(canProcessKnowledgeDocument("READY")).toBe(false);
+    expect(canProcessKnowledgeDocument("INACTIVE")).toBe(false);
+  });
+
+  it("allows deactivate only for READY", () => {
+    expect(canDeactivateKnowledgeDocument("READY")).toBe(true);
+    expect(canDeactivateKnowledgeDocument("RECEIVED")).toBe(false);
+    expect(canDeactivateKnowledgeDocument("CHUNKED")).toBe(false);
+    expect(canDeactivateKnowledgeDocument("FAILED")).toBe(false);
+    expect(canDeactivateKnowledgeDocument("INACTIVE")).toBe(false);
+  });
+
+  it("allows reactivate only for INACTIVE", () => {
+    expect(canReactivateKnowledgeDocument("INACTIVE")).toBe(true);
+    expect(canReactivateKnowledgeDocument("READY")).toBe(false);
+    expect(canReactivateKnowledgeDocument("RECEIVED")).toBe(false);
+    expect(canReactivateKnowledgeDocument("CHUNKED")).toBe(false);
+    expect(canReactivateKnowledgeDocument("FAILED")).toBe(false);
+  });
+
+  it("allows replace content for every known document status", () => {
+    for (const status of ADMIN_DOCUMENT_STATUSES) {
+      expect(canReplaceKnowledgeDocumentContent(status)).toBe(true);
+    }
+  });
+
+  it("builds process deactivate and reactivate confirmations", () => {
+    expect(knowledgeDocumentProcessConfirmation({ title: "Horarios" }).body).toContain(
+      "Horarios",
+    );
+    expect(
+      knowledgeDocumentDeactivateConfirmation({ title: "Horarios" }).body,
+    ).toContain("Horarios");
+    expect(
+      knowledgeDocumentReactivateConfirmation({ title: "Horarios" }).body,
+    ).toContain("Horarios");
+    expect(knowledgeDocumentReplaceContentWarning()).toMatch(/Recibido/);
+  });
+
+  it("builds knowledge list create and detail hrefs", () => {
+    expect(adminKnowledgeHref()).toBe("/admin/knowledge");
+    expect(adminKnowledgeNewHref()).toBe("/admin/knowledge/new");
+    expect(
+      adminKnowledgeDocumentHref("dddddddd-dddd-dddd-dddd-dddddddddddd"),
+    ).toBe("/admin/knowledge/dddddddd-dddd-dddd-dddd-dddddddddddd");
+    expect(adminKnowledgeDocumentHref("id with spaces")).toBe(
+      "/admin/knowledge/id%20with%20spaces",
+    );
+  });
+
+  it("maps document status tones for badges", () => {
+    expect(documentStatusTone("READY")).toBe("primary");
+    expect(documentStatusTone("FAILED")).toBe("danger");
+    expect(documentStatusTone("INACTIVE")).toBe("neutral");
+    expect(documentStatusTone("RECEIVED")).toBe("accent");
+    expect(documentStatusTone("CHUNKED")).toBe("accent");
   });
 });

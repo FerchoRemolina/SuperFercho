@@ -114,6 +114,10 @@ export function adminKeys() {
         query.status ?? "all",
       ] as const,
     order: (orderId: string) => ["admin", "order", orderId] as const,
+    knowledgeRoot: () => ["admin", "knowledge"] as const,
+    knowledgeDocuments: () => ["admin", "knowledge", "documents"] as const,
+    knowledgeDocument: (documentId: string) =>
+      ["admin", "knowledge", "document", documentId] as const,
   };
 }
 
@@ -267,6 +271,124 @@ export async function updateAdminOrderStatus(
     method: "POST",
     body,
   });
+}
+
+/** Mirrors DocumentStatus. */
+export type DocumentStatus =
+  | "RECEIVED"
+  | "CHUNKED"
+  | "READY"
+  | "FAILED"
+  | "INACTIVE";
+
+export const ADMIN_DOCUMENT_STATUSES: readonly DocumentStatus[] = [
+  "RECEIVED",
+  "CHUNKED",
+  "READY",
+  "FAILED",
+  "INACTIVE",
+] as const;
+
+/** Mirrors ChunkRestResponse. */
+export type KnowledgeChunk = {
+  id: string;
+  position: number;
+  text: string;
+  embedded: boolean;
+};
+
+/** Mirrors DocumentRestResponse. */
+export type KnowledgeDocument = {
+  id: string;
+  title: string;
+  source: string;
+  content: string;
+  status: DocumentStatus;
+  chunks: KnowledgeChunk[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** Mirrors CreateDocumentRequest. */
+export type CreateAdminKnowledgeDocumentRequest = {
+  title: string;
+  source: string;
+  content: string;
+};
+
+/** Mirrors ReplaceDocumentContentRequest. */
+export type ReplaceAdminKnowledgeDocumentContentRequest = {
+  content: string;
+};
+
+/** GET /api/v1/knowledge/documents — ADMIN. */
+export async function listAdminKnowledgeDocuments(): Promise<
+  KnowledgeDocument[]
+> {
+  return request<KnowledgeDocument[]>("/knowledge/documents");
+}
+
+/** GET /api/v1/knowledge/documents/{documentId} — ADMIN. */
+export async function getAdminKnowledgeDocument(
+  documentId: string,
+): Promise<KnowledgeDocument> {
+  return request<KnowledgeDocument>(
+    `/knowledge/documents/${encodeURIComponent(documentId)}`,
+  );
+}
+
+/** POST /api/v1/knowledge/documents — ADMIN; 201. */
+export async function createAdminKnowledgeDocument(
+  body: CreateAdminKnowledgeDocumentRequest,
+): Promise<KnowledgeDocument> {
+  return request<KnowledgeDocument>("/knowledge/documents", {
+    method: "POST",
+    body,
+  });
+}
+
+/** PUT /api/v1/knowledge/documents/{documentId}/content — ADMIN. */
+export async function replaceAdminKnowledgeDocumentContent(
+  documentId: string,
+  body: ReplaceAdminKnowledgeDocumentContentRequest,
+): Promise<KnowledgeDocument> {
+  return request<KnowledgeDocument>(
+    `/knowledge/documents/${encodeURIComponent(documentId)}/content`,
+    {
+      method: "PUT",
+      body,
+    },
+  );
+}
+
+/** POST /api/v1/knowledge/documents/{documentId}/process — ADMIN. */
+export async function processAdminKnowledgeDocument(
+  documentId: string,
+): Promise<KnowledgeDocument> {
+  return request<KnowledgeDocument>(
+    `/knowledge/documents/${encodeURIComponent(documentId)}/process`,
+    { method: "POST" },
+  );
+}
+
+/** POST /api/v1/knowledge/documents/{documentId}/deactivate — ADMIN. */
+export async function deactivateAdminKnowledgeDocument(
+  documentId: string,
+): Promise<KnowledgeDocument> {
+  return request<KnowledgeDocument>(
+    `/knowledge/documents/${encodeURIComponent(documentId)}/deactivate`,
+    { method: "POST" },
+  );
+}
+
+/** POST /api/v1/knowledge/documents/{documentId}/reactivate — ADMIN. */
+export async function reactivateAdminKnowledgeDocument(
+  documentId: string,
+): Promise<KnowledgeDocument> {
+  return request<KnowledgeDocument>(
+    `/knowledge/documents/${encodeURIComponent(documentId)}/reactivate`,
+    { method: "POST" },
+  );
 }
 
 export function copMoney(amount: number): Money {
