@@ -3,3 +3,9 @@ spring:
     url: ${SUPERFERCHO_DB_URL:jdbc:postgresql://localhost:5432/superfercho}
     username: ${SUPERFERCHO_DB_USERNAME:superfercho}
     password: ${SUPERFERCHO_DB_PASSWORD:superfercho}
+
+superfercho:
+  dev:
+    admin:
+      email: ${SUPERFERCHO_DEV_ADMIN_EMAIL:}
+      password: ${SUPERFERCHO_DEV_ADMIN_PASSWORD:}

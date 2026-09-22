@@ -13,6 +13,7 @@ import com.superfercho.identity.domain.model.AddressStatus;
 import com.superfercho.identity.domain.model.Role;
 import com.superfercho.identity.domain.model.User;
 import com.superfercho.identity.domain.model.UserStatus;
+import com.superfercho.identity.infrastructure.configuration.LocalDevAdminRunner;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -56,6 +57,14 @@ class IdentityPersistenceAdapterTest {
 
     @Autowired
     private AddressRepository addressRepository;
+
+    @Autowired(required = false)
+    private LocalDevAdminRunner localDevAdminRunner;
+
+    @Test
+    void localDevAdminRunnerIsNotLoadedOutsideLocalProfile() {
+        assertThat(localDevAdminRunner).isNull();
+    }
 
     @Test
     void shouldPersistAndReloadUser() {

@@ -327,7 +327,7 @@ $frontendDir = Join-Path $Root "frontend"
 
 Start-Process -FilePath "cmd.exe" -WorkingDirectory $backendDir -ArgumentList @(
     "/k",
-    "title SuperFercho backend && mvnw.cmd spring-boot:run"
+    "title SuperFercho backend && mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=local"
 ) | Out-Null
 
 Start-Process -FilePath "cmd.exe" -WorkingDirectory $frontendDir -ArgumentList @(

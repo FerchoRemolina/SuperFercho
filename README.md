@@ -252,6 +252,8 @@ Aplicación (`.env.example` y `backend/src/main/resources/application.yml`):
 | `SUPERFERCHO_OPENAI_CHAT_CONNECT_TIMEOUT` | Timeout de conexión del chat |
 | `SUPERFERCHO_OPENAI_CHAT_READ_TIMEOUT` | Timeout de lectura del chat |
 | `SERVER_PORT` | Puerto HTTP (default `8080`) |
+| `SUPERFERCHO_DEV_ADMIN_EMAIL` | Email del ADMIN local de desarrollo (solo perfil `local`; vacío = no se crea) |
+| `SUPERFERCHO_DEV_ADMIN_PASSWORD` | Contraseña del ADMIN local de desarrollo (solo perfil `local`; vacío = no se crea) |
 
 `backend/src/main/resources/application.yml` define además `SUPERFERCHO_OPENAI_EMBEDDINGS_URL` (default `https://api.openai.com/v1/embeddings`) y el modelo de embeddings `text-embedding-3-small`. Esa URL no está en `.env.example`.
 
@@ -270,7 +272,23 @@ El script:
 - inicia Spring Boot en `:8080` y Next.js en `:3000` en ventanas aparte;
 - usa un `.env` local (no versionado);
 - genera un `SUPERFERCHO_JWT_SECRET` la primera vez y lo reutiliza después;
+- arranca Spring Boot con el perfil `local`;
 - si 5432, 8080 o 3000 ya están ocupados, muestra el proceso (nombre y PID) y se detiene; no mata procesos existentes.
+
+### ADMIN local de desarrollo
+
+El perfil `local` puede crear o actualizar de forma idempotente un usuario `ADMIN` de desarrollo. No corre fuera de ese perfil y no expone ningún endpoint.
+
+En `.env` (nunca en Git) configura:
+
+```
+SUPERFERCHO_DEV_ADMIN_EMAIL=
+SUPERFERCHO_DEV_ADMIN_PASSWORD=
+```
+
+Si alguna de las dos está vacía, el arranque no inventa credenciales y omite el bootstrap. Si ambas están definidas, se crea el ADMIN o se actualiza el usuario con ese email para que quede `ADMIN` / `ACTIVE` con esa contraseña (BCrypt). Volver a arrancar no crea un duplicado.
+
+Esas credenciales son solo locales. No las versionar. El registro de clientes sigue creando únicamente `CUSTOMER`.
 
 Requisitos: Docker Desktop, JDK 21, Node.js 20.9+ (el frontend se arranca con `corepack.cmd pnpm`). Embeddings y chat del Assistant siguen necesitando `OPENAI_API_KEY` en `.env` si se usan.
 
@@ -290,17 +308,17 @@ Windows:
 
 ```bat
 cd backend
-mvnw.cmd spring-boot:run
+mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
 Unix:
 
 ```bash
 cd backend
-./mvnw spring-boot:run
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
-Puerto: `SERVER_PORT` (8080). Requiere `SUPERFERCHO_JWT_SECRET`. Embeddings y chat requieren `OPENAI_API_KEY`.
+Puerto: `SERVER_PORT` (8080). Requiere `SUPERFERCHO_JWT_SECRET`. Embeddings y chat requieren `OPENAI_API_KEY`. El bootstrap del ADMIN local solo corre con el perfil `local` y las variables `SUPERFERCHO_DEV_ADMIN_EMAIL` / `SUPERFERCHO_DEV_ADMIN_PASSWORD` definidas en el entorno.
 
 ### Frontend
 

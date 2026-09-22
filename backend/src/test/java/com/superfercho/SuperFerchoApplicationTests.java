@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.superfercho.identity.application.port.CurrentUserProvider;
 import com.superfercho.identity.application.port.PasswordHasher;
+import com.superfercho.identity.infrastructure.configuration.LocalDevAdminRunner;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -28,6 +30,9 @@ class SuperFerchoApplicationTests {
     @Autowired
     private SecurityFilterChain securityFilterChain;
 
+    @Autowired
+    private ApplicationContext applicationContext;
+
     @Test
     void contextLoads() {
         assertThat(clock).isNotNull();
@@ -35,5 +40,6 @@ class SuperFerchoApplicationTests {
         assertThat(passwordHasher).isNotNull();
         assertThat(currentUserProvider).isNotNull();
         assertThat(securityFilterChain).isNotNull();
+        assertThat(applicationContext.getBeanNamesForType(LocalDevAdminRunner.class)).isEmpty();
     }
 }
