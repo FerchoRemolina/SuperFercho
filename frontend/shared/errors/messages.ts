@@ -62,6 +62,8 @@ export function messageForApiProblem(problem: ApiProblem): string {
       return "No encontramos ese documento.";
     case "KNOWLEDGE_PROCESSING_FAILED":
       return "No se pudo procesar el documento. Inténtalo de nuevo.";
+    case "INVALID_SEARCH_REQUEST":
+      return "La búsqueda no es válida. Revisa el límite (1 a 20) e inténtalo de nuevo.";
     case "ACCESS_DENIED":
       return "No tienes permiso para esta acción.";
     case "UNAUTHENTICATED":

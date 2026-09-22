@@ -24,6 +24,7 @@ import {
   processAdminKnowledgeDocument,
   reactivateAdminKnowledgeDocument,
   replaceAdminKnowledgeDocumentContent,
+  searchAdminKnowledge,
   searchAdminProducts,
   updateAdminCategory,
   updateAdminOrderStatus,
@@ -35,11 +36,16 @@ import {
   type ListAdminOrdersQuery,
   type ListAdminProductsQuery,
   type ReplaceAdminKnowledgeDocumentContentRequest,
+  type SearchAdminKnowledgeQuery,
   type UpdateAdminCategoryRequest,
   type UpdateAdminOrderStatusRequest,
   type UpdateAdminProductRequest,
 } from "@/features/admin/api";
-import { isAdminRole, shouldSearchAdminProducts } from "@/features/admin/presentation";
+import {
+  isAdminRole,
+  shouldSearchAdminKnowledge,
+  shouldSearchAdminProducts,
+} from "@/features/admin/presentation";
 import { useSession } from "@/shared/session/session-provider";
 
 const keys = adminKeys();
@@ -369,6 +375,22 @@ export function useAdminPaymentQuery(paymentId: string) {
     queryKey: keys.payment(paymentId),
     queryFn: () => getAdminPayment(paymentId),
     enabled: isAdminRole(session?.role) && paymentId.length > 0,
+  });
+}
+
+export function useAdminKnowledgeSearchQuery(query: SearchAdminKnowledgeQuery) {
+  const { session } = useSession();
+  const searchText = query.query.trim();
+  const searching = shouldSearchAdminKnowledge(searchText);
+
+  return useQuery({
+    queryKey: keys.knowledgeSearch(searchText, query.limit),
+    queryFn: () =>
+      searchAdminKnowledge({
+        query: searchText,
+        limit: query.limit,
+      }),
+    enabled: isAdminRole(session?.role) && searching,
   });
 }
 

@@ -2,18 +2,23 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ADMIN_ORDER_STATUSES } from "@/features/admin/api";
+import {
+  ADMIN_ORDER_STATUSES,
+  type ListAdminOrdersQuery,
+} from "@/features/admin/api";
 import { useAdminOrdersQuery } from "@/features/admin/hooks";
 import {
   adminOrderDetailHref,
+  adminOrdersFilterSelectValue,
   adminOrdersHref,
   adminOrdersListQueryFromSearchParams,
   adminOrdersPageCount,
+  adminOrdersStatusFromSelectValue,
   canGoToNextAdminOrdersPage,
   canGoToPreviousAdminOrdersPage,
   formatAdminInstant,
 } from "@/features/admin/presentation";
-import { orderStatusLabel, type OrderStatus } from "@/features/orders/api";
+import { orderStatusLabel } from "@/features/orders/api";
 import { OrderStatusBadge } from "@/features/orders/components/order-status-badge";
 import { isApiError } from "@/shared/errors/api-problem";
 import { messageForApiProblem } from "@/shared/errors/messages";
@@ -48,7 +53,7 @@ export function AdminOrdersPageContent() {
 
   function replaceFilters(next: {
     page?: number;
-    status?: OrderStatus | "";
+    status?: ListAdminOrdersQuery["status"] | "";
   }) {
     router.replace(
       adminOrdersHref({
@@ -66,8 +71,8 @@ export function AdminOrdersPageContent() {
           Pedidos
         </h1>
         <p className="mt-2 max-w-2xl text-base text-sf-muted">
-          Consulta los pedidos de todos los clientes. El detalle se abre en una
-          pantalla aparte.
+          Consulta los pedidos de todos los clientes. Ventas agrupa Confirmado,
+          En preparación, Listo y Entregado.
         </p>
       </div>
 
@@ -75,15 +80,16 @@ export function AdminOrdersPageContent() {
         <SelectField
           id="admin-order-status"
           label="Estado"
-          value={listQuery.status ?? ""}
+          value={adminOrdersFilterSelectValue(listQuery.status)}
           onChange={(event) =>
             replaceFilters({
               page: 0,
-              status: (event.target.value || "") as OrderStatus | "",
+              status: adminOrdersStatusFromSelectValue(event.target.value),
             })
           }
         >
           <option value="">Todos</option>
+          <option value="sales">Ventas</option>
           {ADMIN_ORDER_STATUSES.map((status) => (
             <option key={status} value={status}>
               {orderStatusLabel(status)}

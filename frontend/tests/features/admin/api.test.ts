@@ -3,6 +3,7 @@ import {
   activateAdminCategory,
   activateAdminProduct,
   adminKeys,
+  ADMIN_SALES_ORDER_STATUSES,
   changeAdminProductPrice,
   createAdminCategory,
   createAdminKnowledgeDocument,
@@ -22,6 +23,7 @@ import {
   processAdminKnowledgeDocument,
   reactivateAdminKnowledgeDocument,
   replaceAdminKnowledgeDocumentContent,
+  searchAdminKnowledge,
   searchAdminProducts,
   updateAdminCategory,
   updateAdminOrderStatus,
@@ -405,6 +407,23 @@ describe("admin orders api", () => {
     );
   });
 
+  it("sends Ventas multi-status as a single comma-separated status param", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ items: [], page: 0, size: 20, totalElements: 0 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listAdminOrders({
+      page: 0,
+      size: 20,
+      status: ADMIN_SALES_ORDER_STATUSES,
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "http://localhost:8080/api/v1/admin/orders?page=0&size=20&status=CONFIRMED%2CPREPARING%2CREADY%2CDELIVERED",
+    );
+  });
+
   it("omits status when listing all admin orders", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(pagedAdminOrders));
     vi.stubGlobal("fetch", fetchMock);
@@ -427,6 +446,22 @@ describe("admin orders api", () => {
       20,
       "all",
     ]);
+    expect(
+      adminKeys().orders({
+        page: 0,
+        size: 20,
+        status: ADMIN_SALES_ORDER_STATUSES,
+      }),
+    ).toEqual(["admin", "orders", "list", 0, 20, "sales"]);
+    expect(
+      adminKeys().orders({ page: 0, size: 20, status: "CONFIRMED" }),
+    ).not.toEqual(
+      adminKeys().orders({
+        page: 0,
+        size: 20,
+        status: ADMIN_SALES_ORDER_STATUSES,
+      }),
+    );
   });
 
   it("propagates RFC7807 errors from GET /admin/orders", async () => {
@@ -914,6 +949,94 @@ describe("admin payment api", () => {
 
     await expect(getAdminPayment(adminPayment.id)).rejects.toMatchObject({
       problem: { status: 404, code: "PAYMENT_NOT_FOUND" },
+    });
+  });
+});
+
+describe("admin knowledge search api", () => {
+  it("searches knowledge with query limit and JWT", async () => {
+    configureSessionPersistence(new MemoryPersistence());
+    setSession({
+      userId: "99999999-9999-9999-9999-999999999999",
+      role: "ADMIN",
+      accessToken: "admin-token",
+      expiresAt: "2099-01-01T00:00:00Z",
+    });
+    const result = {
+      hits: [
+        {
+          documentId: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+          chunkId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          title: "Horarios",
+          source: "manual-interno",
+          chunkText: "Abrimos de 8 a 20.",
+          score: 0.91,
+        },
+      ],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(result));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      searchAdminKnowledge({ query: "horario", limit: 10 }),
+    ).resolves.toEqual(result);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      "http://localhost:8080/api/v1/knowledge/search?query=horario&limit=10",
+    );
+    expect(init.method ?? "GET").toBe("GET");
+    expect(new Headers(init.headers).get("Authorization")).toBe(
+      "Bearer admin-token",
+    );
+  });
+
+  it("maps knowledge search query keys", () => {
+    expect(adminKeys().knowledgeSearch("horario", 10)).toEqual([
+      "admin",
+      "knowledge",
+      "search",
+      "horario",
+      10,
+    ]);
+  });
+
+  it("propagates INVALID_SEARCH_REQUEST and KNOWLEDGE_PROCESSING_FAILED", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            status: 400,
+            code: "INVALID_SEARCH_REQUEST",
+            title: "Bad Request",
+            detail: "limit must be between 1 and 20",
+          },
+          400,
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            status: 409,
+            code: "KNOWLEDGE_PROCESSING_FAILED",
+            title: "Conflict",
+            detail: "failed to search knowledge",
+          },
+          409,
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      searchAdminKnowledge({ query: "x", limit: 99 }),
+    ).rejects.toMatchObject({
+      problem: { status: 400, code: "INVALID_SEARCH_REQUEST" },
+    });
+    await expect(
+      searchAdminKnowledge({ query: "x", limit: 5 }),
+    ).rejects.toMatchObject({
+      problem: { status: 409, code: "KNOWLEDGE_PROCESSING_FAILED" },
     });
   });
 });

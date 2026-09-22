@@ -39,6 +39,14 @@ export const ADMIN_ORDER_STATUSES: readonly OrderStatus[] = [
   "CANCELLED",
 ] as const;
 
+/** Blueprint Ventas filter: excludes PENDING and CANCELLED. */
+export const ADMIN_SALES_ORDER_STATUSES: readonly OrderStatus[] = [
+  "CONFIRMED",
+  "PREPARING",
+  "READY",
+  "DELIVERED",
+] as const;
+
 export const ADMIN_CATALOG_VIEW = "ADMIN";
 
 /** Mirrors CreateCategoryRequest. */
@@ -93,8 +101,49 @@ export type SearchAdminProductsQuery = {
 export type ListAdminOrdersQuery = {
   page: number;
   size: number;
-  status?: OrderStatus;
+  /** One status, or the Ventas multi-status set. */
+  status?: OrderStatus | readonly OrderStatus[];
 };
+
+export function adminOrdersStatusQueryKey(
+  status: ListAdminOrdersQuery["status"],
+): string {
+  if (status == null) {
+    return "all";
+  }
+  if (typeof status === "string") {
+    return status;
+  }
+  return isAdminSalesOrderStatuses(status) ? "sales" : status.join(",");
+}
+
+export function isAdminSalesOrderStatuses(
+  statuses: readonly OrderStatus[],
+): boolean {
+  if (statuses.length !== ADMIN_SALES_ORDER_STATUSES.length) {
+    return false;
+  }
+  const unique = new Set(statuses);
+  if (unique.size !== ADMIN_SALES_ORDER_STATUSES.length) {
+    return false;
+  }
+  return ADMIN_SALES_ORDER_STATUSES.every((status) => unique.has(status));
+}
+
+export function serializeAdminOrdersStatusParam(
+  status: ListAdminOrdersQuery["status"],
+): string | undefined {
+  if (status == null) {
+    return undefined;
+  }
+  if (typeof status === "string") {
+    return status;
+  }
+  if (isAdminSalesOrderStatuses(status)) {
+    return ADMIN_SALES_ORDER_STATUSES.join(",");
+  }
+  return undefined;
+}
 
 export function adminKeys() {
   return {
@@ -115,13 +164,15 @@ export function adminKeys() {
         "list",
         query.page,
         query.size,
-        query.status ?? "all",
+        adminOrdersStatusQueryKey(query.status),
       ] as const,
     order: (orderId: string) => ["admin", "order", orderId] as const,
     knowledgeRoot: () => ["admin", "knowledge"] as const,
     knowledgeDocuments: () => ["admin", "knowledge", "documents"] as const,
     knowledgeDocument: (documentId: string) =>
       ["admin", "knowledge", "document", documentId] as const,
+    knowledgeSearch: (query: string, limit: number) =>
+      ["admin", "knowledge", "search", query, limit] as const,
     paymentsRoot: () => ["admin", "payments"] as const,
     payment: (paymentId: string) => ["admin", "payment", paymentId] as const,
   };
@@ -250,7 +301,7 @@ export async function listAdminOrders(
     `/admin/orders${toQuery({
       page: String(query.page),
       size: String(query.size),
-      status: query.status,
+      status: serializeAdminOrdersStatusParam(query.status),
     })}`,
   );
 }
@@ -419,6 +470,43 @@ export const ADMIN_PAYMENT_STATUSES: readonly PaymentStatus[] = [
 /** GET /api/v1/payments/{paymentId} — ADMIN. */
 export async function getAdminPayment(paymentId: string): Promise<AdminPayment> {
   return request<AdminPayment>(`/payments/${encodeURIComponent(paymentId)}`);
+}
+
+/** Mirrors KnowledgeSearchHitRestResponse. */
+export type KnowledgeSearchHit = {
+  documentId: string;
+  chunkId: string;
+  title: string;
+  source: string;
+  chunkText: string;
+  score: number;
+};
+
+/** Mirrors KnowledgeSearchRestResponse. */
+export type KnowledgeSearchResult = {
+  hits: KnowledgeSearchHit[];
+};
+
+/** Query for GET /api/v1/knowledge/search — limit is required by the controller (1–20). */
+export type SearchAdminKnowledgeQuery = {
+  query: string;
+  limit: number;
+};
+
+export const ADMIN_KNOWLEDGE_SEARCH_MIN_LIMIT = 1;
+export const ADMIN_KNOWLEDGE_SEARCH_MAX_LIMIT = 20;
+export const ADMIN_KNOWLEDGE_SEARCH_DEFAULT_LIMIT = 10;
+
+/** GET /api/v1/knowledge/search — ADMIN. */
+export async function searchAdminKnowledge(
+  query: SearchAdminKnowledgeQuery,
+): Promise<KnowledgeSearchResult> {
+  return request<KnowledgeSearchResult>(
+    `/knowledge/search${toQuery({
+      query: query.query,
+      limit: String(query.limit),
+    })}`,
+  );
 }
 
 export function copMoney(amount: number): Money {

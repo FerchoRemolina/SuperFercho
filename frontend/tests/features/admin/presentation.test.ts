@@ -3,11 +3,14 @@ import {
   adminKnowledgeDocumentHref,
   adminKnowledgeHref,
   adminKnowledgeNewHref,
+  adminKnowledgeSearchQueryFromSearchParams,
   adminOrderDetailErrorKind,
   adminOrderDetailHref,
+  adminOrdersFilterSelectValue,
   adminOrdersHref,
   adminOrdersListQueryFromSearchParams,
   adminOrdersPageCount,
+  adminOrdersStatusFromSelectValue,
   adminOrderStatusAdvanceConfirmation,
   adminOrderStatusAdvanceLabel,
   adminOrderStatusPanelState,
@@ -32,12 +35,18 @@ import {
   knowledgeDocumentReplaceContentWarning,
   listQueryFromSearchParams,
   nextAdminOrderStatus,
+  parseAdminKnowledgeSearchLimit,
   parseAdminOrderStatus,
   parseAdminOrdersPage,
+  parseAdminOrdersStatusFilter,
   paymentStatusTone,
+  shouldSearchAdminKnowledge,
   shouldSearchAdminProducts,
 } from "@/features/admin/presentation";
-import { ADMIN_DOCUMENT_STATUSES } from "@/features/admin/api";
+import {
+  ADMIN_DOCUMENT_STATUSES,
+  ADMIN_SALES_ORDER_STATUSES,
+} from "@/features/admin/api";
 import { ApiError } from "@/shared/errors/api-problem";
 import { formatMoney } from "@/shared/money/money";
 import { messageForApiProblem } from "@/shared/errors/messages";
@@ -118,6 +127,37 @@ describe("admin orders presentation", () => {
     });
   });
 
+  it("parses Ventas multi-status regardless of token order", () => {
+    expect(
+      parseAdminOrdersStatusFilter("CONFIRMED,PREPARING,READY,DELIVERED"),
+    ).toEqual(ADMIN_SALES_ORDER_STATUSES);
+    expect(
+      parseAdminOrdersStatusFilter("DELIVERED,READY,PREPARING,CONFIRMED"),
+    ).toEqual(ADMIN_SALES_ORDER_STATUSES);
+    expect(
+      adminOrdersListQueryFromSearchParams({
+        status: "CONFIRMED,PREPARING,READY,DELIVERED",
+      }),
+    ).toEqual({
+      page: 0,
+      size: 20,
+      status: ADMIN_SALES_ORDER_STATUSES,
+    });
+  });
+
+  it("rejects invalid tokens and non-Ventas multi-status sets", () => {
+    expect(parseAdminOrdersStatusFilter("SOLD")).toBeUndefined();
+    expect(
+      parseAdminOrdersStatusFilter("CONFIRMED,PREPARING,READY,SOLD"),
+    ).toBeUndefined();
+    expect(
+      parseAdminOrdersStatusFilter("CONFIRMED,PREPARING,READY"),
+    ).toBeUndefined();
+    expect(
+      parseAdminOrdersStatusFilter("PENDING,CONFIRMED,PREPARING,READY,DELIVERED"),
+    ).toBeUndefined();
+  });
+
   it("builds orders href with page and status filters", () => {
     expect(adminOrdersHref({})).toBe("/admin/orders");
     expect(adminOrdersHref({ page: 0, status: "" })).toBe("/admin/orders");
@@ -127,6 +167,25 @@ describe("admin orders presentation", () => {
     expect(adminOrdersHref({ page: 0, status: "CANCELLED" })).toBe(
       "/admin/orders?status=CANCELLED",
     );
+    expect(
+      adminOrdersHref({ page: 0, status: ADMIN_SALES_ORDER_STATUSES }),
+    ).toBe(
+      "/admin/orders?status=CONFIRMED%2CPREPARING%2CREADY%2CDELIVERED",
+    );
+  });
+
+  it("maps select values to and from Ventas and single statuses", () => {
+    expect(adminOrdersFilterSelectValue(undefined)).toBe("");
+    expect(adminOrdersFilterSelectValue("CONFIRMED")).toBe("CONFIRMED");
+    expect(adminOrdersFilterSelectValue(ADMIN_SALES_ORDER_STATUSES)).toBe(
+      "sales",
+    );
+    expect(adminOrdersStatusFromSelectValue("")).toBe("");
+    expect(adminOrdersStatusFromSelectValue("sales")).toEqual(
+      ADMIN_SALES_ORDER_STATUSES,
+    );
+    expect(adminOrdersStatusFromSelectValue("READY")).toBe("READY");
+    expect(adminOrdersStatusFromSelectValue("SOLD")).toBe("");
   });
 
   it("computes pagination bounds from totalElements", () => {
@@ -331,6 +390,16 @@ describe("admin knowledge presentation", () => {
 
   it("builds knowledge list create and detail hrefs", () => {
     expect(adminKnowledgeHref()).toBe("/admin/knowledge");
+    expect(adminKnowledgeHref({ query: "  " })).toBe("/admin/knowledge");
+    expect(adminKnowledgeHref({ query: "horario" })).toBe(
+      "/admin/knowledge?query=horario",
+    );
+    expect(adminKnowledgeHref({ query: "horario", limit: 5 })).toBe(
+      "/admin/knowledge?query=horario&limit=5",
+    );
+    expect(adminKnowledgeHref({ query: "horario", limit: 10 })).toBe(
+      "/admin/knowledge?query=horario",
+    );
     expect(adminKnowledgeNewHref()).toBe("/admin/knowledge/new");
     expect(
       adminKnowledgeDocumentHref("dddddddd-dddd-dddd-dddd-dddddddddddd"),
@@ -338,6 +407,23 @@ describe("admin knowledge presentation", () => {
     expect(adminKnowledgeDocumentHref("id with spaces")).toBe(
       "/admin/knowledge/id%20with%20spaces",
     );
+  });
+
+  it("parses knowledge search query and limit", () => {
+    expect(shouldSearchAdminKnowledge("")).toBe(false);
+    expect(shouldSearchAdminKnowledge("  ")).toBe(false);
+    expect(shouldSearchAdminKnowledge("horario")).toBe(true);
+    expect(parseAdminKnowledgeSearchLimit(null)).toBe(10);
+    expect(parseAdminKnowledgeSearchLimit("0")).toBe(10);
+    expect(parseAdminKnowledgeSearchLimit("21")).toBe(10);
+    expect(parseAdminKnowledgeSearchLimit("abc")).toBe(10);
+    expect(parseAdminKnowledgeSearchLimit("7")).toBe(7);
+    expect(
+      adminKnowledgeSearchQueryFromSearchParams({
+        query: "  horario  ",
+        limit: "5",
+      }),
+    ).toEqual({ query: "horario", limit: 5 });
   });
 
   it("maps document status tones for badges", () => {

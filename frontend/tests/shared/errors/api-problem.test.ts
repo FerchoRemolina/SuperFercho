@@ -170,6 +170,15 @@ describe("messageForApiProblem", () => {
         detail: "document processing failed",
       }),
     ).toBe("No se pudo procesar el documento. Inténtalo de nuevo.");
+    expect(
+      messageForApiProblem({
+        status: 400,
+        code: "INVALID_SEARCH_REQUEST",
+        detail: "limit must be between 1 and 20",
+      }),
+    ).toBe(
+      "La búsqueda no es válida. Revisa el límite (1 a 20) e inténtalo de nuevo.",
+    );
   });
 
   it("uses a generic internal message for 500 without leaking a stack", () => {

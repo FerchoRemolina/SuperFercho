@@ -5,9 +5,15 @@ import type {
 } from "@/features/admin/api";
 import {
   ADMIN_DOCUMENT_STATUSES,
+  ADMIN_KNOWLEDGE_SEARCH_DEFAULT_LIMIT,
+  ADMIN_KNOWLEDGE_SEARCH_MAX_LIMIT,
+  ADMIN_KNOWLEDGE_SEARCH_MIN_LIMIT,
   ADMIN_ORDER_STATUSES,
   ADMIN_ORDERS_DEFAULT_PAGE,
   ADMIN_ORDERS_DEFAULT_SIZE,
+  ADMIN_SALES_ORDER_STATUSES,
+  isAdminSalesOrderStatuses,
+  serializeAdminOrdersStatusParam,
 } from "@/features/admin/api";
 import type { CategoryStatus, ProductStatus } from "@/features/catalog/api";
 import {
@@ -90,6 +96,50 @@ export function parseAdminOrderStatus(
     : undefined;
 }
 
+/**
+ * Parses `status` from the admin orders URL.
+ * - empty → no filter
+ * - one known OrderStatus → that status
+ * - exactly the Ventas set (any token order) → ADMIN_SALES_ORDER_STATUSES
+ * - invalid tokens or other multi-sets → undefined (rejected)
+ */
+export function parseAdminOrdersStatusFilter(
+  value: string | null | undefined,
+): ListAdminOrdersQuery["status"] {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const parts = trimmed
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+
+  if (parts.length === 0) {
+    return undefined;
+  }
+
+  const statuses: OrderStatus[] = [];
+  for (const part of parts) {
+    const status = parseAdminOrderStatus(part);
+    if (!status) {
+      return undefined;
+    }
+    statuses.push(status);
+  }
+
+  if (statuses.length === 1) {
+    return statuses[0];
+  }
+
+  if (isAdminSalesOrderStatuses(statuses)) {
+    return ADMIN_SALES_ORDER_STATUSES;
+  }
+
+  return undefined;
+}
+
 export function parseAdminOrdersPage(value: string | null | undefined): number {
   if (value == null || value.trim() === "") {
     return ADMIN_ORDERS_DEFAULT_PAGE;
@@ -108,21 +158,51 @@ export function adminOrdersListQueryFromSearchParams(params: {
   return {
     page: parseAdminOrdersPage(params.page),
     size: ADMIN_ORDERS_DEFAULT_SIZE,
-    status: parseAdminOrderStatus(params.status),
+    status: parseAdminOrdersStatusFilter(params.status),
   };
+}
+
+export type AdminOrdersFilterSelectValue = OrderStatus | "" | "sales";
+
+export function adminOrdersFilterSelectValue(
+  status: ListAdminOrdersQuery["status"],
+): AdminOrdersFilterSelectValue {
+  if (status == null) {
+    return "";
+  }
+  if (typeof status === "string") {
+    return status;
+  }
+  return isAdminSalesOrderStatuses(status) ? "sales" : "";
+}
+
+export function adminOrdersStatusFromSelectValue(
+  value: string,
+): ListAdminOrdersQuery["status"] | "" {
+  if (value === "" || value == null) {
+    return "";
+  }
+  if (value === "sales") {
+    return ADMIN_SALES_ORDER_STATUSES;
+  }
+  return parseAdminOrderStatus(value) ?? "";
 }
 
 export function adminOrdersHref(query: {
   page?: number;
-  status?: OrderStatus | "";
+  status?: ListAdminOrdersQuery["status"] | "";
 }): string {
   const search = new URLSearchParams();
   const page = query.page ?? ADMIN_ORDERS_DEFAULT_PAGE;
   if (page > ADMIN_ORDERS_DEFAULT_PAGE) {
     search.set("page", String(page));
   }
-  if (query.status && parseAdminOrderStatus(query.status)) {
-    search.set("status", query.status);
+  const statusParam =
+    query.status === "" || query.status == null
+      ? undefined
+      : serializeAdminOrdersStatusParam(query.status);
+  if (statusParam) {
+    search.set("status", statusParam);
   }
   const encoded = search.toString();
   return encoded ? `/admin/orders?${encoded}` : "/admin/orders";
@@ -318,8 +398,60 @@ export function knowledgeDocumentReplaceContentWarning(): string {
   return "Al reemplazar el contenido, el documento volverá a Recibido, se eliminarán sus fragmentos e índices, y deberás procesarlo de nuevo.";
 }
 
-export function adminKnowledgeHref(): string {
-  return "/admin/knowledge";
+export function adminKnowledgeHref(args?: {
+  query?: string;
+  limit?: number;
+}): string {
+  const search = new URLSearchParams();
+  const query = args?.query?.trim() ?? "";
+  if (shouldSearchAdminKnowledge(query)) {
+    search.set("query", query);
+    const limit = parseAdminKnowledgeSearchLimit(
+      args?.limit !== undefined ? String(args.limit) : null,
+    );
+    if (limit !== ADMIN_KNOWLEDGE_SEARCH_DEFAULT_LIMIT) {
+      search.set("limit", String(limit));
+    }
+  }
+  const encoded = search.toString();
+  return encoded ? `/admin/knowledge?${encoded}` : "/admin/knowledge";
+}
+
+export function shouldSearchAdminKnowledge(query: string): boolean {
+  return query.trim().length > 0;
+}
+
+export function parseAdminKnowledgeSearchLimit(
+  value: string | null | undefined,
+): number {
+  if (value == null || value.trim() === "") {
+    return ADMIN_KNOWLEDGE_SEARCH_DEFAULT_LIMIT;
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (
+    !Number.isFinite(parsed) ||
+    parsed < ADMIN_KNOWLEDGE_SEARCH_MIN_LIMIT ||
+    parsed > ADMIN_KNOWLEDGE_SEARCH_MAX_LIMIT
+  ) {
+    return ADMIN_KNOWLEDGE_SEARCH_DEFAULT_LIMIT;
+  }
+  return parsed;
+}
+
+export function adminKnowledgeSearchQueryFromSearchParams(params: {
+  query?: string | null;
+  limit?: string | null;
+}): { query: string; limit: number } {
+  return {
+    query: params.query?.trim() ?? "",
+    limit: parseAdminKnowledgeSearchLimit(params.limit),
+  };
+}
+
+export function formatKnowledgeSearchScore(score: number): string {
+  return new Intl.NumberFormat("es-CO", {
+    maximumFractionDigits: 4,
+  }).format(score);
 }
 
 export function adminKnowledgeNewHref(): string {
