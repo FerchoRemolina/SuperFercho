@@ -114,6 +114,16 @@ describe("admin knowledge payloads", () => {
     });
   });
 
+  it("allows submit when title source and content are present", () => {
+    expect(
+      validateAdminKnowledgeDocument({
+        title: "Horarios",
+        source: "manual-interno",
+        content: "Abrimos de 8 a 20.",
+      }),
+    ).toEqual({});
+  });
+
   it("rejects blank replace content and maps valid content", () => {
     expect(
       validateAdminKnowledgeDocumentContent(
