@@ -106,6 +106,15 @@ export function SiteHeader() {
               {isCustomer ? (
                 <>
                   <Link
+                    href="/assistant"
+                    className={buttonClassName("ghost")}
+                    aria-current={
+                      isActivePath(pathname, "/assistant") ? "page" : undefined
+                    }
+                  >
+                    Fercho
+                  </Link>
+                  <Link
                     href="/lists"
                     className={buttonClassName("ghost")}
                     aria-current={isActivePath(pathname, "/lists") ? "page" : undefined}
@@ -142,6 +151,13 @@ export function SiteHeader() {
                   >
                     {isCustomer ? (
                       <>
+                        <Link
+                          href="/assistant"
+                          role="menuitem"
+                          className="flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-sf-ink hover:bg-sf-bg"
+                        >
+                          Fercho
+                        </Link>
                         <Link
                           href="/lists"
                           role="menuitem"
@@ -259,6 +275,17 @@ export function SiteHeader() {
               ))}
               {isCustomer ? (
                 <>
+                  <Link
+                    href="/assistant"
+                    className={cx(
+                      "flex min-h-12 items-center rounded-lg px-3 text-base font-semibold",
+                      isActivePath(pathname, "/assistant")
+                        ? "bg-sf-bg text-sf-primary"
+                        : "text-sf-ink hover:bg-sf-bg",
+                    )}
+                  >
+                    Fercho
+                  </Link>
                   <Link
                     href="/lists"
                     className={cx(

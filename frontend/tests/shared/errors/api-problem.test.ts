@@ -216,6 +216,57 @@ describe("messageForApiProblem", () => {
     );
   });
 
+  it("uses Spanish messages for Assistant problem codes without leaking English detail", () => {
+    expect(
+      messageForApiProblem({
+        status: 400,
+        code: "INVALID_CHAT_REQUEST",
+        detail: "message cannot be blank",
+      }),
+    ).toBe("El mensaje no es válido. Revisa el texto e inténtalo de nuevo.");
+    expect(
+      messageForApiProblem({
+        status: 400,
+        code: "INVALID_CONFIRMATION",
+        detail: "Invalid confirmation",
+      }),
+    ).toBe(
+      "La confirmación ya no es válida. Vuelve a solicitar la acción con Fercho.",
+    );
+    expect(
+      messageForApiProblem({
+        status: 404,
+        code: "CONVERSATION_NOT_FOUND",
+        detail: "Conversation not found",
+      }),
+    ).toBe("No encontramos esa conversación. Inicia una nueva.");
+    expect(
+      messageForApiProblem({
+        status: 409,
+        code: "LLM_PROVIDER_FAILED",
+        detail: "LLM provider request failed",
+      }),
+    ).toBe(
+      "Fercho no pudo responder ahora. Inténtalo de nuevo en unos momentos.",
+    );
+    expect(
+      messageForApiProblem({
+        status: 400,
+        code: "TOOL_NOT_ALLOWED",
+        detail: "tool is not allowed",
+      }),
+    ).toBe("Fercho no puede realizar esa acción.");
+    expect(
+      messageForApiProblem({
+        status: 400,
+        code: "INVALID_TOOL_ARGUMENTS",
+        detail: "missing required argument",
+      }),
+    ).toBe(
+      "Fercho recibió datos incompletos para esa acción. Inténtalo de nuevo.",
+    );
+  });
+
   it("uses a generic internal message for 500 without leaking a stack", () => {
     expect(
       messageForApiProblem({

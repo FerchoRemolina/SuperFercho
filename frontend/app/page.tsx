@@ -100,10 +100,15 @@ export default function HomePage() {
               Tu asistente en el súper
             </h2>
             <p className="mt-3 max-w-2xl text-base text-sf-muted">
-              Fercho es el asistente inteligente de SuperFercho. El chat aún no
-              está disponible en esta versión: por ahora puedes comprar desde el
-              catálogo, el carrito y tus listas.
+              Fercho te ayuda con productos, carrito, listas y pedidos. Inicia
+              sesión como cliente para chatear con él.
             </p>
+            <Link
+              href="/assistant"
+              className={`${buttonClassName("primary")} mt-6 inline-flex`}
+            >
+              Hablar con Fercho
+            </Link>
           </Card>
         </Container>
       </section>

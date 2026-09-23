@@ -72,6 +72,18 @@ export function messageForApiProblem(problem: ApiProblem): string {
       return "No se pudo procesar el documento. Inténtalo de nuevo.";
     case "INVALID_SEARCH_REQUEST":
       return "La búsqueda no es válida. Revisa el límite (1 a 20) e inténtalo de nuevo.";
+    case "INVALID_CHAT_REQUEST":
+      return "El mensaje no es válido. Revisa el texto e inténtalo de nuevo.";
+    case "INVALID_CONFIRMATION":
+      return "La confirmación ya no es válida. Vuelve a solicitar la acción con Fercho.";
+    case "CONVERSATION_NOT_FOUND":
+      return "No encontramos esa conversación. Inicia una nueva.";
+    case "LLM_PROVIDER_FAILED":
+      return "Fercho no pudo responder ahora. Inténtalo de nuevo en unos momentos.";
+    case "TOOL_NOT_ALLOWED":
+      return "Fercho no puede realizar esa acción.";
+    case "INVALID_TOOL_ARGUMENTS":
+      return "Fercho recibió datos incompletos para esa acción. Inténtalo de nuevo.";
     case "ACCESS_DENIED":
       return "No tienes permiso para esta acción.";
     case "UNAUTHENTICATED":

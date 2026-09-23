@@ -1,10 +1,5 @@
-import { PlaceholderScreen } from "@/shared/ui/placeholder-screen";
+import { AssistantChat } from "@/features/assistant/components/assistant-chat";
 
 export default function AssistantPage() {
-  return (
-    <PlaceholderScreen
-      title="Fercho"
-      description="El chat de Fercho aún no está disponible en esta versión. Puedes seguir comprando desde el catálogo, el carrito y tus listas."
-    />
-  );
+  return <AssistantChat />;
 }
