@@ -1,10 +1,5 @@
-import { PlaceholderScreen } from "@/shared/ui/placeholder-screen";
+import { ListsPageContent } from "@/features/lists/components/lists-page-content";
 
 export default function ListsPage() {
-  return (
-    <PlaceholderScreen
-      title="Listas de compras"
-      description="Las shopping lists usarán /api/v1/shopping-lists. No existe REST para pasar una lista completa al carrito."
-    />
-  );
+  return <ListsPageContent />;
 }

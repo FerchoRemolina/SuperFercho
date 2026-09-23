@@ -4,6 +4,7 @@ import { isProductAvailable, type Product } from "@/features/catalog/api";
 import { ProductImage } from "@/features/catalog/components/product-image";
 import { productStockLabel } from "@/features/catalog/quantity";
 import { FavoriteToggle } from "@/features/favorites/components/favorite-toggle";
+import { AddToListControl } from "@/features/lists/components/add-to-list-control";
 import { Badge } from "@/shared/ui/badge";
 import { formatMoney } from "@/shared/money/money";
 import { cx } from "@/shared/utils/cx";
@@ -57,6 +58,7 @@ export function ProductCard({ product }: { product: Product }) {
         stock={product.stock}
         className="mt-3"
       />
+      <AddToListControl productId={product.id} className="mt-2" />
     </article>
   );
 }

@@ -18,6 +18,12 @@ export function messageForApiProblem(problem: ApiProblem): string {
       return "No encontramos esta categoría.";
     case "CART_NOT_FOUND":
       return "No encontramos tu carrito.";
+    case "SHOPPING_LIST_NOT_FOUND":
+      return "No encontramos esa lista.";
+    case "INVALID_SHOPPING_LIST":
+      return "La lista no es válida. Revisa el nombre e inténtalo de nuevo.";
+    case "INVALID_SHOPPING_LIST_ITEM":
+      return "La cantidad debe ser mayor que cero.";
     case "INVALID_CART":
       return "No se pudo actualizar el carrito.";
     case "INVALID_CART_ITEM":

@@ -1,10 +1,10 @@
-import { PlaceholderScreen } from "@/shared/ui/placeholder-screen";
+import { ListDetailPageContent } from "@/features/lists/components/list-detail-page-content";
 
-export default function ListDetailPage() {
-  return (
-    <PlaceholderScreen
-      title="Lista de compras"
-      description="El detalle de una lista se implementará más adelante."
-    />
-  );
+export default async function ListDetailPage({
+  params,
+}: {
+  params: Promise<{ shoppingListId: string }>;
+}) {
+  const { shoppingListId } = await params;
+  return <ListDetailPageContent shoppingListId={shoppingListId} />;
 }

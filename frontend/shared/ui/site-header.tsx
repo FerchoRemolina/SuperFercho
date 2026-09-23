@@ -106,6 +106,13 @@ export function SiteHeader() {
               {isCustomer ? (
                 <>
                   <Link
+                    href="/lists"
+                    className={buttonClassName("ghost")}
+                    aria-current={isActivePath(pathname, "/lists") ? "page" : undefined}
+                  >
+                    Mis listas
+                  </Link>
+                  <Link
                     href="/favorites"
                     className={buttonClassName("ghost", "gap-2")}
                     aria-current={isActivePath(pathname, "/favorites") ? "page" : undefined}
@@ -135,6 +142,13 @@ export function SiteHeader() {
                   >
                     {isCustomer ? (
                       <>
+                        <Link
+                          href="/lists"
+                          role="menuitem"
+                          className="flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-sf-ink hover:bg-sf-bg"
+                        >
+                          Mis listas
+                        </Link>
                         <Link
                           href="/favorites"
                           role="menuitem"
@@ -245,6 +259,17 @@ export function SiteHeader() {
               ))}
               {isCustomer ? (
                 <>
+                  <Link
+                    href="/lists"
+                    className={cx(
+                      "flex min-h-12 items-center rounded-lg px-3 text-base font-semibold",
+                      isActivePath(pathname, "/lists")
+                        ? "bg-sf-bg text-sf-primary"
+                        : "text-sf-ink hover:bg-sf-bg",
+                    )}
+                  >
+                    Mis listas
+                  </Link>
                   <Link
                     href="/favorites"
                     className={cx(

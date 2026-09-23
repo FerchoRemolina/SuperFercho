@@ -8,6 +8,7 @@ import { CatalogQueryError } from "@/features/catalog/components/catalog-query-e
 import { ProductImage } from "@/features/catalog/components/product-image";
 import { productStockLabel } from "@/features/catalog/quantity";
 import { useCategoryQuery, useProductQuery } from "@/features/catalog/hooks";
+import { AddToListControl } from "@/features/lists/components/add-to-list-control";
 import { isApiError } from "@/shared/errors/api-problem";
 import { formatMoney } from "@/shared/money/money";
 import { Badge } from "@/shared/ui/badge";
@@ -109,6 +110,7 @@ export function ProductDetailContent({ productId }: { productId: string }) {
               available={available}
               stock={product.stock}
             />
+            <AddToListControl productId={product.id} />
             <Link href="/catalog" className={buttonClassName("secondary")}>
               Seguir viendo productos
             </Link>

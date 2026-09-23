@@ -112,6 +112,16 @@ describe("messageForApiProblem", () => {
     ).toBe("No encontramos tu carrito.");
   });
 
+  it("uses a Spanish message for SHOPPING_LIST_NOT_FOUND", () => {
+    expect(
+      messageForApiProblem({
+        status: 404,
+        code: "SHOPPING_LIST_NOT_FOUND",
+        detail: "Shopping list not found: bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      }),
+    ).toBe("No encontramos esa lista.");
+  });
+
   it("uses a Spanish message for INVALID_CART_ITEM instead of the English detail", () => {
     expect(
       messageForApiProblem({
