@@ -222,6 +222,13 @@ Rules:
 - a product that is not sellable is not publicly visible (public GET → 404) and cannot be added to a cart or sold, even if `Product.status` is `ACTIVE`
 - inactive categories cannot be used publicly (`GetCategoryUseCase` / public list)
 - Catalog owns stock
+- Stock lifecycle (Catalog remains owner):
+  - initial stock is set on product creation (`CreateProductUseCase`)
+  - administrative absolute adjustment after create: `AdjustProductStockUseCase` via `POST /api/v1/products/{productId}/stock` (request body `{ "stock": <int >= 0> }` only; domain `Product.changeStock`; persistence compare-and-set using the stock loaded just before the write as `:expectedStock`; not a delta; not a reservation)
+  - checkout decrements via Catalog `InventoryPort.decreaseStockAtomically`
+  - customer cancel restores via Catalog `InventoryPort.restoreStock`
+  - Orders does **not** call the admin stock endpoint and does **not** write Catalog tables directly
+  - there is no stock movement history, mandatory adjustment reason, ledger, lots, or suppliers module
 - historical rows are not physically deleted
 - activation/deactivation are explicit use cases (`Activate*` / `Deactivate*`), not HTTP DELETE
 
@@ -241,13 +248,14 @@ Public catalog reads default to `CatalogView.PUBLIC`. Admin listing uses `view=A
 - one cart per customer (`UNIQUE` on `customer_id`)
 - one product line per product in a cart (domain invariant; Flyway does not declare `UNIQUE (cart_id, product_id)`)
 - quantity > 0
-- stock is not reserved when adding to cart or lists
+- stock is not reserved when adding to cart or lists; shopping-list membership does not decrease inventory
+- stock 0 does not prevent keeping a product on a shopping list (or adding it again if still sellable); cart/checkout remain the purchase validators
 - cart stored price (`price_at_addition`) is informational; Catalog current price is authoritative at checkout
 - adding a product to cart or shopping list, and `AddShoppingListToCart`, require a sellable product via `ProductQueryPort`; missing, `INACTIVE` product, or `INACTIVE` category → not found
-- `AddShoppingListToCart` is an application/tool capability; there is no dedicated REST path
+- `AddShoppingListToCart` is an application/tool capability (Assistant); there is no dedicated REST path such as `POST …/shopping-lists/{id}/cart` and it does not decrement stock by itself
 - `Favorite` is an independent aggregate (`id`, `customerId`, `productId`, `createdAt`); one favorite per customer+product (`UNIQUE (customer_id, product_id)`)
 - adding a favorite requires a sellable product via `ProductQueryPort`; stock 0 does not block; `INACTIVE` product or category cannot be added again
-- listing favorites composes Catalog cards via `ProductCardQueryPort` (batch); missing catalog products remain as favorites with `product = null`; `INACTIVE` products stay listed with `available = false`
+- listing favorites composes Catalog cards via `ProductCardQueryPort` (batch); missing catalog products remain as favorites with `product = null`; cards include `status` and `available` (`sellable`: product and category both `ACTIVE`). `available = false` is not the same as stock 0 and can occur with `status = ACTIVE` when the category is `INACTIVE`
 - Assistant has no favorite tools in this phase
 
 ### 3.4 Orders
@@ -364,11 +372,11 @@ There is no `GetCurrentUser` use case and no public admin-provisioning use case.
 ### Catalog
 
 - `CreateCategoryUseCase`, `UpdateCategoryUseCase`, `ActivateCategoryUseCase`, `DeactivateCategoryUseCase`, `ListCategoriesUseCase`, `GetCategoryUseCase`
-- `CreateProductUseCase`, `UpdateProductUseCase`, `ActivateProductUseCase`, `DeactivateProductUseCase`, `ChangeProductPriceUseCase`
+- `CreateProductUseCase`, `UpdateProductUseCase`, `ActivateProductUseCase`, `DeactivateProductUseCase`, `ChangeProductPriceUseCase`, `AdjustProductStockUseCase`
 - `GetProductUseCase`, `ListProductsUseCase`, `SearchProductsUseCase`
 - `FindProductPriceUseCase` — implements `ProductQueryPort` (sellable: product `ACTIVE` and category `ACTIVE`)
 - `FindProductCardsUseCase` — implements `ProductCardQueryPort` (batch card projection; includes `INACTIVE`; `sellable` follows `CatalogVisibility`)
-- `InventoryPort.decreaseStockAtomically` / `restoreStock`
+- `InventoryPort.decreaseStockAtomically` / `restoreStock` — checkout/cancel only; not used by admin stock adjust
 
 ### Shopping
 
@@ -456,8 +464,10 @@ Not a duplicate of Shopping’s port. Different shape, different consumer. `chec
 - **Owner:** Catalog
 - **Purpose:** Atomic decrement; restore on cancel
 - **Input:** `(productId, quantity)` lines
-- **Implementation:** `InventoryPersistenceAdapter` / native SQL
-- **Consumer:** Orders checkout and cancel
+- **Implementation:** `InventoryPersistenceAdapter` / native SQL (`decrementStockIfAvailable` / `incrementStock`)
+- **Consumer:** Orders checkout and cancel only
+
+Admin absolute stock adjustment does **not** use `InventoryPort`. It uses `AdjustProductStockUseCase` → `ProductRepository.adjustStockIfUnchanged` (CAS). Orders never calls `POST …/stock`.
 
 Shopping does not decrement stock.
 
@@ -606,6 +616,19 @@ Zero rows → insufficient stock. Restore uses `stock = stock + :quantity` witho
 
 The decrement predicate is product `ACTIVE` and sufficient stock, not category status. Checkout rejects a non-sellable product (including an `INACTIVE` category) before this SQL runs.
 
+Admin absolute stock adjust (independent of checkout/cancel SQL; does not reuse or modify the statements above):
+
+```text
+UPDATE catalog.products
+   SET stock = :newStock,
+       updated_at = :updatedAt
+ WHERE id = :id
+   AND stock = :expectedStock
+   AND :newStock >= 0
+```
+
+Zero rows after a successful domain `changeStock` → concurrent conflict (`409 PRODUCT_STOCK_CONFLICT`) if the product still exists, or `404 PRODUCT_NOT_FOUND` if it was removed. `INACTIVE` products may receive an admin adjust. No Flyway migration is required (existing `stock >= 0` CHECK). There is no movement history, ledger, lots, or suppliers surface.
+
 ### 6.4 V4 — Orders
 
 **`orders.orders`**
@@ -659,8 +682,9 @@ There is no `payment_method`, `cancellation_deadline_at`, `placed_at`, `version`
 
 **`shopping.shopping_lists` / `shopping.shopping_list_items`**
 
-- list: `id`, `customer_id` (logical), `name`, timestamps
-- items: FK to list ON DELETE CASCADE, `item_index`, `product_id` (logical), `quantity` > 0
+- list: `id`, `customer_id` (logical), `name`, `created_at`, `updated_at`
+- items: `id`, `shopping_list_id` FK → list ON DELETE CASCADE, `item_index` (persistence ordering; not a REST filter), `product_id` (logical), `quantity` > 0, `created_at`
+- REST item shape exposes `id`, `productId`, `quantity`, `createdAt` (not `item_index`)
 
 ### 6.6 V6 — Payments
 
@@ -841,7 +865,7 @@ Source: `IdentitySecurityConfiguration`.
 |---|---|
 | GET catalog with `view=ADMIN` | `hasRole(ADMIN)` |
 | `POST /api/v1/categories`, `PUT /categories/{id}`, `POST …/activate`, `POST …/deactivate` | ADMIN |
-| `POST /api/v1/products`, `PUT /products/{id}`, `POST …/activate`, `POST …/deactivate`, `POST …/price` | ADMIN |
+| `POST /api/v1/products`, `PUT /products/{id}`, `POST …/activate`, `POST …/deactivate`, `POST …/price`, `POST …/stock` | ADMIN |
 | `POST /api/v1/orders/{orderId}/status` | ADMIN |
 | `GET /api/v1/admin/orders`, `GET /api/v1/admin/orders/**` | ADMIN |
 | `GET /api/v1/payments/{paymentId}` | ADMIN |
@@ -919,6 +943,11 @@ GET defaults to public view. `view=ADMIN` requires `ADMIN`.
 | POST | `/api/v1/products/{productId}/activate` | ADMIN | Activate |
 | POST | `/api/v1/products/{productId}/deactivate` | ADMIN | Deactivate |
 | POST | `/api/v1/products/{productId}/price` | ADMIN | Change price |
+| POST | `/api/v1/products/{productId}/stock` | ADMIN | Absolute stock adjust (`AdjustProductStockRequest`: `{ "stock": <int >= 0> }` — new absolute value only; the client does not send `expectedStock`). Domain `Product.changeStock`. Persistence CAS (`SET stock = :newStock WHERE id = :id AND stock = :expectedStock`) where `:expectedStock` is the value loaded in the use case. Response `ProductRestResponse`. Concurrent conflict → `409 PRODUCT_STOCK_CONFLICT`. Missing product → `404 PRODUCT_NOT_FOUND`. Allowed on `INACTIVE`. Does not use `InventoryPort`, does not reserve stock, and does not require a new Flyway migration. Path remains under `/api/v1/products/…` (not `/admin/products` or `/admin/stock`). |
+
+Auth for product mutations (including `…/stock`): `ADMIN` → allowed; `CUSTOMER` → 403; unauthenticated → 401; unmatched routes → `anyRequest().denyAll()`.
+
+`PUT /products/{productId}` does not change price or stock. Initial stock is set only on `POST /products`. Price and stock after create use the dedicated `…/price` and `…/stock` endpoints.
 
 ### 10.4 Shopping (`CUSTOMER`)
 
@@ -937,11 +966,11 @@ GET defaults to public view. `view=ADMIN` requires `ADMIN`.
 | PATCH | `/api/v1/shopping-lists/{id}/items/{productId}` | Change item quantity |
 | DELETE | `/api/v1/shopping-lists/{id}/items/{productId}` | Remove item |
 | DELETE | `/api/v1/shopping-lists/{id}/items` | Clear items |
-| GET | `/api/v1/favorites` | List current user’s favorites (`items[]` of `productId`, `createdAt`, `product`). `product` may be `null` if Catalog no longer has the id. `INACTIVE` products stay listed with `available: false` |
+| GET | `/api/v1/favorites` | List current user’s favorites (`items[]` of `productId`, `createdAt`, `product`). `product` may be `null` if Catalog no longer has the id. Present cards expose `status` and `available` (sellability). `available: false` can appear for an `INACTIVE` product or an `ACTIVE` product whose category is `INACTIVE`; stock is not part of this payload |
 | POST | `/api/v1/favorites/{productId}` | Idempotent add. **201** if created, **200** if already present. Missing/unsellable product → **404** `PRODUCT_NOT_FOUND`. Stock 0 does not block |
 | DELETE | `/api/v1/favorites/{productId}` | Idempotent remove. Always **204** |
 
-There is no HTTP delete of a shopping list. Favorites are identified by `productId`, not by favorite id. Identity comes from the JWT. ADMIN cannot use these routes.
+There is no HTTP delete of a shopping list. There is no REST endpoint to move an entire list into the cart; clients that need that behaviour use item-by-item `POST /api/v1/cart/items` or the Assistant/application `AddShoppingListToCart` capability. Favorites are identified by `productId`, not by favorite id. Identity comes from the JWT. ADMIN cannot use these routes.
 
 ### 10.5 Orders
 
@@ -1141,10 +1170,10 @@ JDK `HttpClient` is used for OpenAI chat and embeddings (no extra HTTP client de
 
 - Modular monolith with hexagonal modules listed in §0
 - Identity register/login/JWT/addresses
-- Catalog, stock ownership, public vs ADMIN view
-- Shopping cart and lists
-- Simulated payments (`SIMULATED_CARD`, `CASH_ON_DELIVERY`)
-- Checkout in one local TX, cancel + stock restore (only after a successful `PENDING` persist), auto-confirm via `saveIfPending`
+- Catalog, stock ownership, public vs ADMIN view, admin absolute stock adjust (`POST …/stock` + CAS on loaded stock; separate from `InventoryPort`; no reservation/ledger)
+- Shopping cart, shopping lists (no list DELETE; no REST list→cart), and favorites (REST + ownership + Catalog card composition)
+- Simulated payments (`SIMULATED_CARD`, `CASH_ON_DELIVERY`; statuses `PENDING` / `APPROVED` / `DECLINED`; refund via `refundedAt`, no `REFUNDED` status)
+- Checkout via `POST /api/v1/orders` + `Idempotency-Key` in one local TX; customer cancel within 15 minutes of `createdAt`; stock restore only after a successful `PENDING` persist; auto-confirm via `saveIfPending`
 - Knowledge documents, chunking, embeddings, pgvector, ADMIN REST
 - Assistant chat, `LLMPort`, allowlisted tools, confirmation for checkout and cancel
 - Security `denyAll` default

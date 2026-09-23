@@ -1,47 +1,45 @@
 # SuperFercho Frontend Technical Architecture Blueprint
 
-**Estado:** Arquitectura objetivo (no implementada)
+**Estado:** Arquitectura de referencia del frontend MVP implementado en `frontend/`
 
-**Tipo:** Diseño técnico aprobable
+**Tipo:** Documentación técnica (alineada al código y al backend blueprint)
 
 **Fuente de verdad del backend:** código REST, seguridad y `docs/architecture/backend-technical-blueprint.md`
 
-**Inspección del repositorio:** 2026-09-19
+**Fuente de verdad del frontend:** código bajo `frontend/` (App Router, features, shared)
 
-**Cierre de decisiones técnicas:** 2026-09-19 (sin implementación)
+**Inspección / alineación documental:** 2026-09-22
 
 Leyenda de decisiones:
 
 | Etiqueta | Significado |
 |---|---|
-| **DECIDIDO** | Encaja con el backend actual y se recomienda como base de implementación |
+| **DECIDIDO** | Encaja con el backend actual y está implementado (o sigue siendo la base vigente) |
 | **PROPUESTO** | Recomendación técnica; se puede sustituir sin cambiar contratos REST |
-| **PENDIENTE** | No se puede cerrar con la información o capacidades actuales del backend |
+| **PENDIENTE** | Depende de infraestructura externa o de un cambio de backend aún no existente |
+| **FUTURO / fuera del MVP** | Decidido no implementar en el MVP REST o UI actuales |
 
-Este documento no describe un frontend existente. No se deben inventar endpoints, DTOs ni reglas de negocio.
+Este documento describe el frontend existente y los contratos REST reales. No inventa endpoints, DTOs ni reglas de negocio.
 
 ---
 
 ## 0. Hallazgo de inspección
 
-**DECIDIDO (hecho observado):** no existe frontend en el repositorio.
+**DECIDIDO (hecho observado):** existe `frontend/` como aplicación Next.js (App Router) en el mismo repositorio, junto a `backend/` y `docs/`.
 
-No hay `package.json`, no hay `src/` de UI, no hay archivos `.tsx` / `.jsx` / `.vue`, no hay carpeta `frontend/` ni `web/`. El artefacto Maven (`com.superfercho:superfercho`) vive en `backend/`, con REST en `/api/v1`.
-
-**DECIDIDO (ubicación objetivo al inicializar):** el frontend vivirá en `frontend/` como aplicación independiente en el mismo repositorio. No monorepo (sin Turborepo, Nx ni workspaces npm). Layout objetivo:
+Layout vigente:
 
 ```text
 SuperFercho/
-├── backend/      # módulo Maven actual; el traslado es mecánico al inicializar
-├── frontend/     # Next.js (aún no creado)
+├── backend/      # módulo Maven
+├── frontend/     # Next.js App Router + features + shared
 ├── docs/
 └── README.md
 ```
 
-El módulo Maven vive en `backend/`. Ese traslado no cambia contratos REST.
+No monorepo tooling (sin Turborepo, Nx ni workspaces npm). Alias `@/*` → `frontend/*`.
 
-El frontend, cuando se implemente, será un cliente nuevo que consume ese API. No duplica Domain, no habla con PostgreSQL y no reimplementa vendibilidad, stock, checkout ni Assistant.
-
+El frontend es un cliente HTTP del API `/api/v1`. No duplica Domain, no habla con PostgreSQL y no reimplementa vendibilidad, stock atómico de checkout ni Assistant.
 ---
 
 ## 1. Stack
@@ -67,24 +65,20 @@ Por qué Next.js:
 - TypeScript modela los records REST reales (`Money`, enums Jackson `STRING`).
 - Un rewrite de Next.js evita CORS en desarrollo (el backend **no** configura CORS hoy).
 
-### 1.1 Versiones recomendadas (inspección 2026-09-19)
-
-Fuentes: npm `latest` estable, docs de Next.js 16, Tailwind v4, Node.js Release, pnpm. **No se instala nada en esta tarea.** Los parches exactos se pinnean en `frontend/package.json` al crear el proyecto.
+### 1.1 Versiones (alineadas a `frontend/package.json`)
 
 | Paquete | Versión | Motivo |
 |---|---|---|
-| Next.js | **16.3.5** | `latest` estable. No 16.4 canary. App Router, `engines.node >= 20.9.0`, peer `react@^19` |
-| React | **19.3.0** | `latest` estable, peer de Next 16 |
+| Next.js | **16.3.5** | App Router, `engines.node >= 20.9.0`, peer `react@^19` |
+| React | **19.3.0** | peer de Next 16 |
 | React DOM | **19.3.0** | misma línea que React |
-| TypeScript | **5.9.3** | Último 5.9.x confirmado. Next 16 exige ≥ 5.1.0. `typescript@7` es `latest` en npm; el MVP no lo persigue |
-| Tailwind CSS | **4.3.3** | `latest` de la línea 4 aprobada |
-| `@tailwindcss/postcss` | **4.3.3** | plugin oficial v4, misma versión que `tailwindcss` |
-| `@tanstack/react-query` | **5.103.1** | `latest` de la línea 5; peer React 18 o 19 |
+| TypeScript | **5.9.3** | Next 16 exige ≥ 5.1.0 |
+| Tailwind CSS | **4.3.3** | línea 4 aprobada |
+| `@tailwindcss/postcss` | **4.3.3** | plugin oficial v4 |
+| `@tanstack/react-query` | **5.103.1** | línea 5 |
 | `@types/react` / `@types/react-dom` | **19.3.x** | alineados a React 19.3 |
-| Node.js | **24.21.0** (Active LTS «Krypton») | LTS, no Current 26. Mínimo Next: 20.9 |
-| pnpm | **12.4.2** | `latest` de la línea 12 |
-
-Al inicializar: `packageManager: "pnpm@12.4.2"` y `engines.node: ">=20.9.0"`. Si `create-next-app` fija un parche 16.3.x / 19.3.x distinto el mismo día, se acepta ese parche dentro de la misma minor.
+| Node.js | **>= 20.9.0** (LTS en desarrollo) | mínimo Next |
+| pnpm | **12.4.2** | `packageManager` del proyecto |
 
 **DECIDIDO (gestor):** pnpm. Sin npm/yarn/bun como herramienta principal.
 
@@ -131,7 +125,7 @@ Reglas:
 
 ## 3. Estructura de carpetas
 
-No crear todavía. **DECIDIDO:** raíz de la app Next.js = `frontend/` (sin `src/`, para que `app/`, `features/` y `shared/` queden al mismo nivel). Alias `@/*` → `frontend/*`.
+**DECIDIDO:** raíz de la app Next.js = `frontend/` (sin `src/`), con `app/`, `features/` y `shared/` al mismo nivel. Alias `@/*` → `frontend/*`.
 
 ```text
 frontend/
@@ -230,20 +224,19 @@ Sin `tailwind.config.js`: Tailwind 4 es CSS-first.
 | `/orders` | `GET /api/v1/orders?page&size` |
 | `/orders/[orderId]` | `GET /api/v1/orders/{id}` (incluye `payment` para comprobante de UI), `POST .../cancel` |
 | `/lists` | `GET/POST /api/v1/shopping-lists` |
-| `/lists/[shoppingListId]` | GET/PATCH/items |
+| `/lists/[shoppingListId]` | `GET/PATCH /api/v1/shopping-lists/{id}`; `POST/PATCH/DELETE …/items`; `DELETE …/items` (clear) |
 | `/addresses` | `/api/v1/addresses` |
 | `/assistant` | `POST /api/v1/assistant/chat` |
 
-No hay REST para “añadir lista completa al carrito”. Esa capacidad existe como use case/tool del Assistant, no como endpoint. La UI de listas no debe inventar `POST /cart/from-list`.
-
+No hay REST para “añadir lista completa al carrito” (no existe `POST /api/v1/shopping-lists/{id}/cart` ni `POST /cart/from-list`). Esa capacidad existe como use case/tool del Assistant (`AddShoppingListToCart`). La UI de listas añade ítems al carrito **uno a uno** con `POST /api/v1/cart/items`.
 ### 4.3 ADMIN
 
 | Ruta UI | API |
 |---|---|
 | `/admin` | Hub de navegación. **No hay** endpoint de métricas. |
 | `/admin/categories` | GET `view=ADMIN` + POST/PUT/activate/deactivate |
-| `/admin/products` | GET `view=ADMIN` + mutaciones + `POST .../price` |
-| `/admin/products/[productId]` | GET `view=ADMIN` + update |
+| `/admin/products` | GET `view=ADMIN` + create/update + activate/deactivate + `POST .../price` (ajuste de stock en el detalle) |
+| `/admin/products/[productId]` | GET `view=ADMIN` + update de ficha; operaciones independientes: `ProductPricePanel` (`POST .../price`), `ProductStatusActions` (activate/deactivate), `ProductStockPanel` (`POST .../stock`) |
 | `/admin/orders` | `GET /api/v1/admin/orders?page&size` (todos los estados). Ventas: mismos query params + `status=CONFIRMED,PREPARING,READY,DELIVERED` (también vale `status` repetido). |
 | `/admin/orders/[orderId]` | `GET /api/v1/admin/orders/{orderId}` (incluye `payment` anidado); `POST /api/v1/orders/{orderId}/status` |
 | `/admin/payments/[paymentId]` | `GET /api/v1/payments/{paymentId}` |
@@ -482,6 +475,23 @@ GET sin `view` o `view=PUBLIC`: permitAll. `view=ADMIN`: JWT ADMIN. El storefron
 | PUT | `/api/v1/products/{productId}` | ADMIN | `UpdateProductRequest`: `categoryId`, `barcode`, `name`, `brand`, `description`, `imageUrl` (no precio ni stock aquí) | |
 | POST | `.../activate` `.../deactivate` | ADMIN | — | |
 | POST | `.../price` | ADMIN | `ChangeProductPriceRequest`: `price` | |
+| POST | `.../stock` | ADMIN | `AdjustProductStockRequest`: `{ "stock": <int >= 0> }` (valor absoluto; el cliente **no** envía `expectedStock`; el CAS lo hace el backend). Respuesta `ProductRestResponse`. Path bajo `/api/v1/products/…` (no `/admin/products` ni `/admin/stock`). | |
+
+Stock Admin (contrato real + UI):
+
+- stock inicial en `POST /products`;
+- ajuste administrativo posterior con `POST /products/{productId}/stock` (absoluto, no delta; no reserva de checkout);
+- el formulario de edición de ficha (`PUT`) no modifica stock ni precio;
+- `ProductStockPanel` en `/admin/products/[productId]` es la UI de ese endpoint (panel separado del form de ficha, de `ProductPricePanel` y de `ProductStatusActions`);
+- validación de cliente: entero `>= 0`; éxito → mensaje local + invalidación de producto admin; error → Problem Details (`404 PRODUCT_NOT_FOUND`, `409 PRODUCT_STOCK_CONFLICT`, `400 INVALID_PRODUCT`);
+- checkout descuenta y cancelación restaura vía `InventoryPort` en el backend; el frontend Admin no llama esos flujos;
+- Orders no usa el endpoint administrativo de stock;
+- no hay historial de movimientos, razón obligatoria, ledger, lotes, proveedores ni grilla de inventario;
+- no es inventario avanzado.
+
+Errores: 400 `INVALID_CATEGORY` / `INVALID_PRODUCT` / `INVALID_CATEGORY_REFERENCE`, 404 `CATEGORY_NOT_FOUND` / `PRODUCT_NOT_FOUND`, 409 `DUPLICATE_BARCODE` / `PRODUCT_STOCK_CONFLICT` (ajuste concurrente de stock).
+
+Auth de mutaciones Admin de producto (incluye `…/stock`): `ADMIN` permitido; `CUSTOMER` → 403; no autenticado → 401; resto → `denyAll` del backend.
 
 Contrato del **storefront** (descubierto en la implementación; no inventar lo que no está en el controller):
 
@@ -490,8 +500,6 @@ Contrato del **storefront** (descubierto en la implementación; no inventar lo q
 - `brand` no se filtra aparte: participa en la búsqueda textual `GET /products/search?text=`.
 - El parámetro de búsqueda es `text`, no `q`. La ruta UI es `/search?text=`.
 - Vista pública por defecto: el storefront no envía `view`. El backend excluye productos y categorías INACTIVE de esa vista; el frontend no vuelve a filtrarlos.
-
-Errores: 400 `INVALID_CATEGORY` / `INVALID_PRODUCT` / `INVALID_CATEGORY_REFERENCE`, 404 `CATEGORY_NOT_FOUND` / `PRODUCT_NOT_FOUND`, 409 `DUPLICATE_BARCODE`.
 
 Vendibilidad (backend): `Product.status == ACTIVE` **y** `Category.status == ACTIVE`. El público no lista ni vende el resto. El frontend no reimplementa la regla: un 404 público es “no disponible”.
 
@@ -523,12 +531,13 @@ Producto inexistente o no vendible → 404 `PRODUCT_NOT_FOUND`. Cantidad ≤ 0 e
 
 Favoritos es del CUSTOMER autenticado. El cliente **no envía** `customerId` ni `userId`: el backend toma la identidad del JWT. Query key única: `['favorites']`. La membresía de un producto se deriva de `favorite.productId === product.id` sobre esa query; no hay store paralelo, `localStorage` ni pending-intent.
 
-`GET /api/v1/favorites` → `{ items: [{ productId, createdAt, product }] }`. El backend ya compone `product`; el frontend **no** hace N+1 contra `/products/{id}`.
+`GET /api/v1/favorites` → `{ items: [{ productId, createdAt, product }] }`. El backend ya compone `product`; el frontend **no** hace N+1 obligatorio contra `/products/{id}` para pintar la ficha de favorito.
 
-`product` puede ser `null` (el id ya no existe en Catalog). Si el producto existe pero no es vendible: `status = INACTIVE` y `available = false`. El frontend **no** elimina automáticamente esos favoritos.
+`product` puede ser `null` (el id ya no existe en Catalog). Si el producto existe pero no es vendible, el card trae `available = false`. Eso **no** implica necesariamente `status = INACTIVE`: un producto `ACTIVE` con categoría `INACTIVE` también es `available = false`. El frontend **no** elimina automáticamente esos favoritos.
 
-`FavoriteProduct.available` es vendibilidad de catálogo (producto y categoría ACTIVE). **No** es stock. `isProductAvailable(product)` del catálogo sigue significando `stock > 0` para compra. Un producto ACTIVE con stock 0 puede ser favorito. En `/favorites`, la acción de carrito usa `product && available && status !== INACTIVE`; no se interpreta `available` con `isProductAvailable()`.
+`FavoriteProduct.available` es vendibilidad de catálogo (producto y categoría ACTIVE). **No** es stock. `isProductAvailable(product)` del catálogo sigue significando `stock > 0` para compra. Un producto ACTIVE con stock 0 puede ser favorito.
 
+Stock en la UI de `/favorites`: el payload de favoritos **no** incluye `stock`. La página hidrata stock mediante el catálogo público (`useProductsQuery` / `GET /products`), el mismo patrón que listas. Sellability (`available`) y stock se muestran por separado. El CTA “Agregar al carrito” usa `canOfferAddToCart(sellable, stock)`: se oculta cuando el stock conocido es `<= 0`; no se reinterpreta `available=false` como agotado. Si el stock aún no está en el listado público, el CTA sigue la sellability sin inventar inventario.
 | Método | Path | Comportamiento real |
 |---|---|---|
 | GET | `/api/v1/favorites` | Lista del CUSTOMER autenticado, en el orden del backend. |
@@ -543,9 +552,11 @@ Producto inexistente o no vendible al **añadir** → 404 `PRODUCT_NOT_FOUND`. S
 
 ### 7.6 Shopping lists (`CUSTOMER`)
 
+Rutas UI: `/lists`, `/lists/[shoppingListId]`.
+
 `ShoppingListRestResponse`: `id`, `customerId`, `name`, `items[]`, `createdAt`, `updatedAt`.
 
-`ShoppingListItemRestResponse`: `id`, `productId`, `quantity`, `createdAt`.
+`ShoppingListItemRestResponse`: `id`, `productId`, `quantity`, `createdAt` (el persistente también tiene `item_index`; no es campo de UI).
 
 | Método | Path | Request |
 |---|---|---|
@@ -553,13 +564,20 @@ Producto inexistente o no vendible al **añadir** → 404 `PRODUCT_NOT_FOUND`. S
 | POST | `/api/v1/shopping-lists` | `CreateShoppingListRequest`: `name` (obligatorio, ≤ 255) |
 | GET | `/api/v1/shopping-lists/{id}` | 404 si no es del principal |
 | PATCH | `/api/v1/shopping-lists/{id}` | `RenameShoppingListRequest`: `name` |
-| POST | `.../items` | `AddItemRequest` |
+| POST | `/api/v1/shopping-lists/{id}/items` | `AddItemRequest`: `productId`, `quantity` |
 | PATCH | `.../items/{productId}` | `ChangeItemQuantityRequest` |
 | DELETE | `.../items/{productId}` | |
 | DELETE | `.../items` | vacía ítems |
 
-No hay DELETE de la lista. No hay REST “lista → carrito”.
+No hay DELETE de la lista completa. No hay REST “lista → carrito”.
 
+Comportamiento UI / stock:
+
+- la lista **no reserva** stock; `stock = 0` no impide mantener el producto en la lista;
+- el detalle hidrata productos del catálogo público para nombre, precio y stock;
+- sellability (`status === ACTIVE` en la proyección de catálogo usada) y stock se muestran por separado;
+- “Agregar al carrito” es ítem a ítem (`POST /api/v1/cart/items` con la `quantity` de la línea); se oculta cuando el stock conocido es `<= 0`;
+- el checkout sigue siendo la autoridad final de stock; añadir al carrito desde la lista no decrementa inventario.
 ### 7.7 Orders
 
 Checkout **CUSTOMER autenticado**. El body **no** incluye `customerId` ni `userId`. ADMIN → `403 ACCESS_DENIED`. Sin JWT → `401 UNAUTHENTICATED`.
@@ -733,7 +751,7 @@ Modales, filtros, texto de búsqueda, pasos de checkout, scroll del chat. Local 
 | Lista | `name` | 400 `INVALID_SHOPPING_LIST` |
 | Checkout | dirección, método, ítems del carrito + `expectedUnitPrice` vigente | ver §7.7 |
 | Admin categoría | `name`, `description` | |
-| Admin producto | create vs update vs price (tres requests distintos) | `DUPLICATE_BARCODE`, `INVALID_CATEGORY_REFERENCE` |
+| Admin producto | create vs update vs price vs stock (requests distintos) | `DUPLICATE_BARCODE`, `INVALID_CATEGORY_REFERENCE`, `PRODUCT_STOCK_CONFLICT` |
 | Admin knowledge | `title`, `source`, `content` | |
 
 Presentación: `ApiProblem.code` + `detail` en `shared/errors`, no if/else en cada form.
@@ -761,15 +779,14 @@ Estados de UI:
 | Situación | Cómo se refleja el backend |
 |---|---|
 | Loading / empty / error | query + listas vacías reales (el backend ya entrega la lista completa; no hay paginación de catálogo) |
-| `stock = 0` | producto visible si es vendible; la UI de catálogo puede deshabilitar el CTA. Shopping **no** impide el alta. En checkout: `stock = 0` → `PRODUCT_NOT_AVAILABLE`; `quantity > stock` → `STOCK_UNAVAILABLE`. Un ACTIVE con stock 0 **puede** ser favorito. |
-| No vendible (producto o categoría INACTIVE) | el backend los excluye del listado público; detalle público → 404; el alta al carrito o a favoritos → 404 `PRODUCT_NOT_FOUND`; checkout → `PRODUCT_NOT_AVAILABLE`; el frontend no refiltra. Un favorito ya guardado puede devolver `product: null` o `status=INACTIVE` / `available=false`; no se borra solo. |
-| `FavoriteProduct.available` vs stock | `available` en Favoritos es vendibilidad, no inventario. No usar `isProductAvailable()` (stock del catálogo) para interpretarlo. |
+| `stock = 0` | producto visible si es vendible; la UI de catálogo / favoritos / listas puede ocultar el CTA de carrito. Shopping **no** impide el alta a carrito ni a lista. En checkout: `stock = 0` → `PRODUCT_NOT_AVAILABLE`; `quantity > stock` → `STOCK_UNAVAILABLE`. Un ACTIVE con stock 0 **puede** ser favorito o ítem de lista. |
+| No vendible (producto o categoría INACTIVE) | el backend los excluye del listado público; detalle público → 404; el alta al carrito, lista o favoritos → 404 `PRODUCT_NOT_FOUND`; checkout → `PRODUCT_NOT_AVAILABLE`; el frontend no refiltra. Un favorito ya guardado puede devolver `product: null` o `available=false` (con `status` ACTIVE o INACTIVE según el caso); no se borra solo. |
+| `FavoriteProduct.available` vs stock | `available` en Favoritos es vendibilidad, no inventario. No usar `isProductAvailable()` (stock del catálogo) para interpretarlo. Stock 0 es un estado UI aparte. |
 | Precio en carrito vs catálogo | `priceAtAddition` es informativo (precio al crear la línea). Checkout envía `expectedUnitPrice` = precio **vigente** (`Product.currentPrice()`). No tratar `priceAtAddition` como precio de cobro. |
 | 409 `PRODUCT_PRICE_CHANGED` | recargar producto/carrito; no cobrar el precio viejo |
 | 409 `STOCK_UNAVAILABLE` / `PRODUCT_NOT_AVAILABLE` | códigos de **checkout**, no de Shopping; no reintentar el mismo body a ciegas |
 
-`AddShoppingListToCart` no tiene REST: la UI de listas permite añadir ítem a ítem al carrito (`POST /cart/items`) o usar Assistant. No hay botón que llame un endpoint inexistente.
-
+`AddShoppingListToCart` no tiene REST: **fuera del contrato REST MVP**. La UI de listas añade ítem a ítem al carrito (`POST /api/v1/cart/items`) o el Assistant usa la capacidad Application. No hay botón que llame un endpoint inexistente. Ese flujo no decrementa stock; el checkout sí.
 ---
 
 ## 11. Checkout (flujo visual)
@@ -797,12 +814,14 @@ No hay wizard de tarjeta real (el API no acepta PAN/CVV).
 Hub `/admin` + las pantallas con API real:
 
 - Categorías y productos con `view=ADMIN` (incluye INACTIVE).
-- Precio por `POST .../price`, no por PUT de producto.
+- Stock inicial en create; ajuste administrativo absoluto por `POST /api/v1/products/{productId}/stock` (`ProductStockPanel` en el detalle: validación `>= 0`, éxito/error locales, separado del form de ficha). Sin grilla de inventario, ledger, lotes ni proveedores.
+- Precio por `POST .../price`, no por PUT de producto (`ProductPricePanel` en el detalle).
+- Activate/deactivate vía `ProductStatusActions` (producto) / acciones equivalentes de categoría.
 - Knowledge: crear, listar, contenido, process, deactivate/reactivate, search.
-- Pedidos: formulario de transición con `orderId` conocido (`POST .../status`). Sin grilla global.
-- Pagos: consulta por `paymentId`.
+- Pedidos: listado/tabla vía `GET /api/v1/admin/orders` (véase §4.3; Ventas = filtro multi-status en la misma ruta); detalle con transición de estado (`POST .../status`).
+- Pagos: consulta por `paymentId` (sin listado global).
 
-No hay dashboard de KPIs, no hay upload de imágenes (solo `imageUrl` string), no hay bootstrap de ADMIN por API pública.
+No hay dashboard de KPIs, no hay upload de imágenes (solo `imageUrl` string), no hay bootstrap de ADMIN por API pública. No hay `/admin/sales`, receipt, inventario avanzado, ledger, lotes ni proveedores.
 
 ---
 
@@ -936,12 +955,15 @@ El frontend no despliega Flyway ni el JAR.
 - Assistant solo `POST /chat`; confirmación con token del backend.
 - ADMIN no shopper.
 - Tabla admin de pedidos vía `GET /api/v1/admin/orders`; Ventas = filtro `status`; detalle vía `GET /api/v1/admin/orders/{orderId}`. No reutilizar `GET /api/v1/orders` para ADMIN. Comprobante = UI del detalle enriquecido; sin `/receipt`.
-- Sin duplicar vendibilidad, stock ni checkout.
+- Stock Admin: create con stock inicial; ajuste absoluto `POST /api/v1/products/{productId}/stock` + `ProductStockPanel` (validación, éxito/error; separado del form de ficha); PUT de ficha sin stock/precio; sin ledger/lotes/proveedores/grilla.
+- Favoritos y listas implementados (CUSTOMER); stock 0 no quita el ítem; CTA de carrito respeta stock conocido sin confundirlo con `available`.
+- Checkout UI `/checkout` → REST `POST /api/v1/orders` + `Idempotency-Key`; cancelación 15 min desde `createdAt`; payment MVP sin status `REFUNDED`.
+- Sin duplicar vendibilidad, stock atómico de checkout ni InventoryPort en el cliente.
 
-### PROPUESTO (al implementar, no bloquea el diseño)
+### PROPUESTO (mejoras no bloqueantes)
 
 - Zod para schemas de form (espejo de records REST, no invariantes de stock).
-- Vitest, Testing Library, Playwright, MSW.
+- Ampliar coverage Playwright/MSW donde aún no exista.
 - Tokens visuales concretos (`@theme`) y copy de marca.
 
 ### Rechazado
@@ -949,31 +971,30 @@ El frontend no despliega Flyway ni el JAR.
 - Redux, Axios, GraphQL, tRPC, Prisma, WebSocket de chat.
 - Material UI, Chakra, Ant Design, Bootstrap, shadcn/ui.
 - Turborepo, Nx, `src/` directory, `tailwind.config.js` de v3.
-- Cookie HttpOnly sin cambio de API, `GET /me` inventado, REST lista→carrito inventado, reutilizar `GET /api/v1/orders` para ADMIN.
+- Cookie HttpOnly sin cambio de API, `GET /me` inventado, **REST lista→carrito** (no forma parte del contrato REST MVP; existe Application/Assistant), reutilizar `GET /api/v1/orders` para ADMIN, `POST /api/v1/checkout`.
 - TypeScript 7 y Next 16.4 canary en el arranque.
 
 ### Riesgos
 
 | Riesgo | Mitigación |
 |---|---|
-| Token en JS (XSS) | TTL 15 min; no `localStorage`; CSP al implementar |
+| Token en JS (XSS) | TTL 15 min; no `localStorage`; CSP al endurecer despliegue |
 | Sin refresh | 401 → login; UX de sesión corta |
 | Sin CORS | rewrite/proxy same-origin |
 | Sin `GET /me` | UI con `role` + `userId`; nombre solo si se guardó al registrar (opcional, frágil) |
 | Assistant in-memory | avisar que el hilo muere al reiniciar el API |
 | Catálogo GET sin paginar | listas grandes; paginación es cambio de backend |
+| Favoritos sin stock en el payload | hidratar stock desde catálogo público; si falta, no inventar |
 | Admin orders | listado y detalle por APIs ADMIN; snapshots históricos del pedido |
-| Traslado Maven → `backend/` | mecánico al inicializar; no mezclar con cambios de dominio |
 
-### PENDIENTE
+### PENDIENTE / fuera del MVP REST
 
-Solo lo que depende de implementación o de infraestructura / backend futuros:
+Solo lo que depende de infraestructura externa o de un cambio de backend aún no existente:
 
-- Parche exacto de cada paquete el día de `pnpm create` (dentro de las minors cerradas).
-- El módulo Maven ya está en `backend/`. Crear `frontend/` (aún no existe).
-- Cookie HttpOnly, refresh token, CORS explícito, `GET /me`, REST lista→carrito (requieren backend).
+- Cookie HttpOnly, refresh token, CORS explícito, `GET /me` (requieren backend).
 - Hosting, dominio y TLS de producción.
 - Paginación del catálogo: **no existe hoy** (`GET /products` y `GET /products/search` son listas completas). Añadir `page`/`size` sería un cambio de backend, no de frontend.
+- REST lista→carrito: **no** está pendiente de implementación frontend; **no** forma parte del contrato REST MVP (véase Rechazado).
 
 ---
 
@@ -985,15 +1006,16 @@ Límites que el frontend **no** debe tapar con APIs ficticias:
 
 1. No hay `GET /api/v1/me`.
 2. No hay REST de Sales, Invoice ni receipts; Ventas filtra `GET /api/v1/admin/orders`.
-3. No hay REST para `AddShoppingListToCart`.
+3. No hay REST para `AddShoppingListToCart` (ni `POST /api/v1/checkout`).
 4. No hay CORS configurado.
 5. No hay refresh token.
 6. ADMIN no puede usar cart/checkout/assistant/favorites.
 7. El simulador CARD no declina; el código `PAYMENT_DECLINED` igual existe.
 8. Conversaciones Assistant no son durables.
+9. Favoritos REST no incluyen `stock`; la UI lo obtiene del catálogo público cuando está disponible.
 
 ---
 
 ## 22. Veredicto
 
-Documento de arquitectura **objetivo**. Decisiones de stack, ubicación, sesión, API client y desarrollo local cerradas. Apto para inicializar `frontend/` sin modificar el backend cerrado.
+Documento de arquitectura de referencia del **frontend MVP implementado** en `frontend/`, alineado al backend cerrado. Catálogo, favoritos, listas, carrito, checkout (`POST /orders`), pedidos, Admin (incluido stock) y Assistant consumen los contratos reales.
