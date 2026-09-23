@@ -1,5 +1,6 @@
 import type {
   AdjustAdminProductStockRequest,
+  BarcodeProductSuggestion,
   ChangeAdminProductPriceRequest,
   CreateAdminCategoryRequest,
   CreateAdminKnowledgeDocumentRequest,
@@ -89,6 +90,26 @@ export function emptyAdminProductFormValues(): AdminProductFormValues {
     price: "",
     stock: "",
     imageUrl: "",
+  };
+}
+
+/**
+ * Prefills only barcode metadata fields from Open Food Facts.
+ * Never touches price, stock, categoryId (or any status — not in this form).
+ */
+export function applyBarcodeSuggestion(
+  values: AdminProductFormValues,
+  suggestion: BarcodeProductSuggestion,
+): AdminProductFormValues {
+  return {
+    ...values,
+    barcode: suggestion.barcode ?? values.barcode,
+    name: suggestion.name?.trim() ? suggestion.name : values.name,
+    brand: suggestion.brand?.trim() ? suggestion.brand : values.brand,
+    description: suggestion.description?.trim()
+      ? suggestion.description
+      : values.description,
+    imageUrl: suggestion.imageUrl?.trim() ? suggestion.imageUrl : values.imageUrl,
   };
 }
 

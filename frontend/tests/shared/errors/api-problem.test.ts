@@ -267,6 +267,32 @@ describe("messageForApiProblem", () => {
     );
   });
 
+  it("uses Spanish messages for barcode lookup problem codes", () => {
+    expect(
+      messageForApiProblem({
+        status: 400,
+        code: "INVALID_BARCODE",
+        detail: "barcode cannot be blank",
+      }),
+    ).toBe("El código de barras no es válido.");
+    expect(
+      messageForApiProblem({
+        status: 404,
+        code: "BARCODE_LOOKUP_NOT_FOUND",
+        detail: "No product found for barcode: 000",
+      }),
+    ).toBe("No encontramos ese código de barras en Open Food Facts.");
+    expect(
+      messageForApiProblem({
+        status: 502,
+        code: "BARCODE_LOOKUP_FAILED",
+        detail: "barcode lookup provider request failed",
+      }),
+    ).toBe(
+      "No se pudo consultar Open Food Facts. Inténtalo de nuevo o completa el producto a mano.",
+    );
+  });
+
   it("uses a generic internal message for 500 without leaking a stack", () => {
     expect(
       messageForApiProblem({

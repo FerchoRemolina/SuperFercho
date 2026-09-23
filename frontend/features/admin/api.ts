@@ -309,6 +309,24 @@ export async function deactivateAdminProduct(productId: string): Promise<Product
   );
 }
 
+/** Mirrors BarcodeProductSuggestionRestResponse. ADMIN lookup only. */
+export type BarcodeProductSuggestion = {
+  barcode: string;
+  name: string | null;
+  brand: string | null;
+  description: string | null;
+  imageUrl: string | null;
+};
+
+/** GET /api/v1/products/barcode-lookup/{barcode} — ADMIN. Does not create a product. */
+export async function lookupProductByBarcode(
+  barcode: string,
+): Promise<BarcodeProductSuggestion> {
+  return request<BarcodeProductSuggestion>(
+    `/products/barcode-lookup/${encodeURIComponent(barcode)}`,
+  );
+}
+
 /** GET /api/v1/admin/orders — ADMIN; no reutilizar GET /api/v1/orders. */
 export async function listAdminOrders(
   query: ListAdminOrdersQuery,

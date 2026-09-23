@@ -64,6 +64,8 @@ public class IdentitySecurityConfiguration {
                         .permitAll()
                         .requestMatchers("/error")
                         .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/products/barcode-lookup/**")
+                        .hasRole("ADMIN")
                         .requestMatchers(CatalogGetRequestMatcher.adminView())
                         .hasRole("ADMIN")
                         .requestMatchers(CatalogGetRequestMatcher.publicView())

@@ -2,8 +2,11 @@ package com.superfercho.catalog.infrastructure.rest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.superfercho.catalog.application.exception.BarcodeLookupFailedException;
+import com.superfercho.catalog.application.exception.BarcodeLookupNotFoundException;
 import com.superfercho.catalog.application.exception.CategoryNotFoundException;
 import com.superfercho.catalog.application.exception.DuplicateBarcodeException;
+import com.superfercho.catalog.application.exception.InvalidBarcodeException;
 import com.superfercho.catalog.application.exception.InvalidCategoryReferenceException;
 import com.superfercho.catalog.application.exception.ProductNotFoundException;
 import com.superfercho.catalog.domain.exception.InvalidCategoryException;
@@ -66,6 +69,30 @@ class CatalogExceptionHandlerTest {
                 handler.handleProductNotFound(new ProductNotFoundException(PRODUCT_ID)),
                 HttpStatus.NOT_FOUND,
                 "PRODUCT_NOT_FOUND");
+    }
+
+    @Test
+    void shouldMapInvalidBarcodeTo400() {
+        assertProblem(
+                handler.handleInvalidBarcode(new InvalidBarcodeException("barcode cannot be blank")),
+                HttpStatus.BAD_REQUEST,
+                "INVALID_BARCODE");
+    }
+
+    @Test
+    void shouldMapBarcodeLookupNotFoundTo404() {
+        assertProblem(
+                handler.handleBarcodeLookupNotFound(new BarcodeLookupNotFoundException("000")),
+                HttpStatus.NOT_FOUND,
+                "BARCODE_LOOKUP_NOT_FOUND");
+    }
+
+    @Test
+    void shouldMapBarcodeLookupFailedTo502() {
+        assertProblem(
+                handler.handleBarcodeLookupFailed(new BarcodeLookupFailedException("down")),
+                HttpStatus.BAD_GATEWAY,
+                "BARCODE_LOOKUP_FAILED");
     }
 
     private static void assertProblem(ProblemDetail problem, HttpStatus status, String code) {

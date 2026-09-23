@@ -1,7 +1,10 @@
 package com.superfercho.catalog.infrastructure.rest;
 
+import com.superfercho.catalog.application.exception.BarcodeLookupFailedException;
+import com.superfercho.catalog.application.exception.BarcodeLookupNotFoundException;
 import com.superfercho.catalog.application.exception.CategoryNotFoundException;
 import com.superfercho.catalog.application.exception.DuplicateBarcodeException;
+import com.superfercho.catalog.application.exception.InvalidBarcodeException;
 import com.superfercho.catalog.application.exception.InvalidCategoryReferenceException;
 import com.superfercho.catalog.application.exception.ProductNotFoundException;
 import com.superfercho.catalog.application.exception.ProductStockConflictException;
@@ -53,6 +56,21 @@ public class CatalogExceptionHandler {
     @ExceptionHandler(ProductStockConflictException.class)
     ProblemDetail handleProductStockConflict(ProductStockConflictException exception) {
         return problem(HttpStatus.CONFLICT, "PRODUCT_STOCK_CONFLICT", exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidBarcodeException.class)
+    ProblemDetail handleInvalidBarcode(InvalidBarcodeException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "INVALID_BARCODE", exception.getMessage());
+    }
+
+    @ExceptionHandler(BarcodeLookupNotFoundException.class)
+    ProblemDetail handleBarcodeLookupNotFound(BarcodeLookupNotFoundException exception) {
+        return problem(HttpStatus.NOT_FOUND, "BARCODE_LOOKUP_NOT_FOUND", exception.getMessage());
+    }
+
+    @ExceptionHandler(BarcodeLookupFailedException.class)
+    ProblemDetail handleBarcodeLookupFailed(BarcodeLookupFailedException ignored) {
+        return problem(HttpStatus.BAD_GATEWAY, "BARCODE_LOOKUP_FAILED", "Barcode lookup provider request failed");
     }
 
     private static ProblemDetail problem(HttpStatus status, String code, String detail) {

@@ -84,6 +84,12 @@ export function messageForApiProblem(problem: ApiProblem): string {
       return "Fercho no puede realizar esa acción.";
     case "INVALID_TOOL_ARGUMENTS":
       return "Fercho recibió datos incompletos para esa acción. Inténtalo de nuevo.";
+    case "INVALID_BARCODE":
+      return "El código de barras no es válido.";
+    case "BARCODE_LOOKUP_NOT_FOUND":
+      return "No encontramos ese código de barras en Open Food Facts.";
+    case "BARCODE_LOOKUP_FAILED":
+      return "No se pudo consultar Open Food Facts. Inténtalo de nuevo o completa el producto a mano.";
     case "ACCESS_DENIED":
       return "No tienes permiso para esta acción.";
     case "UNAUTHENTICATED":
