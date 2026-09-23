@@ -32,9 +32,11 @@ import com.superfercho.identity.domain.model.UserStatus;
 import com.superfercho.identity.infrastructure.rest.AddressController;
 import com.superfercho.identity.infrastructure.rest.AuthController;
 import com.superfercho.identity.infrastructure.rest.CustomerController;
+import com.superfercho.orders.application.dto.CheckoutResult;
 import com.superfercho.orders.application.dto.OrderItemResult;
 import com.superfercho.orders.application.dto.OrderResult;
 import com.superfercho.orders.application.dto.PagedResult;
+import com.superfercho.orders.application.dto.PaymentStatus;
 import com.superfercho.orders.application.dto.ShippingAddressResult;
 import com.superfercho.orders.application.usecase.GetAdminOrderUseCase;
 import com.superfercho.orders.application.usecase.GetOrderUseCase;
@@ -167,6 +169,8 @@ class HttpAuthorizationSecurityTest {
         when(getOrderUseCase.execute(any())).thenReturn(orderResult());
         when(listAdminOrdersUseCase.execute(any())).thenReturn(new PagedResult<>(List.of(), 0, 20, 0));
         when(getAdminOrderUseCase.execute(any())).thenReturn(orderResult());
+        when(transactionalCheckoutUseCase.execute(any())).thenReturn(checkoutResult());
+        when(transactionalCancelOrderUseCase.execute(any())).thenReturn(orderResult());
     }
 
     @Test
@@ -312,6 +316,11 @@ class HttpAuthorizationSecurityTest {
     void shouldRejectCustomerOrdersWithoutJwt() throws Exception {
         mockMvc.perform(get("/api/v1/orders")).andExpect(unauthenticated());
         mockMvc.perform(get("/api/v1/orders/{orderId}", ORDER_ID)).andExpect(unauthenticated());
+        mockMvc.perform(post("/api/v1/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(checkoutJson()))
+                .andExpect(unauthenticated());
+        mockMvc.perform(post("/api/v1/orders/{orderId}/cancel", ORDER_ID)).andExpect(unauthenticated());
     }
 
     @Test
@@ -321,6 +330,15 @@ class HttpAuthorizationSecurityTest {
         mockMvc.perform(get("/api/v1/orders/{orderId}", ORDER_ID)
                         .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
                 .andExpect(notBlockedBySecurity());
+        mockMvc.perform(post("/api/v1/orders")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER))
+                        .header("Idempotency-Key", "security-test-checkout-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(checkoutJson()))
+                .andExpect(notBlockedBySecurity());
+        mockMvc.perform(post("/api/v1/orders/{orderId}/cancel", ORDER_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(notBlockedBySecurity());
     }
 
     @Test
@@ -328,6 +346,15 @@ class HttpAuthorizationSecurityTest {
         mockMvc.perform(get("/api/v1/orders").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
                 .andExpect(accessDenied());
         mockMvc.perform(get("/api/v1/orders/{orderId}", ORDER_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(accessDenied());
+        mockMvc.perform(post("/api/v1/orders")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN))
+                        .header("Idempotency-Key", "security-test-checkout-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(checkoutJson()))
+                .andExpect(accessDenied());
+        mockMvc.perform(post("/api/v1/orders/{orderId}/cancel", ORDER_ID)
                         .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
                 .andExpect(accessDenied());
     }
@@ -666,5 +693,30 @@ class HttpAuthorizationSecurityTest {
                 null,
                 NOW,
                 null);
+    }
+
+    private static CheckoutResult checkoutResult() {
+        return new CheckoutResult(
+                ORDER_ID,
+                "ORD-P-1001",
+                OrderStatus.PENDING,
+                PaymentStatus.APPROVED,
+                Money.cop(new BigDecimal("21.00")));
+    }
+
+    private static String checkoutJson() {
+        return """
+                {
+                  "addressId": "22222222-2222-2222-2222-222222222222",
+                  "paymentMethod": "SIMULATED_CARD",
+                  "items": [
+                    {
+                      "productId": "33333333-3333-3333-3333-333333333333",
+                      "quantity": 1,
+                      "expectedUnitPrice": { "amount": 10.50, "currency": "COP" }
+                    }
+                  ]
+                }
+                """;
     }
 }

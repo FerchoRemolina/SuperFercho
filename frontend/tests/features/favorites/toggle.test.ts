@@ -96,4 +96,25 @@ describe("favorite toggle composition", () => {
   it("preserves the existing query key used after mutations", () => {
     expect(favoritesKeys().root()).toEqual(["favorites"]);
   });
+
+  it("hides the cart CTA when catalog stock is 0 without conflating available", () => {
+    const favoriteItem = source(
+      "features/favorites/components/favorite-item-card.tsx",
+    );
+    const page = source(
+      "features/favorites/components/favorites-page-content.tsx",
+    );
+
+    expect(page).toContain("useProductsQuery");
+    expect(page).toContain("catalogProduct={productsById.get(item.productId)}");
+    expect(favoriteItem).toContain("canOfferAddToCart");
+    expect(favoriteItem).toContain("isFavoriteProductPurchasable");
+    expect(favoriteItem).toContain("productStockLabel");
+    expect(favoriteItem).toContain("agotado");
+    expect(favoriteItem).toContain("offerAddToCart");
+    expect(favoriteItem).toContain("Disponible");
+    expect(favoriteItem).toContain("No disponible");
+    expect(favoriteItem).not.toContain("available={stock");
+    expect(favoriteItem).not.toContain("available={!outOfStock");
+  });
 });

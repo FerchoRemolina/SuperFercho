@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useProductsQuery } from "@/features/catalog/hooks";
 import { FavoriteItemCard } from "@/features/favorites/components/favorite-item-card";
 import { useFavoritesQuery } from "@/features/favorites/hooks";
 import { isApiError } from "@/shared/errors/api-problem";
@@ -14,6 +15,7 @@ import { Skeleton } from "@/shared/ui/skeleton";
 
 export function FavoritesPageContent() {
   const favoritesQuery = useFavoritesQuery();
+  const productsQuery = useProductsQuery();
 
   if (favoritesQuery.isPending) {
     return (
@@ -69,6 +71,10 @@ export function FavoritesPageContent() {
     );
   }
 
+  const productsById = new Map(
+    (productsQuery.data ?? []).map((product) => [product.id, product]),
+  );
+
   return (
     <Container as="main" className="py-10 md:py-16">
       <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
@@ -77,7 +83,10 @@ export function FavoritesPageContent() {
       <ul className="mt-8 grid gap-4">
         {items.map((item) => (
           <li key={item.productId}>
-            <FavoriteItemCard item={item} />
+            <FavoriteItemCard
+              item={item}
+              catalogProduct={productsById.get(item.productId)}
+            />
           </li>
         ))}
       </ul>

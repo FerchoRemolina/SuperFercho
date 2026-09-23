@@ -62,4 +62,16 @@ describe("shopping lists composition", () => {
     expect(createForm).not.toContain("customerId");
     expect(api).not.toMatch(/body:.*customerId/);
   });
+
+  it("hides Agregar al carrito when stock is 0 while keeping sellability separate", () => {
+    const listItem = source("features/lists/components/list-item-card.tsx");
+    expect(listItem).toContain("canOfferAddToCart");
+    expect(listItem).toContain("product.status === \"ACTIVE\"");
+    expect(listItem).toContain("productStockLabel");
+    expect(listItem).toContain("offerAddToCart");
+    expect(listItem).toContain("Agregar al carrito");
+    expect(listItem).toContain("agotado");
+    expect(listItem).toContain("Disponible");
+    expect(listItem).toContain("No disponible");
+  });
 });

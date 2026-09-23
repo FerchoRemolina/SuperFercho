@@ -10,6 +10,23 @@ export function productStockLabel(stock: number): string {
   return `${stock} unidades disponibles`;
 }
 
+/**
+ * Sellability (`available` / ACTIVE) and stock are independent.
+ * Hide the cart CTA only when stock is known and <= 0; unknown stock does not block the CTA.
+ */
+export function canOfferAddToCart(
+  sellable: boolean,
+  stock: number | undefined,
+): boolean {
+  if (!sellable) {
+    return false;
+  }
+  if (stock !== undefined && stock <= 0) {
+    return false;
+  }
+  return true;
+}
+
 export function initialSelectedQuantity(stock: number): number {
   return stock > 0 ? 1 : 0;
 }

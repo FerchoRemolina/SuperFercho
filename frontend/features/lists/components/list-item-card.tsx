@@ -8,7 +8,10 @@ import {
   type Product,
 } from "@/features/catalog/api";
 import { ProductImage } from "@/features/catalog/components/product-image";
-import { productStockLabel } from "@/features/catalog/quantity";
+import {
+  canOfferAddToCart,
+  productStockLabel,
+} from "@/features/catalog/quantity";
 import type { ShoppingListItem } from "@/features/lists/api";
 import { ListQuantityStepper } from "@/features/lists/components/list-quantity-stepper";
 import { useRemoveShoppingListItemMutation } from "@/features/lists/hooks";
@@ -35,6 +38,9 @@ export function ListItemCard({
   const [addedFeedback, setAddedFeedback] = useAddedFeedback();
 
   const purchasable = product !== undefined && product.status === "ACTIVE";
+  const stock = product?.stock;
+  const offerAddToCart = canOfferAddToCart(purchasable, stock);
+  const outOfStock = stock !== undefined && stock <= 0;
   const stockLabel = product ? productStockLabel(product.stock) : null;
 
   const removeError =
@@ -115,6 +121,12 @@ export function ListItemCard({
                 quitarlo de la lista.
               </p>
             ) : null}
+            {purchasable && outOfStock ? (
+              <p className="text-sm text-sf-muted">
+                Este producto está agotado por ahora. Puedes mantenerlo en la
+                lista.
+              </p>
+            ) : null}
           </>
         ) : (
           <>
@@ -150,7 +162,7 @@ export function ListItemCard({
             quantity={item.quantity}
             disabled={busy || removeMutation.isPending}
           />
-          {purchasable ? (
+          {offerAddToCart ? (
             <Button
               type="button"
               variant="secondary"

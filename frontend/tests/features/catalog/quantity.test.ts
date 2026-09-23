@@ -3,6 +3,7 @@ import { isProductAvailable } from "@/features/catalog/api";
 import {
   canDecrementSelectedQuantity,
   canIncrementSelectedQuantity,
+  canOfferAddToCart,
   clampSelectedQuantity,
   initialSelectedQuantity,
   nextSelectedQuantity,
@@ -63,5 +64,13 @@ describe("catalog stock UX", () => {
     expect(productStockLabel(1)).toBe("1 unidad disponible");
     expect(productStockLabel(8)).toBe("8 unidades disponibles");
     expect(isProductAvailable(product)).toBe(true);
+  });
+
+  it("keeps sellability and stock independent for the cart CTA", () => {
+    expect(canOfferAddToCart(true, 3)).toBe(true);
+    expect(canOfferAddToCart(true, 0)).toBe(false);
+    expect(canOfferAddToCart(true, undefined)).toBe(true);
+    expect(canOfferAddToCart(false, 8)).toBe(false);
+    expect(canOfferAddToCart(false, 0)).toBe(false);
   });
 });

@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { AddToCartButton } from "@/features/cart/components/add-to-cart-button";
+import type { Product } from "@/features/catalog/api";
 import { ProductImage } from "@/features/catalog/components/product-image";
+import {
+  canOfferAddToCart,
+  productStockLabel,
+} from "@/features/catalog/quantity";
 import {
   isFavoriteProductPurchasable,
   type FavoriteItem,
@@ -10,9 +15,20 @@ import { formatMoney } from "@/shared/money/money";
 import { Badge } from "@/shared/ui/badge";
 import { Card } from "@/shared/ui/card";
 
-export function FavoriteItemCard({ item }: { item: FavoriteItem }) {
+export function FavoriteItemCard({
+  item,
+  catalogProduct,
+}: {
+  item: FavoriteItem;
+  /** Public catalog row used only for stock; sellability stays on FavoriteProduct.available. */
+  catalogProduct?: Product;
+}) {
   const product = item.product;
   const purchasable = isFavoriteProductPurchasable(product);
+  const stock = catalogProduct?.stock;
+  const offerAddToCart = canOfferAddToCart(purchasable, stock);
+  const stockKnown = stock !== undefined;
+  const outOfStock = stockKnown && stock <= 0;
 
   if (!product) {
     return (
@@ -47,19 +63,35 @@ export function FavoriteItemCard({ item }: { item: FavoriteItem }) {
           )}
         </h2>
         <p className="text-base font-bold text-sf-ink">{formatMoney(product.price)}</p>
-        <Badge tone={purchasable ? "primary" : "danger"} className="w-fit">
-          {purchasable ? "Disponible" : "No disponible"}
-        </Badge>
+        <div className="flex flex-wrap gap-2">
+          <Badge tone={purchasable ? "primary" : "danger"} className="w-fit">
+            {purchasable ? "Disponible" : "No disponible"}
+          </Badge>
+          {stockKnown ? (
+            <Badge tone={stock > 0 ? "primary" : "danger"} className="w-fit">
+              {productStockLabel(stock)}
+            </Badge>
+          ) : null}
+        </div>
         {!purchasable ? (
           <p className="text-sm text-sf-muted">
             Este producto no está a la venta ahora. Puedes mantenerlo o quitarlo de
             favoritos.
           </p>
         ) : null}
+        {purchasable && outOfStock ? (
+          <p className="text-sm text-sf-muted">
+            Este producto está agotado por ahora. Puedes mantenerlo en favoritos.
+          </p>
+        ) : null}
         <div className="mt-auto grid gap-3 md:grid-cols-2">
           <FavoriteToggle productId={item.productId} variant="action" />
-          {purchasable ? (
-            <AddToCartButton productId={product.id} available={true} />
+          {offerAddToCart ? (
+            <AddToCartButton
+              productId={product.id}
+              available={true}
+              stock={stock}
+            />
           ) : null}
         </div>
       </div>
