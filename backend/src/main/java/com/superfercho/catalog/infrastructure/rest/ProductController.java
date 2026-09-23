@@ -2,21 +2,25 @@ package com.superfercho.catalog.infrastructure.rest;
 
 import com.superfercho.catalog.application.dto.ActivateProductCommand;
 import com.superfercho.catalog.application.dto.AdjustProductStockCommand;
+import com.superfercho.catalog.application.dto.ArchiveProductCommand;
 import com.superfercho.catalog.application.dto.CatalogView;
 import com.superfercho.catalog.application.dto.ChangeProductPriceCommand;
 import com.superfercho.catalog.application.dto.CreateProductCommand;
 import com.superfercho.catalog.application.dto.DeactivateProductCommand;
 import com.superfercho.catalog.application.dto.GetProductCommand;
 import com.superfercho.catalog.application.dto.ListProductsCommand;
+import com.superfercho.catalog.application.dto.RestoreProductCommand;
 import com.superfercho.catalog.application.dto.SearchProductsCommand;
 import com.superfercho.catalog.application.dto.UpdateProductCommand;
 import com.superfercho.catalog.application.usecase.ActivateProductUseCase;
 import com.superfercho.catalog.application.usecase.AdjustProductStockUseCase;
+import com.superfercho.catalog.application.usecase.ArchiveProductUseCase;
 import com.superfercho.catalog.application.usecase.ChangeProductPriceUseCase;
 import com.superfercho.catalog.application.usecase.CreateProductUseCase;
 import com.superfercho.catalog.application.usecase.DeactivateProductUseCase;
 import com.superfercho.catalog.application.usecase.GetProductUseCase;
 import com.superfercho.catalog.application.usecase.ListProductsUseCase;
+import com.superfercho.catalog.application.usecase.RestoreProductUseCase;
 import com.superfercho.catalog.application.usecase.SearchProductsUseCase;
 import com.superfercho.catalog.application.usecase.UpdateProductUseCase;
 import com.superfercho.catalog.domain.model.ProductStatus;
@@ -51,6 +55,8 @@ public class ProductController {
     private final UpdateProductUseCase updateProductUseCase;
     private final ActivateProductUseCase activateProductUseCase;
     private final DeactivateProductUseCase deactivateProductUseCase;
+    private final ArchiveProductUseCase archiveProductUseCase;
+    private final RestoreProductUseCase restoreProductUseCase;
     private final ChangeProductPriceUseCase changeProductPriceUseCase;
     private final AdjustProductStockUseCase adjustProductStockUseCase;
 
@@ -62,6 +68,8 @@ public class ProductController {
             UpdateProductUseCase updateProductUseCase,
             ActivateProductUseCase activateProductUseCase,
             DeactivateProductUseCase deactivateProductUseCase,
+            ArchiveProductUseCase archiveProductUseCase,
+            RestoreProductUseCase restoreProductUseCase,
             ChangeProductPriceUseCase changeProductPriceUseCase,
             AdjustProductStockUseCase adjustProductStockUseCase) {
         this.createProductUseCase = createProductUseCase;
@@ -71,6 +79,8 @@ public class ProductController {
         this.updateProductUseCase = updateProductUseCase;
         this.activateProductUseCase = activateProductUseCase;
         this.deactivateProductUseCase = deactivateProductUseCase;
+        this.archiveProductUseCase = archiveProductUseCase;
+        this.restoreProductUseCase = restoreProductUseCase;
         this.changeProductPriceUseCase = changeProductPriceUseCase;
         this.adjustProductStockUseCase = adjustProductStockUseCase;
     }
@@ -125,7 +135,9 @@ public class ProductController {
             @PathVariable UUID productId, @RequestBody UpdateProductRequest request) {
         return ProductRestResponse.from(updateProductUseCase.execute(new UpdateProductCommand(
                 productId,
-                request.categoryId(),
+                request.productTypeId(),
+                request.productVariantId(),
+                request.presentation(),
                 request.barcode(),
                 request.name(),
                 request.brand(),
@@ -142,6 +154,16 @@ public class ProductController {
     public ProductRestResponse deactivate(@PathVariable UUID productId) {
         return ProductRestResponse.from(
                 deactivateProductUseCase.execute(new DeactivateProductCommand(productId)));
+    }
+
+    @PostMapping("/{productId}/archive")
+    public ProductRestResponse archive(@PathVariable UUID productId) {
+        return ProductRestResponse.from(archiveProductUseCase.execute(new ArchiveProductCommand(productId)));
+    }
+
+    @PostMapping("/{productId}/restore")
+    public ProductRestResponse restore(@PathVariable UUID productId) {
+        return ProductRestResponse.from(restoreProductUseCase.execute(new RestoreProductCommand(productId)));
     }
 
     @PostMapping("/{productId}/price")

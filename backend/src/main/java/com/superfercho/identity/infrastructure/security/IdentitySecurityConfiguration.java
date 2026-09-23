@@ -83,6 +83,8 @@ public class IdentitySecurityConfiguration {
                                 "/api/v1/products",
                                 "/api/v1/products/{productId}/activate",
                                 "/api/v1/products/{productId}/deactivate",
+                                "/api/v1/products/{productId}/archive",
+                                "/api/v1/products/{productId}/restore",
                                 "/api/v1/products/{productId}/price",
                                 "/api/v1/products/{productId}/stock")
                         .hasRole("ADMIN")
