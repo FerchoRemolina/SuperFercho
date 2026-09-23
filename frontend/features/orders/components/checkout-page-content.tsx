@@ -57,7 +57,7 @@ export function CheckoutPageContent() {
     return (
       <Container as="main" className="py-10 md:py-16">
         <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
-          Checkout
+          Confirmar pedido
         </h1>
         <CheckoutSkeleton />
       </Container>
@@ -71,7 +71,7 @@ export function CheckoutPageContent() {
     return (
       <Container as="main" className="py-10 md:py-16">
         <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
-          Checkout
+          Confirmar pedido
         </h1>
         <div className="mt-8 grid gap-4">
           <Alert tone="error" title="No se pudo cargar el carrito">
@@ -94,7 +94,7 @@ export function CheckoutPageContent() {
     return (
       <Container as="main" className="py-10 md:py-16">
         <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
-          Checkout
+          Confirmar pedido
         </h1>
         <div className="mt-8">
           <EmptyState
@@ -118,7 +118,7 @@ export function CheckoutPageContent() {
     return (
       <Container as="main" className="py-10 md:py-16">
         <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
-          Checkout
+          Confirmar pedido
         </h1>
         <div className="mt-8 grid gap-4">
           <Alert tone="error" title="No se pudieron cargar las direcciones">
@@ -215,8 +215,8 @@ export function CheckoutPageContent() {
   return (
     <Container as="main" className="py-10 md:py-16">
       <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
-        Checkout
-      </h1>
+        Confirmar pedido
+        </h1>
       <p className="mt-2 max-w-2xl text-base text-sf-muted">
         El pedido se crea pendiente. El precio enviado es el vigente del
         catálogo, no el precio al agregar.
@@ -345,7 +345,7 @@ export function CheckoutPageContent() {
                       </span>
                       <span className="mt-1 block text-sm text-sf-muted">
                         {method === "SIMULATED_CARD"
-                          ? "Simulación del MVP. No se piden datos de tarjeta."
+                          ? "Simulación de pago. No se piden datos de tarjeta reales."
                           : "El pago queda pendiente hasta la entrega."}
                       </span>
                     </span>

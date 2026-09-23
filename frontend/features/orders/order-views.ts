@@ -139,7 +139,7 @@ export function orderStatusTone(status: OrderStatus): OrderStatusTone {
 export function orderStatusHint(status: OrderStatus): string | null {
   switch (status) {
     case "PENDING":
-      return "El supermercado aún no confirma este pedido.";
+      return "Puedes cancelarlo durante los primeros 15 minutos después de realizarlo.";
     case "CANCELLED":
       return "Este pedido fue cancelado.";
     default:
@@ -162,27 +162,81 @@ function problemFromError(error: unknown): ApiProblem | null {
   return null;
 }
 
-export type CancelPanelState = "hidden" | "idle" | "confirming" | "pending";
+export type CancelPanelState =
+  | "hidden"
+  | "expired"
+  | "idle"
+  | "confirming"
+  | "pending";
+
+/** Matches backend Order.CUSTOMER_CANCELLATION_WINDOW (15 minutes). */
+export const CUSTOMER_CANCELLATION_WINDOW_MS = 15 * 60 * 1000;
+
+export const CANCEL_WINDOW_IDLE_COPY =
+  "Puedes cancelar este pedido durante los primeros 15 minutos después de realizarlo.";
+
+export const CANCEL_WINDOW_EXPIRED_COPY =
+  "El plazo de 15 minutos para cancelar este pedido ya terminó.";
 
 export const CANCEL_CONFIRMATION_TITLE = "¿Cancelar este pedido?";
 export const CANCEL_CONFIRMATION_BODY =
   "El pedido se cancelará y no podrás deshacerlo desde esta pantalla. El supermercado dejará de gestionarlo.";
 
-export function canShowCancelAction(order: Order): boolean {
-  return order.status === "PENDING";
+export function customerCancellationDeadline(createdAt: string): Date {
+  return new Date(
+    new Date(createdAt).getTime() + CUSTOMER_CANCELLATION_WINDOW_MS,
+  );
+}
+
+export function isWithinCustomerCancellationWindow(
+  order: Order,
+  now: Date = new Date(),
+): boolean {
+  if (order.status !== "PENDING") {
+    return false;
+  }
+  return now.getTime() <= customerCancellationDeadline(order.createdAt).getTime();
+}
+
+export function canShowCancelAction(
+  order: Order,
+  now: Date = new Date(),
+): boolean {
+  return isWithinCustomerCancellationWindow(order, now);
+}
+
+export function cancellationRemainingLabel(
+  createdAt: string,
+  now: Date = new Date(),
+): string | null {
+  const remainingMs =
+    customerCancellationDeadline(createdAt).getTime() - now.getTime();
+  if (remainingMs <= 0) {
+    return null;
+  }
+  const minutes = Math.max(1, Math.ceil(remainingMs / 60_000));
+  if (minutes === 1) {
+    return "Te queda aproximadamente 1 minuto para cancelar.";
+  }
+  return `Te quedan aproximadamente ${minutes} minutos para cancelar.`;
 }
 
 export function cancelPanelState({
   order,
   confirming,
   isPending,
+  now = new Date(),
 }: {
   order: Order;
   confirming: boolean;
   isPending: boolean;
+  now?: Date;
 }): CancelPanelState {
-  if (!canShowCancelAction(order)) {
+  if (order.status !== "PENDING") {
     return "hidden";
+  }
+  if (!isWithinCustomerCancellationWindow(order, now)) {
+    return "expired";
   }
   if (isPending) {
     return "pending";

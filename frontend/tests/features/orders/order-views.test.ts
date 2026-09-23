@@ -3,12 +3,17 @@ import { orderStatusLabel, type Order } from "@/features/orders/api";
 import {
   CANCEL_CONFIRMATION_BODY,
   CANCEL_CONFIRMATION_TITLE,
+  CANCEL_WINDOW_EXPIRED_COPY,
+  CANCEL_WINDOW_IDLE_COPY,
+  CUSTOMER_CANCELLATION_WINDOW_MS,
   formatOrderDate,
   canShowCancelAction,
   cancelErrorCopy,
   cancelOrderCacheKeys,
+  cancellationRemainingLabel,
   cancelPanelState,
   isCancelSubmitLocked,
+  isWithinCustomerCancellationWindow,
   listPaymentSummary,
   orderDetailErrorCopy,
   orderDetailHref,
@@ -21,6 +26,8 @@ import {
   paymentRefundLabel,
 } from "@/features/orders/order-views";
 import { ApiError } from "@/shared/errors/api-problem";
+
+const now = new Date("2026-03-01T15:05:00Z");
 
 const order: Order = {
   id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
@@ -230,7 +237,7 @@ describe("order status presentation", () => {
     expect(orderStatusLabel("CANCELLED")).toBe("Cancelado");
     expect(orderStatusTone("PENDING")).toBe("accent");
     expect(orderStatusTone("CANCELLED")).toBe("danger");
-    expect(orderStatusHint("PENDING")).toContain("confirma");
+    expect(orderStatusHint("PENDING")).toContain("15 minutos");
     expect(orderStatusHint("CANCELLED")).toContain("cancelado");
   });
 
@@ -240,30 +247,62 @@ describe("order status presentation", () => {
 });
 
 describe("order cancellation presentation", () => {
-  it("shows the cancel action only while the order is PENDING", () => {
-    expect(canShowCancelAction(order)).toBe(true);
-    expect(canShowCancelAction({ ...order, status: "CONFIRMED" })).toBe(false);
-    expect(canShowCancelAction({ ...order, status: "PREPARING" })).toBe(false);
-    expect(canShowCancelAction({ ...order, status: "READY" })).toBe(false);
-    expect(canShowCancelAction({ ...order, status: "DELIVERED" })).toBe(false);
-    expect(canShowCancelAction({ ...order, status: "CANCELLED" })).toBe(false);
+  it("shows the cancel action only while PENDING and within 15 minutes", () => {
+    expect(canShowCancelAction(order, now)).toBe(true);
+    expect(CUSTOMER_CANCELLATION_WINDOW_MS).toBe(15 * 60 * 1000);
+    expect(isWithinCustomerCancellationWindow(order, now)).toBe(true);
+    expect(
+      isWithinCustomerCancellationWindow(
+        order,
+        new Date("2026-03-01T15:16:00Z"),
+      ),
+    ).toBe(false);
+    expect(canShowCancelAction({ ...order, status: "CONFIRMED" }, now)).toBe(
+      false,
+    );
+    expect(canShowCancelAction({ ...order, status: "PREPARING" }, now)).toBe(
+      false,
+    );
+    expect(canShowCancelAction({ ...order, status: "READY" }, now)).toBe(false);
+    expect(canShowCancelAction({ ...order, status: "DELIVERED" }, now)).toBe(
+      false,
+    );
+    expect(canShowCancelAction({ ...order, status: "CANCELLED" }, now)).toBe(
+      false,
+    );
   });
 
   it("moves from idle to confirmation then locks submit while pending", () => {
     expect(
-      cancelPanelState({ order, confirming: false, isPending: false }),
+      cancelPanelState({ order, confirming: false, isPending: false, now }),
     ).toBe("idle");
     expect(
-      cancelPanelState({ order, confirming: true, isPending: false }),
+      cancelPanelState({ order, confirming: true, isPending: false, now }),
     ).toBe("confirming");
     expect(
-      cancelPanelState({ order, confirming: true, isPending: true }),
+      cancelPanelState({ order, confirming: true, isPending: true, now }),
     ).toBe("pending");
     expect(isCancelSubmitLocked(false)).toBe(false);
     expect(isCancelSubmitLocked(true)).toBe(true);
+    expect(CANCEL_WINDOW_IDLE_COPY).toContain("15 minutos");
+    expect(cancellationRemainingLabel(order.createdAt, now)).toMatch(/minutos/);
     expect(CANCEL_CONFIRMATION_TITLE).toMatch(/Cancelar/);
     expect(CANCEL_CONFIRMATION_BODY).toMatch(/no podrás deshacerlo/);
     expect(CANCEL_CONFIRMATION_BODY).not.toMatch(/reembolso/i);
+  });
+
+  it("explains expiration without showing the cancel CTA", () => {
+    const expiredNow = new Date("2026-03-01T15:16:00Z");
+    expect(
+      cancelPanelState({
+        order,
+        confirming: false,
+        isPending: false,
+        now: expiredNow,
+      }),
+    ).toBe("expired");
+    expect(CANCEL_WINDOW_EXPIRED_COPY).toContain("15 minutos");
+    expect(cancellationRemainingLabel(order.createdAt, expiredNow)).toBeNull();
   });
 
   it("hides the panel for a successful cancelled order", () => {
@@ -272,6 +311,7 @@ describe("order cancellation presentation", () => {
         order: { ...order, status: "CANCELLED" },
         confirming: true,
         isPending: false,
+        now,
       }),
     ).toBe("hidden");
   });
@@ -287,7 +327,8 @@ describe("order cancellation presentation", () => {
       ),
     ).toEqual({
       title: "No se puede cancelar",
-      message: "Este pedido ya no puede cancelarse.",
+      message:
+        "Este pedido ya no puede cancelarse. El plazo de 15 minutos terminó o el pedido ya cambió de estado.",
     });
   });
 

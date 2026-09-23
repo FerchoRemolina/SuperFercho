@@ -27,14 +27,24 @@ describe("parseApiProblem", () => {
 });
 
 describe("messageForApiProblem", () => {
-  it("prefers the backend detail when the code has no mapped message", () => {
+  it("prefers a Spanish status fallback when the code has no mapped message", () => {
     expect(
       messageForApiProblem({
         status: 409,
         code: "UNKNOWN_CONFLICT",
         detail: "Detalle del backend",
       }),
-    ).toBe("Detalle del backend");
+    ).toBe("No se pudo completar la operación.");
+  });
+
+  it("never surfaces English backend detail for unmapped codes", () => {
+    expect(
+      messageForApiProblem({
+        status: 409,
+        code: "UNKNOWN_CONFLICT",
+        detail: "Product price changed: 33333333-3333-3333-3333-333333333333",
+      }),
+    ).toBe("No se pudo completar la operación.");
   });
 
   it("uses a Spanish message for STOCK_UNAVAILABLE even if the backend detail includes an id", () => {
@@ -148,7 +158,9 @@ describe("messageForApiProblem", () => {
         code: "CANCELLATION_NOT_ALLOWED",
         detail: "customer cancellation window has expired",
       }),
-    ).toBe("Este pedido ya no puede cancelarse.");
+    ).toBe(
+      "Este pedido ya no puede cancelarse. El plazo de 15 minutos terminó o el pedido ya cambió de estado.",
+    );
   });
 
   it("uses a neutral Spanish message for INVALID_ORDER_TRANSITION", () => {

@@ -4,7 +4,7 @@ export default function AssistantPage() {
   return (
     <PlaceholderScreen
       title="Fercho"
-      description="Fercho es el asistente inteligente de SuperFercho. El chat se habilitará más adelante."
+      description="El chat de Fercho aún no está disponible en esta versión. Puedes seguir comprando desde el catálogo, el carrito y tus listas."
     />
   );
 }

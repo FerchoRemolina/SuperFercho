@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Order } from "@/features/orders/api";
 import { useCancelOrderMutation } from "@/features/orders/hooks";
 import {
   CANCEL_CONFIRMATION_BODY,
   CANCEL_CONFIRMATION_TITLE,
+  CANCEL_WINDOW_EXPIRED_COPY,
+  CANCEL_WINDOW_IDLE_COPY,
   cancelErrorCopy,
+  cancellationRemainingLabel,
   cancelPanelState,
   isCancelSubmitLocked,
 } from "@/features/orders/order-views";
@@ -16,12 +19,22 @@ import { Button } from "@/shared/ui/button";
 export function CancelOrderPanel({ order }: { order: Order }) {
   const cancelMutation = useCancelOrderMutation();
   const [confirming, setConfirming] = useState(false);
+  const [now, setNow] = useState(() => new Date());
   const locked = isCancelSubmitLocked(cancelMutation.isPending);
   const state = cancelPanelState({
     order,
     confirming,
     isPending: cancelMutation.isPending,
+    now,
   });
+
+  useEffect(() => {
+    if (order.status !== "PENDING") {
+      return;
+    }
+    const id = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(id);
+  }, [order.status, order.createdAt]);
 
   if (state === "hidden") {
     return null;
@@ -30,6 +43,7 @@ export function CancelOrderPanel({ order }: { order: Order }) {
   const error = cancelMutation.isError
     ? cancelErrorCopy(cancelMutation.error)
     : null;
+  const remaining = cancellationRemainingLabel(order.createdAt, now);
 
   return (
     <div className="grid gap-3 rounded-2xl border border-dashed border-sf-border bg-sf-surface p-4">
@@ -39,12 +53,16 @@ export function CancelOrderPanel({ order }: { order: Order }) {
         </Alert>
       ) : null}
 
+      {state === "expired" ? (
+        <p className="text-sm text-sf-muted">{CANCEL_WINDOW_EXPIRED_COPY}</p>
+      ) : null}
+
       {state === "idle" ? (
         <>
-          <p className="text-sm text-sf-muted">
-            Puedes cancelar este pedido mientras el supermercado aún no lo
-            confirme.
-          </p>
+          <p className="text-sm text-sf-muted">{CANCEL_WINDOW_IDLE_COPY}</p>
+          {remaining ? (
+            <p className="text-sm font-semibold text-sf-ink">{remaining}</p>
+          ) : null}
           <Button
             type="button"
             variant="ghost"
@@ -58,7 +76,9 @@ export function CancelOrderPanel({ order }: { order: Order }) {
             Cancelar pedido
           </Button>
         </>
-      ) : (
+      ) : null}
+
+      {state === "confirming" || state === "pending" ? (
         <>
           <p className="text-sm font-semibold text-sf-ink">
             {CANCEL_CONFIRMATION_TITLE}
@@ -90,7 +110,7 @@ export function CancelOrderPanel({ order }: { order: Order }) {
             </Button>
           </div>
         </>
-      )}
+      ) : null}
     </div>
   );
 }

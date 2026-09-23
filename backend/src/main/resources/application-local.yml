@@ -9,3 +9,5 @@ superfercho:
     admin:
       email: ${SUPERFERCHO_DEV_ADMIN_EMAIL:}
       password: ${SUPERFERCHO_DEV_ADMIN_PASSWORD:}
+    demo-seed:
+      enabled: ${SUPERFERCHO_DEV_DEMO_SEED:true}

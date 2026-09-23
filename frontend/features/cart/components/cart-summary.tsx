@@ -45,8 +45,8 @@ export function CartSummary({ cart }: { cart: Cart }) {
         ) : null}
       </dl>
       <p className="text-sm text-sf-muted">
-        Cada línea usa el precio al agregar. No incluye envío, impuestos ni
-        descuentos: el backend no los envía.
+        Cada línea usa el precio al agregar. Esta suma no incluye envío,
+        impuestos ni descuentos.
       </p>
       {errorMessage ? (
         <Alert tone="error" title="No se pudo vaciar">

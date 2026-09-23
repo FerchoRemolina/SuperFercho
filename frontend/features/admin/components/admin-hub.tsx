@@ -23,11 +23,12 @@ const sections = [
   },
   {
     href: "/admin/knowledge",
-    title: "Knowledge",
+    title: "Base de conocimiento",
     description:
-      "Consulta los documentos de conocimiento del supermercado.",
+      "Consulta y gestiona los documentos de la base de conocimiento del supermercado.",
   },
 ];
+
 
 export function AdminHub() {
   return (

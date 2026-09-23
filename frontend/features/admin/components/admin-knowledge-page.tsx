@@ -59,11 +59,11 @@ export function AdminKnowledgePageContent() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
-            Knowledge
+            Base de conocimiento
           </h1>
           <p className="mt-2 max-w-2xl text-base text-sf-muted">
-            Consulta los documentos de conocimiento del supermercado. La
-            búsqueda semántica solo incluye documentos en estado Listo.
+            Consulta los documentos de la base de conocimiento del supermercado.
+            La búsqueda semántica solo incluye documentos en estado Listo.
           </p>
         </div>
         <Link href={adminKnowledgeNewHref()} className={buttonClassName("primary")}>
@@ -77,7 +77,7 @@ export function AdminKnowledgePageContent() {
         onSubmit={onSearch}
       >
         <label htmlFor="admin-knowledge-search" className="sr-only">
-          Buscar en knowledge
+          Buscar en la base de conocimiento
         </label>
         <input
           id="admin-knowledge-search"

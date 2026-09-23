@@ -511,8 +511,13 @@ export const ADMIN_NAV_LINKS = [
   { href: "/admin/products", label: "Productos", match: "prefix" as const },
   { href: "/admin/categories", label: "Categorías", match: "prefix" as const },
   { href: "/admin/orders", label: "Pedidos", match: "prefix" as const },
-  { href: "/admin/knowledge", label: "Knowledge", match: "prefix" as const },
+  {
+    href: "/admin/knowledge",
+    label: "Base de conocimiento",
+    match: "prefix" as const,
+  },
 ];
+
 
 export function isAdminNavActive(
   href: string,

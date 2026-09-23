@@ -42,6 +42,7 @@ import {
   paymentStatusTone,
   shouldSearchAdminKnowledge,
   shouldSearchAdminProducts,
+  ADMIN_NAV_LINKS,
 } from "@/features/admin/presentation";
 import {
   ADMIN_DOCUMENT_STATUSES,
@@ -461,5 +462,12 @@ describe("admin knowledge presentation", () => {
     expect(paymentStatusTone("APPROVED")).toBe("primary");
     expect(paymentStatusTone("PENDING")).toBe("accent");
     expect(paymentStatusTone("DECLINED")).toBe("danger");
+  });
+
+  it("labels the knowledge nav as Base de conocimiento", () => {
+    const knowledge = ADMIN_NAV_LINKS.find(
+      (link) => link.href === "/admin/knowledge",
+    );
+    expect(knowledge?.label).toBe("Base de conocimiento");
   });
 });
