@@ -79,7 +79,7 @@ export function AddressForm({
   }
 
   return (
-    <form className="grid gap-4" onSubmit={handleSubmit} noValidate>
+    <form className="grid gap-3" onSubmit={handleSubmit} noValidate>
       <TextField
         id={`${formId}-label`}
         label="Nombre de la dirección"
@@ -111,7 +111,7 @@ export function AddressForm({
         autoComplete="off"
         onChange={(event) => update("additionalInfo", event.target.value)}
       />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         <TextField
           id={`${formId}-city`}
           label="Ciudad"
@@ -150,8 +150,8 @@ export function AddressForm({
         </label>
       )}
       {error ? <p className="text-sm text-sf-error">{error}</p> : null}
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <Button type="submit" className="flex-1" disabled={pending}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <Button type="submit" disabled={pending}>
           {pending
             ? "Guardando…"
             : editing
@@ -161,7 +161,6 @@ export function AddressForm({
         <Button
           type="button"
           variant="secondary"
-          className="flex-1"
           disabled={pending}
           onClick={onCancel}
         >
