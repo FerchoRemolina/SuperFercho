@@ -11,13 +11,19 @@ export function BrandLogo({
     <Link
       href="/"
       className={cx(
-        "inline-flex min-h-11 items-center text-lg font-bold tracking-tight text-sf-primary",
+        "inline-flex min-h-11 items-center",
         className,
       )}
-      data-brand-logo={brandingAssets.logo}
-      data-brand-mark={brandingAssets.mark}
+      aria-label="SuperFercho"
     >
-      SuperFercho
+      {/* eslint-disable-next-line @next/next/no-img-element -- static branding SVG from /public */}
+      <img
+        src={brandingAssets.logo}
+        alt="SuperFercho"
+        width={176}
+        height={32}
+        className="h-8 w-auto"
+      />
     </Link>
   );
 }

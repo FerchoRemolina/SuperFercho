@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 40" fill="none" role="img" aria-label="SuperFercho">
+  <rect width="40" height="40" rx="10" fill="#087443"/>
+  <path
+    d="M11 15h18l-1.4 9a2.5 2.5 0 0 1-2.5 2.1H14.9a2.5 2.5 0 0 1-2.5-2.1L11 15Z"
+    fill="#FFD429"
+  />
+  <path d="M11 15 9.8 10H7" stroke="#FFF7CC" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="16.5" cy="30.5" r="1.7" fill="#FFF7CC"/>
+  <circle cx="25.5" cy="30.5" r="1.7" fill="#FFF7CC"/>
+  <path
+    d="M18.5 12.5c0-2.4 1.8-4.2 4.2-4.2 0 2.4-1.8 4.2-4.2 4.2Zm2.4 0c2.4 0 4.2-1.8 4.2-4.2 0 2.4 1.8 4.2 4.2 4.2-2.4 0-4.2 1.8-4.2 4.2 0-2.4-1.8-4.2-4.2-4.2Z"
+    fill="#FFFFFF"
+  />
+  <text
+    x="52"
+    y="27"
+    fill="#087443"
+    font-family="Inter, ui-sans-serif, system-ui, sans-serif"
+    font-size="20"
+    font-weight="700"
+    letter-spacing="-0.03em"
+  >SuperFercho</text>
+</svg>

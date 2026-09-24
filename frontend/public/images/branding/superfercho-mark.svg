@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="SuperFercho">
+  <rect width="64" height="64" rx="16" fill="#087443"/>
+  <path
+    d="M18 24h28l-2.2 14.5a4 4 0 0 1-4 3.4H24.2a4 4 0 0 1-4-3.4L18 24Z"
+    fill="#FFD429"
+  />
+  <path d="M18 24 16.2 16H12" stroke="#FFF7CC" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="26" cy="48" r="2.8" fill="#FFF7CC"/>
+  <circle cx="40" cy="48" r="2.8" fill="#FFF7CC"/>
+  <path
+    d="M30 20c0-4 3-7 7-7 0 4-3 7-7 7Zm4 0c4 0 7-3 7-7 0 4 3 7 7 7-4 0-7 3-7 7 0-4-3-7-7-7Z"
+    fill="#FFFFFF"
+  />
+</svg>
