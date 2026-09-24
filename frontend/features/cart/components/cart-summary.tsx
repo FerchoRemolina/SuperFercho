@@ -26,8 +26,8 @@ export function CartSummary({ cart }: { cart: Cart }) {
         : null;
 
   return (
-    <Card className="grid gap-4">
-      <h2 className="text-xl font-semibold text-sf-ink">Resumen</h2>
+    <Card className="grid gap-3 md:gap-4">
+      <h2 className="text-lg font-semibold text-sf-ink md:text-xl">Resumen</h2>
       <dl className="grid gap-2 text-sm">
         <div className="flex justify-between gap-4">
           <dt className="text-sf-muted">Productos</dt>
@@ -38,15 +38,16 @@ export function CartSummary({ cart }: { cart: Cart }) {
           <dd className="font-semibold text-sf-ink">{unitCount}</dd>
         </div>
         {linesTotal ? (
-          <div className="flex justify-between gap-4 border-t border-sf-border pt-3 text-base">
-            <dt className="font-semibold text-sf-ink">Suma de líneas</dt>
-            <dd className="font-bold text-sf-ink">{formatMoney(linesTotal)}</dd>
+          <div className="flex justify-between gap-4 border-t border-sf-border pt-3">
+            <dt className="text-base font-semibold text-sf-ink">Subtotal</dt>
+            <dd className="text-lg font-bold text-sf-ink">
+              {formatMoney(linesTotal)}
+            </dd>
           </div>
         ) : null}
       </dl>
-      <p className="text-sm text-sf-muted">
-        Cada línea usa el precio al agregar. Esta suma no incluye envío,
-        impuestos ni descuentos.
+      <p className="text-xs leading-relaxed text-sf-muted">
+        Precios al agregar. Sin envío, impuestos ni descuentos.
       </p>
       {errorMessage ? (
         <Alert tone="error" title="No se pudo vaciar">
@@ -56,8 +57,14 @@ export function CartSummary({ cart }: { cart: Cart }) {
       <Link href="/checkout" className={buttonClassName("primary")}>
         Ir a pagar
       </Link>
+      <Link
+        href="/catalog"
+        className="inline-flex min-h-11 items-center justify-center text-sm font-semibold text-sf-muted hover:text-sf-primary hover:underline"
+      >
+        Seguir comprando
+      </Link>
       {confirming ? (
-        <div className="grid gap-2">
+        <div className="grid gap-2 border-t border-sf-border pt-3">
           <p className="text-sm font-semibold text-sf-ink">
             ¿Vaciar el carrito?
           </p>
@@ -85,7 +92,8 @@ export function CartSummary({ cart }: { cart: Cart }) {
       ) : (
         <Button
           type="button"
-          variant="secondary"
+          variant="ghost"
+          className="justify-center px-0 text-sm font-semibold text-sf-muted hover:bg-transparent hover:text-sf-error"
           onClick={() => setConfirming(true)}
         >
           Vaciar carrito

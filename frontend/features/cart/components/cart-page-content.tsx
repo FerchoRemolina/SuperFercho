@@ -20,8 +20,8 @@ export function CartPageContent() {
 
   if (cartQuery.isPending) {
     return (
-      <Container as="main" className="py-10 md:py-16">
-        <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
+      <Container as="main" className="py-8 md:py-16">
+        <h1 className="text-[1.75rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
           Carrito
         </h1>
         <CartSkeleton />
@@ -34,11 +34,11 @@ export function CartPageContent() {
       ? messageForApiProblem(cartQuery.error.problem)
       : "No se pudo cargar el carrito.";
     return (
-      <Container as="main" className="py-10 md:py-16">
-        <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
+      <Container as="main" className="py-8 md:py-16">
+        <h1 className="text-[1.75rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
           Carrito
         </h1>
-        <div className="mt-8 grid gap-4">
+        <div className="mt-6 grid gap-4 md:mt-8">
           <Alert tone="error" title="No se pudo cargar el carrito">
             {message}
           </Alert>
@@ -53,11 +53,11 @@ export function CartPageContent() {
   const cart = cartQuery.data;
   if (!cart || cart.items.length === 0) {
     return (
-      <Container as="main" className="py-10 md:py-16">
-        <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
+      <Container as="main" className="py-8 md:py-16">
+        <h1 className="text-[1.75rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
           Carrito
         </h1>
-        <div className="mt-8">
+        <div className="mt-6 md:mt-8">
           <EmptyState
             title="Tu carrito está vacío"
             description="Añade productos del catálogo para armar tu mercado."
@@ -78,12 +78,15 @@ export function CartPageContent() {
   const mutating = cartQuery.isFetching && !cartQuery.isPending;
 
   return (
-    <Container as="main" className="py-10 md:py-16">
-      <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
+    <Container as="main" className="py-8 md:py-16">
+      <h1 className="text-[1.75rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
         Carrito
       </h1>
-      <div className="mt-8 grid gap-8 md:grid-cols-[minmax(0,1fr)_20rem] md:items-start">
-        <ul className="grid gap-4">
+      <div className="mt-6 grid gap-5 md:mt-8 md:grid-cols-[minmax(0,1fr)_20rem] md:items-start md:gap-8">
+        <aside className="order-1 md:order-2 md:sticky md:top-24">
+          <CartSummary cart={cart} />
+        </aside>
+        <ul className="order-2 grid gap-3 md:order-1 md:gap-4">
           {cart.items.map((item) => (
             <CartLine
               key={item.id}
@@ -93,9 +96,6 @@ export function CartPageContent() {
             />
           ))}
         </ul>
-        <aside className="md:sticky md:top-24">
-          <CartSummary cart={cart} />
-        </aside>
       </div>
     </Container>
   );
@@ -104,33 +104,33 @@ export function CartPageContent() {
 function CartSkeleton() {
   return (
     <div
-      className="mt-8 grid gap-8 md:grid-cols-[minmax(0,1fr)_20rem]"
+      className="mt-6 grid gap-5 md:mt-8 md:grid-cols-[minmax(0,1fr)_20rem] md:gap-8"
       aria-hidden="true"
     >
-      <div className="grid gap-4">
-        <Card className="grid gap-4 md:grid-cols-[6rem_1fr]">
+      <Card className="order-1 grid gap-3 md:order-2">
+        <Skeleton className="h-6 w-1/2" />
+        <Skeleton className="mt-2 h-4 w-full" />
+        <Skeleton className="mt-2 h-4 w-2/3" />
+        <Skeleton className="mt-4 h-11 w-full" />
+      </Card>
+      <div className="order-2 grid gap-3 md:order-1">
+        <Card className="grid grid-cols-[4.5rem_1fr] gap-3 p-3">
           <Skeleton className="aspect-square w-full" />
           <div>
             <Skeleton className="h-5 w-2/3" />
-            <Skeleton className="mt-3 h-4 w-1/3" />
-            <Skeleton className="mt-6 h-11 w-40" />
+            <Skeleton className="mt-2 h-4 w-1/3" />
+            <Skeleton className="mt-4 h-11 w-36" />
           </div>
         </Card>
-        <Card className="grid gap-4 md:grid-cols-[6rem_1fr]">
+        <Card className="grid grid-cols-[4.5rem_1fr] gap-3 p-3">
           <Skeleton className="aspect-square w-full" />
           <div>
             <Skeleton className="h-5 w-1/2" />
-            <Skeleton className="mt-3 h-4 w-1/4" />
-            <Skeleton className="mt-6 h-11 w-40" />
+            <Skeleton className="mt-2 h-4 w-1/4" />
+            <Skeleton className="mt-4 h-11 w-36" />
           </div>
         </Card>
       </div>
-      <Card>
-        <Skeleton className="h-6 w-1/2" />
-        <Skeleton className="mt-4 h-4 w-full" />
-        <Skeleton className="mt-2 h-4 w-2/3" />
-        <Skeleton className="mt-6 h-11 w-full" />
-      </Card>
     </div>
   );
 }
