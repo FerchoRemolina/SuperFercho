@@ -5,10 +5,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.application.port.ProductRepository;
+import com.superfercho.catalog.application.port.ProductTypeRepository;
 import com.superfercho.catalog.domain.model.Category;
 import com.superfercho.catalog.domain.model.CategoryStatus;
+import com.superfercho.catalog.domain.model.Presentation;
+import com.superfercho.catalog.domain.model.PresentationUnit;
 import com.superfercho.catalog.domain.model.Product;
 import com.superfercho.catalog.domain.model.ProductStatus;
+import com.superfercho.catalog.domain.model.ProductType;
+import com.superfercho.catalog.domain.model.ProductTypeStatus;
 import com.superfercho.identity.application.port.AddressRepository;
 import com.superfercho.identity.application.port.UserRepository;
 import com.superfercho.identity.domain.model.Address;
@@ -105,6 +110,9 @@ class TransactionalCheckoutUseCaseIntegrationTest {
 
     @Autowired
     private CategoryRepository categoryRepository;
+
+    @Autowired
+    private ProductTypeRepository productTypeRepository;
 
     @Autowired
     private ProductRepository productRepository;
@@ -423,7 +431,15 @@ class TransactionalCheckoutUseCaseIntegrationTest {
 
     private Product persistProduct(int stock, Money price, ProductStatus status) {
         Category category = categoryRepository.save(newCategory());
-        return productRepository.save(newProduct(category.id(), stock, price, status));
+        ProductType type = productTypeRepository.save(ProductType.create(
+                UUID.randomUUID(),
+                category.id(),
+                "CheckoutType-" + UUID.randomUUID(),
+                null,
+                ProductTypeStatus.ACTIVE,
+                NOW,
+                NOW));
+        return productRepository.save(newProduct(category.id(), type.id(), stock, price, status));
     }
 
     private CheckoutResult executeAuthenticated(
@@ -635,10 +651,13 @@ class TransactionalCheckoutUseCaseIntegrationTest {
                 UUID.randomUUID(), "Checkout-" + UUID.randomUUID(), "Fresh produce", CategoryStatus.ACTIVE, NOW, NOW);
     }
 
-    private static Product newProduct(UUID categoryId, int stock, Money price, ProductStatus status) {
+    private static Product newProduct(UUID categoryId, UUID productTypeId, int stock, Money price, ProductStatus status) {
         return Product.create(
                 UUID.randomUUID(),
                 categoryId,
+                productTypeId,
+                null,
+                Presentation.of(1, PresentationUnit.UNIT),
                 null,
                 "Leche entera",
                 "Alpina",

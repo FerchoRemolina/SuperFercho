@@ -1,5 +1,6 @@
 package com.superfercho.catalog.infrastructure.persistence.entity;
 
+import com.superfercho.catalog.domain.model.PresentationUnit;
 import com.superfercho.catalog.domain.model.ProductStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -21,6 +22,19 @@ public class ProductJpaEntity {
 
     @Column(name = "category_id", nullable = false)
     private UUID categoryId;
+
+    @Column(name = "product_type_id", nullable = false)
+    private UUID productTypeId;
+
+    @Column(name = "product_variant_id")
+    private UUID productVariantId;
+
+    @Column(name = "presentation_quantity", nullable = false, precision = 12, scale = 3)
+    private BigDecimal presentationQuantity;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "presentation_unit", nullable = false)
+    private PresentationUnit presentationUnit;
 
     @Column(name = "barcode")
     private String barcode;
@@ -62,6 +76,10 @@ public class ProductJpaEntity {
     public ProductJpaEntity(
             UUID id,
             UUID categoryId,
+            UUID productTypeId,
+            UUID productVariantId,
+            BigDecimal presentationQuantity,
+            PresentationUnit presentationUnit,
             String barcode,
             String name,
             String brand,
@@ -75,6 +93,10 @@ public class ProductJpaEntity {
             Instant updatedAt) {
         this.id = id;
         this.categoryId = categoryId;
+        this.productTypeId = productTypeId;
+        this.productVariantId = productVariantId;
+        this.presentationQuantity = presentationQuantity;
+        this.presentationUnit = presentationUnit;
         this.barcode = barcode;
         this.name = name;
         this.brand = brand;
@@ -94,6 +116,22 @@ public class ProductJpaEntity {
 
     public UUID getCategoryId() {
         return categoryId;
+    }
+
+    public UUID getProductTypeId() {
+        return productTypeId;
+    }
+
+    public UUID getProductVariantId() {
+        return productVariantId;
+    }
+
+    public BigDecimal getPresentationQuantity() {
+        return presentationQuantity;
+    }
+
+    public PresentationUnit getPresentationUnit() {
+        return presentationUnit;
     }
 
     public String getBarcode() {

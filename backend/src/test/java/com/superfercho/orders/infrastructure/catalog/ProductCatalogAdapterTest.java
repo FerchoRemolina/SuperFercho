@@ -10,11 +10,17 @@ import static org.mockito.Mockito.when;
 import com.superfercho.catalog.application.dto.StockQuantity;
 import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.application.port.ProductRepository;
+import com.superfercho.catalog.application.port.ProductTypeRepository;
+import com.superfercho.catalog.application.port.ProductVariantRepository;
 import com.superfercho.catalog.application.usecase.FindProductPriceUseCase;
 import com.superfercho.catalog.domain.model.Category;
 import com.superfercho.catalog.domain.model.CategoryStatus;
+import com.superfercho.catalog.domain.model.Presentation;
+import com.superfercho.catalog.domain.model.PresentationUnit;
 import com.superfercho.catalog.domain.model.Product;
 import com.superfercho.catalog.domain.model.ProductStatus;
+import com.superfercho.catalog.domain.model.ProductType;
+import com.superfercho.catalog.domain.model.ProductTypeStatus;
 import com.superfercho.orders.application.dto.AvailabilityResult;
 import com.superfercho.orders.application.dto.ProductCatalogInfo;
 import com.superfercho.platform.money.Money;
@@ -34,6 +40,8 @@ class ProductCatalogAdapterTest {
 
     private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
     private static final UUID CATEGORY_ID = UUID.fromString("55555555-5555-5555-5555-555555555555");
+    private static final UUID TYPE_ID = UUID.fromString("66666666-6666-6666-6666-666666666666");
+    private static final Presentation UNIT = Presentation.of(1, PresentationUnit.UNIT);
     private static final UUID MILK_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
     private static final UUID BREAD_ID = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
     private static final Money MILK_PRICE = Money.cop(new BigDecimal("10.50"));
@@ -44,12 +52,20 @@ class ProductCatalogAdapterTest {
     @Mock
     private CategoryRepository categoryRepository;
 
+    @Mock
+    private ProductTypeRepository productTypeRepository;
+
+    @Mock
+    private ProductVariantRepository productVariantRepository;
+
     private ProductCatalogAdapter adapter;
 
     @BeforeEach
     void setUp() {
         adapter = new ProductCatalogAdapter(
-                productRepository, new FindProductPriceUseCase(productRepository, categoryRepository));
+                productRepository,
+                new FindProductPriceUseCase(
+                        productRepository, categoryRepository, productTypeRepository, productVariantRepository));
     }
 
     @Test
@@ -157,6 +173,9 @@ class ProductCatalogAdapterTest {
     private void givenProduct(UUID productId, ProductStatus productStatus, CategoryStatus categoryStatus, int stock) {
         when(productRepository.findById(productId)).thenReturn(Optional.of(product(productId, productStatus, stock)));
         when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category(categoryStatus)));
+        when(productTypeRepository.findById(TYPE_ID))
+                .thenReturn(Optional.of(ProductType.create(
+                        TYPE_ID, CATEGORY_ID, "Leche", null, ProductTypeStatus.ACTIVE, NOW, NOW)));
     }
 
     private static Category category(CategoryStatus status) {
@@ -167,6 +186,9 @@ class ProductCatalogAdapterTest {
         return Product.create(
                 id,
                 CATEGORY_ID,
+                TYPE_ID,
+                null,
+                UNIT,
                 "7701234567890",
                 "Leche entera",
                 "Alpina",

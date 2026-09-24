@@ -18,6 +18,8 @@ class ProductTest {
 
     private static final UUID ID = UUID.fromString("44444444-4444-4444-4444-444444444444");
     private static final UUID CATEGORY_ID = UUID.fromString("55555555-5555-5555-5555-555555555555");
+    private static final UUID TYPE_ID = UUID.fromString("77777777-7777-7777-7777-777777777777");
+    private static final Presentation UNIT = Presentation.of(1, PresentationUnit.UNIT);
     private static final Instant CREATED_AT = Instant.parse("2026-01-01T00:00:00Z");
     private static final Instant UPDATED_AT = Instant.parse("2026-01-01T00:00:00Z");
     private static final Instant LATER = Instant.parse("2026-01-01T00:15:00Z");
@@ -28,6 +30,9 @@ class ProductTest {
 
         assertEquals(ID, product.id());
         assertEquals(CATEGORY_ID, product.categoryId());
+        assertEquals(TYPE_ID, product.productTypeId());
+        assertNull(product.productVariantId());
+        assertEquals(UNIT, product.presentation());
         assertEquals("7701234567890", product.barcode());
         assertEquals("Leche entera", product.name());
         assertEquals("Alpina", product.brand());
@@ -38,6 +43,16 @@ class ProductTest {
         assertEquals(ProductStatus.ACTIVE, product.status());
         assertEquals(CREATED_AT, product.createdAt());
         assertEquals(UPDATED_AT, product.updatedAt());
+    }
+
+    @Test
+    void shouldRejectProductWhenProductTypeIdIsNull() {
+        assertThrows(InvalidProductException.class, () -> validProduct().productTypeId(null).build());
+    }
+
+    @Test
+    void shouldRejectProductWhenPresentationIsNull() {
+        assertThrows(InvalidProductException.class, () -> validProduct().presentation(null).build());
     }
 
     @Test
@@ -102,6 +117,18 @@ class ProductTest {
     }
 
     @Test
+    void shouldAcceptOptionalProductVariantId() {
+        UUID variantId = UUID.fromString("88888888-8888-8888-8888-888888888888");
+        Product withVariant = validProduct().productVariantId(variantId).build();
+        Product withoutVariant = validProduct().productVariantId(null).build();
+
+        assertEquals(variantId, withVariant.productVariantId());
+        assertNull(withoutVariant.productVariantId());
+        assertEquals(Presentation.of(1, PresentationUnit.UNIT), withoutVariant.presentation());
+        assertEquals(TYPE_ID, withoutVariant.productTypeId());
+    }
+
+    @Test
     void shouldActivateProduct() {
         Product inactive = validProduct().status(ProductStatus.INACTIVE).build();
 
@@ -112,6 +139,20 @@ class ProductTest {
         assertEquals(inactive.categoryId(), activated.categoryId());
         assertEquals(inactive.createdAt(), activated.createdAt());
         assertEquals(LATER, activated.updatedAt());
+    }
+
+    @Test
+    void shouldRejectActivateWhenProductIsActive() {
+        Product active = validProduct().build();
+
+        assertThrows(InvalidProductException.class, () -> active.activate(LATER));
+    }
+
+    @Test
+    void shouldRejectActivateWhenProductIsArchived() {
+        Product archived = validProduct().status(ProductStatus.ARCHIVED).build();
+
+        assertThrows(InvalidProductException.class, () -> archived.activate(LATER));
     }
 
     @Test
@@ -128,11 +169,80 @@ class ProductTest {
     }
 
     @Test
+    void shouldRejectDeactivateWhenProductIsInactive() {
+        Product inactive = validProduct().status(ProductStatus.INACTIVE).build();
+
+        assertThrows(InvalidProductException.class, () -> inactive.deactivate(LATER));
+    }
+
+    @Test
+    void shouldRejectDeactivateWhenProductIsArchived() {
+        Product archived = validProduct().status(ProductStatus.ARCHIVED).build();
+
+        assertThrows(InvalidProductException.class, () -> archived.deactivate(LATER));
+    }
+
+    @Test
+    void shouldArchiveActiveProduct() {
+        Product active = validProduct().build();
+
+        Product archived = active.archive(LATER);
+
+        assertEquals(ProductStatus.ARCHIVED, archived.status());
+        assertEquals(active.id(), archived.id());
+        assertEquals(active.stock(), archived.stock());
+        assertEquals(active.price(), archived.price());
+        assertEquals(active.createdAt(), archived.createdAt());
+        assertEquals(LATER, archived.updatedAt());
+    }
+
+    @Test
+    void shouldArchiveInactiveProduct() {
+        Product inactive = validProduct().status(ProductStatus.INACTIVE).build();
+
+        Product archived = inactive.archive(LATER);
+
+        assertEquals(ProductStatus.ARCHIVED, archived.status());
+        assertEquals(LATER, archived.updatedAt());
+    }
+
+    @Test
+    void shouldRejectArchiveWhenProductIsAlreadyArchived() {
+        Product archived = validProduct().status(ProductStatus.ARCHIVED).build();
+
+        assertThrows(InvalidProductException.class, () -> archived.archive(LATER));
+    }
+
+    @Test
+    void shouldRestoreArchivedProductToInactive() {
+        Product archived = validProduct().status(ProductStatus.ARCHIVED).build();
+
+        Product restored = archived.restore(LATER);
+
+        assertEquals(ProductStatus.INACTIVE, restored.status());
+        assertEquals(archived.id(), restored.id());
+        assertEquals(archived.createdAt(), restored.createdAt());
+        assertEquals(LATER, restored.updatedAt());
+    }
+
+    @Test
+    void shouldRejectRestoreWhenProductIsNotArchived() {
+        Product active = validProduct().build();
+        Product inactive = validProduct().status(ProductStatus.INACTIVE).build();
+
+        assertThrows(InvalidProductException.class, () -> active.restore(LATER));
+        assertThrows(InvalidProductException.class, () -> inactive.restore(LATER));
+    }
+
+    @Test
     void shouldUpdateProductInformationAndPreserveIdentity() {
         Product original = validProduct().build();
 
         Product updated = original.updateInformation(
                 original.categoryId(),
+                TYPE_ID,
+                null,
+                UNIT,
                 "7709999999999",
                 "Leche deslactosada",
                 "Alquería",
@@ -142,6 +252,9 @@ class ProductTest {
 
         assertEquals(original.id(), updated.id());
         assertEquals(original.categoryId(), updated.categoryId());
+        assertEquals(TYPE_ID, updated.productTypeId());
+        assertNull(updated.productVariantId());
+        assertEquals(UNIT, updated.presentation());
         assertEquals(original.price(), updated.price());
         assertEquals(original.stock(), updated.stock());
         assertEquals(original.status(), updated.status());
@@ -158,9 +271,13 @@ class ProductTest {
     void shouldUpdateProductCategory() {
         Product original = validProduct().build();
         UUID newCategoryId = UUID.fromString("66666666-6666-6666-6666-666666666666");
+        UUID newTypeId = UUID.fromString("88888888-8888-8888-8888-888888888888");
 
         Product updated = original.updateInformation(
                 newCategoryId,
+                newTypeId,
+                null,
+                UNIT,
                 original.barcode(),
                 original.name(),
                 original.brand(),
@@ -169,6 +286,7 @@ class ProductTest {
                 LATER);
 
         assertEquals(newCategoryId, updated.categoryId());
+        assertEquals(newTypeId, updated.productTypeId());
         assertEquals(original.price(), updated.price());
         assertEquals(original.stock(), updated.stock());
     }
@@ -180,7 +298,16 @@ class ProductTest {
         assertThrows(
                 InvalidProductException.class,
                 () -> original.updateInformation(
-                        original.categoryId(), "7701234567890", "  ", "Alpina", "1L", null, LATER));
+                        original.categoryId(),
+                        TYPE_ID,
+                        null,
+                        UNIT,
+                        "7701234567890",
+                        "  ",
+                        "Alpina",
+                        "1L",
+                        null,
+                        LATER));
     }
 
     @Test
@@ -231,6 +358,9 @@ class ProductTest {
     private static final class ProductBuilder {
         private UUID id = ID;
         private UUID categoryId = CATEGORY_ID;
+        private UUID productTypeId = TYPE_ID;
+        private UUID productVariantId = null;
+        private Presentation presentation = UNIT;
         private String barcode = "7701234567890";
         private String name = "Leche entera";
         private String brand = "Alpina";
@@ -249,6 +379,21 @@ class ProductTest {
 
         private ProductBuilder categoryId(UUID categoryId) {
             this.categoryId = categoryId;
+            return this;
+        }
+
+        private ProductBuilder productTypeId(UUID productTypeId) {
+            this.productTypeId = productTypeId;
+            return this;
+        }
+
+        private ProductBuilder productVariantId(UUID productVariantId) {
+            this.productVariantId = productVariantId;
+            return this;
+        }
+
+        private ProductBuilder presentation(Presentation presentation) {
+            this.presentation = presentation;
             return this;
         }
 
@@ -296,6 +441,9 @@ class ProductTest {
             return Product.create(
                     id,
                     categoryId,
+                    productTypeId,
+                    productVariantId,
+                    presentation,
                     barcode,
                     name,
                     brand,

@@ -5,10 +5,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.application.port.ProductRepository;
+import com.superfercho.catalog.application.port.ProductTypeRepository;
 import com.superfercho.catalog.domain.model.Category;
 import com.superfercho.catalog.domain.model.CategoryStatus;
+import com.superfercho.catalog.domain.model.Presentation;
+import com.superfercho.catalog.domain.model.PresentationUnit;
 import com.superfercho.catalog.domain.model.Product;
 import com.superfercho.catalog.domain.model.ProductStatus;
+import com.superfercho.catalog.domain.model.ProductType;
+import com.superfercho.catalog.domain.model.ProductTypeStatus;
 import com.superfercho.identity.application.port.AddressRepository;
 import com.superfercho.identity.application.port.UserRepository;
 import com.superfercho.identity.domain.model.Address;
@@ -108,6 +113,9 @@ class PendingOrderTransitionConcurrencyIntegrationTest {
 
     @Autowired
     private CategoryRepository categoryRepository;
+
+    @Autowired
+    private ProductTypeRepository productTypeRepository;
 
     @Autowired
     private ProductRepository productRepository;
@@ -261,9 +269,20 @@ class PendingOrderTransitionConcurrencyIntegrationTest {
     private Product persistProduct() {
         Category category = categoryRepository.save(Category.create(
                 UUID.randomUUID(), "Race-" + UUID.randomUUID(), "Fresh produce", CategoryStatus.ACTIVE, NOW, NOW));
+        ProductType type = productTypeRepository.save(ProductType.create(
+                UUID.randomUUID(),
+                category.id(),
+                "RaceType-" + UUID.randomUUID(),
+                null,
+                ProductTypeStatus.ACTIVE,
+                NOW,
+                NOW));
         return productRepository.save(Product.create(
                 UUID.randomUUID(),
                 category.id(),
+                type.id(),
+                null,
+                Presentation.of(1, PresentationUnit.UNIT),
                 null,
                 "Leche entera",
                 "Alpina",

@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.superfercho.catalog.application.dto.ActivateProductCommand;
 import com.superfercho.catalog.application.dto.AdjustProductStockCommand;
+import com.superfercho.catalog.application.dto.ArchiveProductCommand;
 import com.superfercho.catalog.application.dto.CatalogView;
 import com.superfercho.catalog.application.dto.ChangeProductPriceCommand;
 import com.superfercho.catalog.application.dto.CreateProductCommand;
@@ -21,22 +22,27 @@ import com.superfercho.catalog.application.dto.DeactivateProductCommand;
 import com.superfercho.catalog.application.dto.GetProductCommand;
 import com.superfercho.catalog.application.dto.ListProductsCommand;
 import com.superfercho.catalog.application.dto.ProductResult;
+import com.superfercho.catalog.application.dto.RestoreProductCommand;
 import com.superfercho.catalog.application.dto.SearchProductsCommand;
 import com.superfercho.catalog.application.dto.UpdateProductCommand;
 import com.superfercho.catalog.application.exception.DuplicateBarcodeException;
-import com.superfercho.catalog.application.exception.InvalidCategoryReferenceException;
+import com.superfercho.catalog.application.exception.InvalidProductTypeReferenceException;
 import com.superfercho.catalog.application.exception.ProductNotFoundException;
 import com.superfercho.catalog.application.exception.ProductStockConflictException;
 import com.superfercho.catalog.application.usecase.ActivateProductUseCase;
 import com.superfercho.catalog.application.usecase.AdjustProductStockUseCase;
+import com.superfercho.catalog.application.usecase.ArchiveProductUseCase;
 import com.superfercho.catalog.application.usecase.ChangeProductPriceUseCase;
 import com.superfercho.catalog.application.usecase.CreateProductUseCase;
 import com.superfercho.catalog.application.usecase.DeactivateProductUseCase;
 import com.superfercho.catalog.application.usecase.GetProductUseCase;
 import com.superfercho.catalog.application.usecase.ListProductsUseCase;
+import com.superfercho.catalog.application.usecase.RestoreProductUseCase;
 import com.superfercho.catalog.application.usecase.SearchProductsUseCase;
 import com.superfercho.catalog.application.usecase.UpdateProductUseCase;
 import com.superfercho.catalog.domain.exception.InvalidProductException;
+import com.superfercho.catalog.domain.model.Presentation;
+import com.superfercho.catalog.domain.model.PresentationUnit;
 import com.superfercho.catalog.domain.model.ProductStatus;
 import com.superfercho.platform.error.ApiExceptionHandler;
 import com.superfercho.platform.money.Money;
@@ -62,6 +68,8 @@ class ProductControllerTest {
     private static final Instant UPDATED_AT = Instant.parse("2026-03-01T10:30:00Z");
     private static final UUID PRODUCT_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
     private static final UUID CATEGORY_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private static final UUID TYPE_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+    private static final Presentation UNIT = Presentation.of(1, PresentationUnit.UNIT);
     private static final Money PRICE = Money.cop(new BigDecimal("10.50"));
 
     @Autowired
@@ -87,6 +95,12 @@ class ProductControllerTest {
 
     @MockitoBean
     private DeactivateProductUseCase deactivateProductUseCase;
+
+    @MockitoBean
+    private ArchiveProductUseCase archiveProductUseCase;
+
+    @MockitoBean
+    private RestoreProductUseCase restoreProductUseCase;
 
     @MockitoBean
     private ChangeProductPriceUseCase changeProductPriceUseCase;
@@ -120,7 +134,9 @@ class ProductControllerTest {
 
         verify(createProductUseCase)
                 .execute(new CreateProductCommand(
-                        CATEGORY_ID,
+                        TYPE_ID,
+                        null,
+                        UNIT,
                         "7701234567890",
                         "Leche entera",
                         "Alquería",
@@ -259,7 +275,9 @@ class ProductControllerTest {
         verify(updateProductUseCase)
                 .execute(new UpdateProductCommand(
                         PRODUCT_ID,
-                        CATEGORY_ID,
+                        TYPE_ID,
+                        null,
+                        UNIT,
                         "7701234567890",
                         "Leche deslactosada",
                         "Alquería",
@@ -294,6 +312,34 @@ class ProductControllerTest {
 
         verify(deactivateProductUseCase).execute(new DeactivateProductCommand(PRODUCT_ID));
         verifyNoInteractions(activateProductUseCase);
+    }
+
+    @Test
+    void shouldArchiveProduct() throws Exception {
+        when(archiveProductUseCase.execute(new ArchiveProductCommand(PRODUCT_ID)))
+                .thenReturn(productResult(ProductStatus.ARCHIVED, PRICE));
+
+        mockMvc.perform(post("/api/v1/products/{productId}/archive", PRODUCT_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(PRODUCT_ID.toString()))
+                .andExpect(jsonPath("$.status").value("ARCHIVED"));
+
+        verify(archiveProductUseCase).execute(new ArchiveProductCommand(PRODUCT_ID));
+        verifyNoInteractions(restoreProductUseCase, activateProductUseCase);
+    }
+
+    @Test
+    void shouldRestoreProduct() throws Exception {
+        when(restoreProductUseCase.execute(new RestoreProductCommand(PRODUCT_ID)))
+                .thenReturn(productResult(ProductStatus.INACTIVE, PRICE));
+
+        mockMvc.perform(post("/api/v1/products/{productId}/restore", PRODUCT_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(PRODUCT_ID.toString()))
+                .andExpect(jsonPath("$.status").value("INACTIVE"));
+
+        verify(restoreProductUseCase).execute(new RestoreProductCommand(PRODUCT_ID));
+        verifyNoInteractions(archiveProductUseCase, activateProductUseCase);
     }
 
     @Test
@@ -369,14 +415,14 @@ class ProductControllerTest {
     }
 
     @Test
-    void shouldMapInvalidCategoryReferenceToBadRequest() throws Exception {
-        when(createProductUseCase.execute(any())).thenThrow(new InvalidCategoryReferenceException(CATEGORY_ID));
+    void shouldMapInvalidProductTypeReferenceToBadRequest() throws Exception {
+        when(createProductUseCase.execute(any())).thenThrow(new InvalidProductTypeReferenceException(TYPE_ID));
 
         mockMvc.perform(post("/api/v1/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createProductJson()))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_CATEGORY_REFERENCE"));
+                .andExpect(jsonPath("$.code").value("INVALID_PRODUCT_TYPE_REFERENCE"));
     }
 
     @Test
@@ -410,7 +456,9 @@ class ProductControllerTest {
     private static String createProductJson() {
         return """
                 {
-                  "categoryId": "%s",
+                  "productTypeId": "%s",
+                  "productVariantId": null,
+                  "presentation": {"quantity": 1, "unit": "UNIT"},
                   "barcode": "7701234567890",
                   "name": "Leche entera",
                   "brand": "Alquería",
@@ -419,20 +467,22 @@ class ProductControllerTest {
                   "stock": 20,
                   "imageUrl": "https://img.test/leche.png"
                 }
-                """.formatted(CATEGORY_ID);
+                """.formatted(TYPE_ID);
     }
 
     private static String updateProductJson() {
         return """
                 {
-                  "categoryId": "%s",
+                  "productTypeId": "%s",
+                  "productVariantId": null,
+                  "presentation": {"quantity": 1, "unit": "UNIT"},
                   "barcode": "7701234567890",
                   "name": "Leche deslactosada",
                   "brand": "Alquería",
                   "description": "Bolsa 900ml",
                   "imageUrl": "https://img.test/leche-deslactosada.png"
                 }
-                """.formatted(CATEGORY_ID);
+                """.formatted(TYPE_ID);
     }
 
     private static ProductResult productResult(ProductStatus status, Money price) {
@@ -443,6 +493,9 @@ class ProductControllerTest {
         return new ProductResult(
                 PRODUCT_ID,
                 CATEGORY_ID,
+                TYPE_ID,
+                null,
+                UNIT,
                 "7701234567890",
                 "Leche entera",
                 "Alquería",

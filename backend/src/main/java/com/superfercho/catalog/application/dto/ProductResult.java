@@ -1,5 +1,6 @@
 package com.superfercho.catalog.application.dto;
 
+import com.superfercho.catalog.domain.model.Presentation;
 import com.superfercho.catalog.domain.model.Product;
 import com.superfercho.catalog.domain.model.ProductStatus;
 import com.superfercho.platform.money.Money;
@@ -9,6 +10,9 @@ import java.util.UUID;
 public record ProductResult(
         UUID id,
         UUID categoryId,
+        UUID productTypeId,
+        UUID productVariantId,
+        Presentation presentation,
         String barcode,
         String name,
         String brand,
@@ -24,6 +28,9 @@ public record ProductResult(
         return new ProductResult(
                 product.id(),
                 product.categoryId(),
+                product.productTypeId(),
+                product.productVariantId(),
+                product.presentation(),
                 product.barcode(),
                 product.name(),
                 product.brand(),

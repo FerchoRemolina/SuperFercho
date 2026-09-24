@@ -6,14 +6,19 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.superfercho.catalog.application.dto.StockDecrementResult;
 import com.superfercho.catalog.application.dto.StockQuantity;
 import com.superfercho.catalog.application.exception.DuplicateBarcodeException;
-import com.superfercho.catalog.application.exception.InvalidCategoryReferenceException;
+import com.superfercho.catalog.application.exception.InvalidProductTypeReferenceException;
 import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.application.port.InventoryPort;
 import com.superfercho.catalog.application.port.ProductRepository;
+import com.superfercho.catalog.application.port.ProductTypeRepository;
 import com.superfercho.catalog.domain.model.Category;
 import com.superfercho.catalog.domain.model.CategoryStatus;
+import com.superfercho.catalog.domain.model.Presentation;
+import com.superfercho.catalog.domain.model.PresentationUnit;
 import com.superfercho.catalog.domain.model.Product;
 import com.superfercho.catalog.domain.model.ProductStatus;
+import com.superfercho.catalog.domain.model.ProductType;
+import com.superfercho.catalog.domain.model.ProductTypeStatus;
 import com.superfercho.platform.money.Money;
 import java.math.BigDecimal;
 import java.sql.PreparedStatement;
@@ -38,6 +43,7 @@ import org.testcontainers.utility.DockerImageName;
 class CatalogPersistenceAdapterTest {
 
     private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
+    private static final Presentation UNIT = Presentation.of(1, PresentationUnit.UNIT);
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES =
@@ -61,6 +67,9 @@ class CatalogPersistenceAdapterTest {
 
     @Autowired
     private CategoryRepository categoryRepository;
+
+    @Autowired
+    private ProductTypeRepository productTypeRepository;
 
     @Autowired
     private ProductRepository productRepository;
@@ -95,12 +104,15 @@ class CatalogPersistenceAdapterTest {
     @Test
     void shouldPersistAndReloadProduct() {
         Category category = categoryRepository.save(newCategory("Lácteos", CategoryStatus.ACTIVE));
+        ProductType type = productTypeRepository.save(newProductType(category.id(), "Lácteos"));
         Product saved = productRepository.save(
-                newProduct(category.id(), "770111", "Leche entera", ProductStatus.ACTIVE, 10, "4500.50"));
+                newProduct(category.id(), type.id(), "770111", "Leche entera", ProductStatus.ACTIVE, 10, "4500.50"));
 
         Product loaded = productRepository.findById(saved.id()).orElseThrow();
 
         assertThat(loaded.categoryId()).isEqualTo(category.id());
+        assertThat(loaded.productTypeId()).isEqualTo(type.id());
+        assertThat(loaded.presentation()).isEqualTo(UNIT);
         assertThat(loaded.barcode()).isEqualTo("770111");
         assertThat(loaded.name()).isEqualTo("Leche entera");
         assertThat(loaded.brand()).isEqualTo("Alpina");
@@ -112,8 +124,9 @@ class CatalogPersistenceAdapterTest {
     @Test
     void shouldPersistProductStatusPriceAndStock() {
         Category category = categoryRepository.save(newCategory("Abarrotes", CategoryStatus.ACTIVE));
+        ProductType type = productTypeRepository.save(newProductType(category.id(), "Abarrotes"));
         Product saved = productRepository.save(
-                newProduct(category.id(), null, "Arroz", ProductStatus.INACTIVE, 0, "1200.00"));
+                newProduct(category.id(), type.id(), null, "Arroz", ProductStatus.INACTIVE, 0, "1200.00"));
 
         Product loaded = productRepository.findById(saved.id()).orElseThrow();
 
@@ -126,49 +139,55 @@ class CatalogPersistenceAdapterTest {
     @Test
     void shouldRejectDuplicateBarcode() {
         Category category = categoryRepository.save(newCategory("Bebidas", CategoryStatus.ACTIVE));
-        productRepository.save(newProduct(category.id(), "770999", "Agua", ProductStatus.ACTIVE, 5, "1000.00"));
+        ProductType type = productTypeRepository.save(newProductType(category.id(), "Bebidas"));
+        productRepository.save(newProduct(category.id(), type.id(), "770999", "Agua", ProductStatus.ACTIVE, 5, "1000.00"));
 
         assertThatThrownBy(
                         () -> productRepository.save(
-                                newProduct(category.id(), "770999", "Agua gas", ProductStatus.ACTIVE, 3, "1200.00")))
+                                newProduct(category.id(), type.id(), "770999", "Agua gas", ProductStatus.ACTIVE, 3, "1200.00")))
                 .isInstanceOf(DuplicateBarcodeException.class);
     }
 
     @Test
     void shouldAllowMultipleProductsWithoutBarcode() {
         Category category = categoryRepository.save(newCategory("Panadería", CategoryStatus.ACTIVE));
+        ProductType type = productTypeRepository.save(newProductType(category.id(), "Panadería"));
 
-        Product first = productRepository.save(newProduct(category.id(), null, "Pan", ProductStatus.ACTIVE, 2, "500.00"));
-        Product second =
-                productRepository.save(newProduct(category.id(), null, "Croissant", ProductStatus.ACTIVE, 4, "800.00"));
+        Product first = productRepository.save(
+                newProduct(category.id(), type.id(), null, "Pan", ProductStatus.ACTIVE, 2, "500.00"));
+        Product second = productRepository.save(
+                newProduct(category.id(), type.id(), null, "Croissant", ProductStatus.ACTIVE, 4, "800.00"));
 
         assertThat(productRepository.findById(first.id())).isPresent();
         assertThat(productRepository.findById(second.id())).isPresent();
     }
 
     @Test
-    void shouldRejectProductWhenCategoryDoesNotExist() {
-        UUID missingCategoryId = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff");
+    void shouldRejectProductWhenProductTypeDoesNotExist() {
+        Category category = categoryRepository.save(newCategory("Huérfano", CategoryStatus.ACTIVE));
+        UUID missingTypeId = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff");
 
         assertThatThrownBy(
                         () -> productRepository.save(
-                                newProduct(missingCategoryId, "770000", "Huérfano", ProductStatus.ACTIVE, 1, "100.00")))
-                .isInstanceOf(InvalidCategoryReferenceException.class);
+                                newProduct(category.id(), missingTypeId, "770000", "Huérfano", ProductStatus.ACTIVE, 1, "100.00")))
+                .isInstanceOf(InvalidProductTypeReferenceException.class);
     }
 
     @Test
     void shouldRejectNegativePriceAtDatabase() {
         Category category = categoryRepository.save(newCategory("Precio", CategoryStatus.ACTIVE));
+        ProductType type = productTypeRepository.save(newProductType(category.id(), "Precio"));
 
-        assertThatThrownBy(() -> insertProductBypassingDomain(category.id(), new BigDecimal("-0.01"), 1))
+        assertThatThrownBy(() -> insertProductBypassingDomain(category.id(), type.id(), new BigDecimal("-0.01"), 1))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
     void shouldRejectNegativeStockAtDatabase() {
         Category category = categoryRepository.save(newCategory("Stock", CategoryStatus.ACTIVE));
+        ProductType type = productTypeRepository.save(newProductType(category.id(), "Stock"));
 
-        assertThatThrownBy(() -> insertProductBypassingDomain(category.id(), new BigDecimal("1.00"), -1))
+        assertThatThrownBy(() -> insertProductBypassingDomain(category.id(), type.id(), new BigDecimal("1.00"), -1))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -176,11 +195,13 @@ class CatalogPersistenceAdapterTest {
     void shouldListAndFilterProducts() {
         Category dairy = categoryRepository.save(newCategory("Filtrar-lacteos", CategoryStatus.ACTIVE));
         Category fruit = categoryRepository.save(newCategory("Filtrar-frutas", CategoryStatus.ACTIVE));
+        ProductType dairyType = productTypeRepository.save(newProductType(dairy.id(), "Filtrar-lacteos"));
+        ProductType fruitType = productTypeRepository.save(newProductType(fruit.id(), "Filtrar-frutas"));
         Product milk = productRepository.save(
-                newProduct(dairy.id(), "770201", "Leche", ProductStatus.ACTIVE, 8, "2000.00"));
+                newProduct(dairy.id(), dairyType.id(), "770201", "Leche", ProductStatus.ACTIVE, 8, "2000.00"));
         Product inactiveMilk = productRepository.save(
-                newProduct(dairy.id(), "770202", "Leche inactiva", ProductStatus.INACTIVE, 1, "2000.00"));
-        productRepository.save(newProduct(fruit.id(), "770203", "Manzana", ProductStatus.ACTIVE, 6, "300.00"));
+                newProduct(dairy.id(), dairyType.id(), "770202", "Leche inactiva", ProductStatus.INACTIVE, 1, "2000.00"));
+        productRepository.save(newProduct(fruit.id(), fruitType.id(), "770203", "Manzana", ProductStatus.ACTIVE, 6, "300.00"));
 
         assertThat(productRepository.findByCategoryId(dairy.id()))
                 .extracting(Product::id)
@@ -199,9 +220,11 @@ class CatalogPersistenceAdapterTest {
     @Test
     void shouldSearchProductsByNameBrandOrBarcode() {
         Category category = categoryRepository.save(newCategory("Buscar", CategoryStatus.ACTIVE));
+        ProductType type = productTypeRepository.save(newProductType(category.id(), "Buscar"));
         Product milk = productRepository.save(
-                newProduct(category.id(), "770888111", "Zarzamora especial", ProductStatus.ACTIVE, 3, "2500.00"));
-        productRepository.save(newProduct(category.id(), "770888222", "Queso fresco", ProductStatus.ACTIVE, 2, "8000.00"));
+                newProduct(category.id(), type.id(), "770888111", "Zarzamora especial", ProductStatus.ACTIVE, 3, "2500.00"));
+        productRepository.save(
+                newProduct(category.id(), type.id(), "770888222", "Queso fresco", ProductStatus.ACTIVE, 2, "8000.00"));
 
         assertThat(productRepository.searchByNameBrandOrBarcode("zarzamora"))
                 .extracting(Product::id)
@@ -217,10 +240,11 @@ class CatalogPersistenceAdapterTest {
     @Test
     void shouldDecrementAndRestoreStockAtomically() {
         Category category = categoryRepository.save(newCategory("Inventario", CategoryStatus.ACTIVE));
+        ProductType type = productTypeRepository.save(newProductType(category.id(), "Inventario"));
         Product available = productRepository.save(
-                newProduct(category.id(), "770301", "Disponible", ProductStatus.ACTIVE, 2, "1000.00"));
+                newProduct(category.id(), type.id(), "770301", "Disponible", ProductStatus.ACTIVE, 2, "1000.00"));
         Product empty = productRepository.save(
-                newProduct(category.id(), "770302", "Agotado", ProductStatus.ACTIVE, 0, "1000.00"));
+                newProduct(category.id(), type.id(), "770302", "Agotado", ProductStatus.ACTIVE, 0, "1000.00"));
 
         StockDecrementResult failed = inventoryPort.decreaseStockAtomically(
                 List.of(new StockQuantity(available.id(), 1), new StockQuantity(empty.id(), 1)));
@@ -242,8 +266,9 @@ class CatalogPersistenceAdapterTest {
     @Test
     void shouldAdjustStockAtomicallyWithCas() {
         Category category = categoryRepository.save(newCategory("Ajuste", CategoryStatus.ACTIVE));
+        ProductType type = productTypeRepository.save(newProductType(category.id(), "Ajuste"));
         Product product = productRepository.save(
-                newProduct(category.id(), "770401", "Ajustable", ProductStatus.ACTIVE, 5, "1000.00"));
+                newProduct(category.id(), type.id(), "770401", "Ajustable", ProductStatus.ACTIVE, 5, "1000.00"));
 
         assertThat(productRepository.adjustStockIfUnchanged(product.id(), 5, 12, NOW)).isTrue();
         assertThat(productRepository.findById(product.id()).orElseThrow().stock()).isEqualTo(12);
@@ -252,21 +277,23 @@ class CatalogPersistenceAdapterTest {
         assertThat(productRepository.findById(product.id()).orElseThrow().stock()).isEqualTo(12);
     }
 
-    private void insertProductBypassingDomain(UUID categoryId, BigDecimal price, int stock) {
+    private void insertProductBypassingDomain(UUID categoryId, UUID productTypeId, BigDecimal price, int stock) {
         jdbcTemplate.update(
                 connection -> {
                     PreparedStatement statement = connection.prepareStatement(
                             """
                             insert into catalog.products (
-                                id, category_id, name, price_amount, currency, stock, status, created_at, updated_at
-                            ) values (?, ?, 'Bypass', ?, 'COP', ?, 'ACTIVE', ?, ?)
+                                id, category_id, product_type_id, presentation_quantity, presentation_unit,
+                                name, price_amount, currency, stock, status, created_at, updated_at
+                            ) values (?, ?, ?, 1, 'UNIT', 'Bypass', ?, 'COP', ?, 'ACTIVE', ?, ?)
                             """);
                     statement.setObject(1, UUID.randomUUID());
                     statement.setObject(2, categoryId);
-                    statement.setBigDecimal(3, price);
-                    statement.setInt(4, stock);
-                    statement.setTimestamp(5, Timestamp.from(NOW));
+                    statement.setObject(3, productTypeId);
+                    statement.setBigDecimal(4, price);
+                    statement.setInt(5, stock);
                     statement.setTimestamp(6, Timestamp.from(NOW));
+                    statement.setTimestamp(7, Timestamp.from(NOW));
                     return statement;
                 });
     }
@@ -275,11 +302,25 @@ class CatalogPersistenceAdapterTest {
         return Category.create(UUID.randomUUID(), name, "Fresh produce", status, NOW, NOW);
     }
 
+    private static ProductType newProductType(UUID categoryId, String name) {
+        return ProductType.create(
+                UUID.randomUUID(), categoryId, name, "Test type", ProductTypeStatus.ACTIVE, NOW, NOW);
+    }
+
     private static Product newProduct(
-            UUID categoryId, String barcode, String name, ProductStatus status, int stock, String price) {
+            UUID categoryId,
+            UUID productTypeId,
+            String barcode,
+            String name,
+            ProductStatus status,
+            int stock,
+            String price) {
         return Product.create(
                 UUID.randomUUID(),
                 categoryId,
+                productTypeId,
+                null,
+                UNIT,
                 barcode,
                 name,
                 "Alpina",

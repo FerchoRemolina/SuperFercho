@@ -88,7 +88,9 @@ public class ProductController {
     @PostMapping
     public ResponseEntity<ProductRestResponse> create(@RequestBody CreateProductRequest request) {
         ProductRestResponse body = ProductRestResponse.from(createProductUseCase.execute(new CreateProductCommand(
-                request.categoryId(),
+                request.productTypeId(),
+                request.productVariantId(),
+                request.presentation(),
                 request.barcode(),
                 request.name(),
                 request.brand(),

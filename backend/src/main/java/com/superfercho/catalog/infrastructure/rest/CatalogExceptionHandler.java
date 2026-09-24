@@ -4,12 +4,21 @@ import com.superfercho.catalog.application.exception.BarcodeLookupFailedExceptio
 import com.superfercho.catalog.application.exception.BarcodeLookupNotFoundException;
 import com.superfercho.catalog.application.exception.CategoryNotFoundException;
 import com.superfercho.catalog.application.exception.DuplicateBarcodeException;
+import com.superfercho.catalog.application.exception.DuplicateProductTypeException;
+import com.superfercho.catalog.application.exception.DuplicateProductVariantException;
 import com.superfercho.catalog.application.exception.InvalidBarcodeException;
 import com.superfercho.catalog.application.exception.InvalidCategoryReferenceException;
+import com.superfercho.catalog.application.exception.InvalidProductTypeReferenceException;
+import com.superfercho.catalog.application.exception.InvalidProductVariantReferenceException;
 import com.superfercho.catalog.application.exception.ProductNotFoundException;
 import com.superfercho.catalog.application.exception.ProductStockConflictException;
+import com.superfercho.catalog.application.exception.ProductTypeNotFoundException;
+import com.superfercho.catalog.application.exception.ProductVariantNotFoundException;
 import com.superfercho.catalog.domain.exception.InvalidCategoryException;
+import com.superfercho.catalog.domain.exception.InvalidPresentationException;
 import com.superfercho.catalog.domain.exception.InvalidProductException;
+import com.superfercho.catalog.domain.exception.InvalidProductTypeException;
+import com.superfercho.catalog.domain.exception.InvalidProductVariantException;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -33,9 +42,35 @@ public class CatalogExceptionHandler {
         return problem(HttpStatus.BAD_REQUEST, "INVALID_PRODUCT", exception.getMessage());
     }
 
+    @ExceptionHandler(InvalidPresentationException.class)
+    ProblemDetail handleInvalidPresentation(InvalidPresentationException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "INVALID_PRESENTATION", exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidProductTypeException.class)
+    ProblemDetail handleInvalidProductType(InvalidProductTypeException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "INVALID_PRODUCT_TYPE", exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidProductVariantException.class)
+    ProblemDetail handleInvalidProductVariant(InvalidProductVariantException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "INVALID_PRODUCT_VARIANT", exception.getMessage());
+    }
+
     @ExceptionHandler(InvalidCategoryReferenceException.class)
     ProblemDetail handleInvalidCategoryReference(InvalidCategoryReferenceException exception) {
         return problem(HttpStatus.BAD_REQUEST, "INVALID_CATEGORY_REFERENCE", exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidProductTypeReferenceException.class)
+    ProblemDetail handleInvalidProductTypeReference(InvalidProductTypeReferenceException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "INVALID_PRODUCT_TYPE_REFERENCE", exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidProductVariantReferenceException.class)
+    ProblemDetail handleInvalidProductVariantReference(InvalidProductVariantReferenceException exception) {
+        return problem(
+                HttpStatus.BAD_REQUEST, "INVALID_PRODUCT_VARIANT_REFERENCE", exception.getMessage());
     }
 
     @ExceptionHandler(DuplicateBarcodeException.class)
@@ -43,9 +78,29 @@ public class CatalogExceptionHandler {
         return problem(HttpStatus.CONFLICT, "DUPLICATE_BARCODE", exception.getMessage());
     }
 
+    @ExceptionHandler(DuplicateProductTypeException.class)
+    ProblemDetail handleDuplicateProductType(DuplicateProductTypeException exception) {
+        return problem(HttpStatus.CONFLICT, "DUPLICATE_PRODUCT_TYPE", exception.getMessage());
+    }
+
+    @ExceptionHandler(DuplicateProductVariantException.class)
+    ProblemDetail handleDuplicateProductVariant(DuplicateProductVariantException exception) {
+        return problem(HttpStatus.CONFLICT, "DUPLICATE_PRODUCT_VARIANT", exception.getMessage());
+    }
+
     @ExceptionHandler(CategoryNotFoundException.class)
     ProblemDetail handleCategoryNotFound(CategoryNotFoundException exception) {
         return problem(HttpStatus.NOT_FOUND, "CATEGORY_NOT_FOUND", exception.getMessage());
+    }
+
+    @ExceptionHandler(ProductTypeNotFoundException.class)
+    ProblemDetail handleProductTypeNotFound(ProductTypeNotFoundException exception) {
+        return problem(HttpStatus.NOT_FOUND, "PRODUCT_TYPE_NOT_FOUND", exception.getMessage());
+    }
+
+    @ExceptionHandler(ProductVariantNotFoundException.class)
+    ProblemDetail handleProductVariantNotFound(ProductVariantNotFoundException exception) {
+        return problem(HttpStatus.NOT_FOUND, "PRODUCT_VARIANT_NOT_FOUND", exception.getMessage());
     }
 
     @ExceptionHandler(ProductNotFoundException.class)

@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.superfercho.catalog.application.dto.ActivateProductCommand;
 import com.superfercho.catalog.application.dto.AdjustProductStockCommand;
+import com.superfercho.catalog.application.dto.ArchiveProductCommand;
 import com.superfercho.catalog.application.dto.CatalogView;
 import com.superfercho.catalog.application.dto.ChangeProductPriceCommand;
 import com.superfercho.catalog.application.dto.CreateProductCommand;
@@ -17,18 +18,26 @@ import com.superfercho.catalog.application.dto.DeactivateProductCommand;
 import com.superfercho.catalog.application.dto.GetProductCommand;
 import com.superfercho.catalog.application.dto.ListProductsCommand;
 import com.superfercho.catalog.application.dto.ProductResult;
+import com.superfercho.catalog.application.dto.RestoreProductCommand;
 import com.superfercho.catalog.application.dto.SearchProductsCommand;
 import com.superfercho.catalog.application.dto.UpdateProductCommand;
-import com.superfercho.catalog.application.exception.InvalidCategoryReferenceException;
+import com.superfercho.catalog.application.exception.InvalidProductTypeReferenceException;
+import com.superfercho.catalog.application.exception.InvalidProductVariantReferenceException;
 import com.superfercho.catalog.application.exception.ProductNotFoundException;
 import com.superfercho.catalog.application.exception.ProductStockConflictException;
 import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.application.port.ProductRepository;
+import com.superfercho.catalog.application.port.ProductTypeRepository;
+import com.superfercho.catalog.application.port.ProductVariantRepository;
 import com.superfercho.catalog.domain.exception.InvalidProductException;
-import com.superfercho.catalog.domain.model.Category;
-import com.superfercho.catalog.domain.model.CategoryStatus;
+import com.superfercho.catalog.domain.model.Presentation;
+import com.superfercho.catalog.domain.model.PresentationUnit;
 import com.superfercho.catalog.domain.model.Product;
 import com.superfercho.catalog.domain.model.ProductStatus;
+import com.superfercho.catalog.domain.model.ProductType;
+import com.superfercho.catalog.domain.model.ProductTypeStatus;
+import com.superfercho.catalog.domain.model.ProductVariant;
+import com.superfercho.catalog.domain.model.ProductVariantStatus;
 import com.superfercho.platform.money.Money;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -51,6 +60,12 @@ class ProductUseCasesTest {
     private static final UUID PRODUCT_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID CATEGORY_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final UUID OTHER_CATEGORY_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
+    private static final UUID TYPE_ID = UUID.fromString("44444444-4444-4444-4444-444444444444");
+    private static final UUID OTHER_TYPE_ID = UUID.fromString("55555555-5555-5555-5555-555555555555");
+    private static final UUID VARIANT_ID = UUID.fromString("66666666-6666-6666-6666-666666666666");
+    private static final UUID OTHER_VARIANT_ID = UUID.fromString("77777777-7777-7777-7777-777777777777");
+    private static final Presentation UNIT = Presentation.of(1, PresentationUnit.UNIT);
+    private static final Presentation LITER = Presentation.of(1, PresentationUnit.L);
     private static final Money PRICE = Money.cop(new BigDecimal("4500.00"));
 
     @Mock
@@ -59,6 +74,12 @@ class ProductUseCasesTest {
     @Mock
     private CategoryRepository categoryRepository;
 
+    @Mock
+    private ProductTypeRepository productTypeRepository;
+
+    @Mock
+    private ProductVariantRepository productVariantRepository;
+
     private CreateProductUseCase createProduct;
     private UpdateProductUseCase updateProduct;
     private GetProductUseCase getProduct;
@@ -66,45 +87,104 @@ class ProductUseCasesTest {
     private SearchProductsUseCase searchProducts;
     private ActivateProductUseCase activateProduct;
     private DeactivateProductUseCase deactivateProduct;
+    private ArchiveProductUseCase archiveProduct;
+    private RestoreProductUseCase restoreProduct;
     private ChangeProductPriceUseCase changeProductPrice;
     private AdjustProductStockUseCase adjustProductStock;
 
     @BeforeEach
     void setUp() {
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-        createProduct = new CreateProductUseCase(productRepository, categoryRepository, clock);
-        updateProduct = new UpdateProductUseCase(productRepository, categoryRepository, clock);
-        getProduct = new GetProductUseCase(productRepository, categoryRepository);
-        listProducts = new ListProductsUseCase(productRepository, categoryRepository);
-        searchProducts = new SearchProductsUseCase(productRepository, categoryRepository);
+        createProduct = new CreateProductUseCase(
+                productRepository, productTypeRepository, productVariantRepository, clock);
+        updateProduct = new UpdateProductUseCase(
+                productRepository, productTypeRepository, productVariantRepository, clock);
+        getProduct = new GetProductUseCase(
+                productRepository, categoryRepository, productTypeRepository, productVariantRepository);
+        listProducts = new ListProductsUseCase(
+                productRepository, categoryRepository, productTypeRepository, productVariantRepository);
+        searchProducts = new SearchProductsUseCase(
+                productRepository, categoryRepository, productTypeRepository, productVariantRepository);
         activateProduct = new ActivateProductUseCase(productRepository, clock);
         deactivateProduct = new DeactivateProductUseCase(productRepository, clock);
+        archiveProduct = new ArchiveProductUseCase(productRepository, clock);
+        restoreProduct = new RestoreProductUseCase(productRepository, clock);
         changeProductPrice = new ChangeProductPriceUseCase(productRepository, clock);
         adjustProductStock = new AdjustProductStockUseCase(productRepository, clock);
     }
 
     @Test
     void shouldCreateProductAsActive() {
-        when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(activeCategory()));
+        when(productTypeRepository.findById(TYPE_ID)).thenReturn(Optional.of(productType(TYPE_ID, CATEGORY_ID)));
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductResult result = createProduct.execute(createCommand());
 
         assertEquals(CATEGORY_ID, result.categoryId());
+        assertEquals(TYPE_ID, result.productTypeId());
+        assertEquals(UNIT, result.presentation());
         assertEquals("Leche entera", result.name());
         assertEquals(PRICE, result.price());
         assertEquals(10, result.stock());
         assertEquals(ProductStatus.ACTIVE, result.status());
         assertEquals(NOW, result.createdAt());
         verify(productRepository).save(any(Product.class));
-        verify(categoryRepository, never()).save(any());
+        verify(productTypeRepository, never()).save(any());
     }
 
     @Test
-    void shouldRejectCreateWhenCategoryIsMissing() {
-        when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.empty());
+    void shouldDeriveCategoryFromProductTypeOnCreate() {
+        when(productTypeRepository.findById(TYPE_ID)).thenReturn(Optional.of(productType(TYPE_ID, CATEGORY_ID)));
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertThrows(InvalidCategoryReferenceException.class, () -> createProduct.execute(createCommand()));
+        ProductResult result = createProduct.execute(createCommand());
+
+        assertEquals(CATEGORY_ID, result.categoryId());
+        assertEquals(TYPE_ID, result.productTypeId());
+    }
+
+    @Test
+    void shouldCreateProductWithMatchingVariantAndPresentation() {
+        when(productTypeRepository.findById(TYPE_ID)).thenReturn(Optional.of(productType(TYPE_ID, CATEGORY_ID)));
+        when(productVariantRepository.findById(VARIANT_ID))
+                .thenReturn(Optional.of(productVariant(VARIANT_ID, TYPE_ID)));
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ProductResult result = createProduct.execute(new CreateProductCommand(
+                TYPE_ID, VARIANT_ID, LITER, "7701234567890", "Leche", "Alpina", "1L", PRICE, 10, null));
+
+        assertEquals(VARIANT_ID, result.productVariantId());
+        assertEquals(LITER, result.presentation());
+        assertEquals(PresentationUnit.L, result.presentation().unit());
+    }
+
+    @Test
+    void shouldRejectCreateWhenVariantBelongsToAnotherType() {
+        when(productTypeRepository.findById(TYPE_ID)).thenReturn(Optional.of(productType(TYPE_ID, CATEGORY_ID)));
+        when(productVariantRepository.findById(OTHER_VARIANT_ID))
+                .thenReturn(Optional.of(productVariant(OTHER_VARIANT_ID, OTHER_TYPE_ID)));
+
+        assertThrows(
+                InvalidProductVariantReferenceException.class,
+                () -> createProduct.execute(new CreateProductCommand(
+                        TYPE_ID,
+                        OTHER_VARIANT_ID,
+                        UNIT,
+                        "7701234567890",
+                        "Leche",
+                        "Alpina",
+                        "1L",
+                        PRICE,
+                        10,
+                        null)));
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectCreateWhenProductTypeIsMissing() {
+        when(productTypeRepository.findById(TYPE_ID)).thenReturn(Optional.empty());
+
+        assertThrows(InvalidProductTypeReferenceException.class, () -> createProduct.execute(createCommand()));
         verify(productRepository, never()).save(any());
     }
 
@@ -160,12 +240,15 @@ class ProductUseCasesTest {
     void shouldUpdateProductWithoutChangingPriceOrStock() {
         Product existing = product(PRODUCT_ID, CATEGORY_ID, ProductStatus.ACTIVE, 10, PRICE);
         when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(existing));
-        when(categoryRepository.findById(OTHER_CATEGORY_ID)).thenReturn(Optional.of(activeCategory(OTHER_CATEGORY_ID)));
+        when(productTypeRepository.findById(OTHER_TYPE_ID))
+                .thenReturn(Optional.of(productType(OTHER_TYPE_ID, OTHER_CATEGORY_ID)));
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductResult result = updateProduct.execute(new UpdateProductCommand(
                 PRODUCT_ID,
-                OTHER_CATEGORY_ID,
+                OTHER_TYPE_ID,
+                null,
+                UNIT,
                 "770999",
                 "Leche deslactosada",
                 "Alquería",
@@ -173,6 +256,7 @@ class ProductUseCasesTest {
                 null));
 
         assertEquals(OTHER_CATEGORY_ID, result.categoryId());
+        assertEquals(OTHER_TYPE_ID, result.productTypeId());
         assertEquals("Leche deslactosada", result.name());
         assertEquals(PRICE, result.price());
         assertEquals(10, result.stock());
@@ -182,15 +266,39 @@ class ProductUseCasesTest {
     }
 
     @Test
-    void shouldRejectUpdateWhenCategoryIsMissing() {
+    void shouldRejectUpdateWhenProductTypeIsMissing() {
         when(productRepository.findById(PRODUCT_ID))
                 .thenReturn(Optional.of(product(PRODUCT_ID, CATEGORY_ID, ProductStatus.ACTIVE, 10, PRICE)));
-        when(categoryRepository.findById(OTHER_CATEGORY_ID)).thenReturn(Optional.empty());
+        when(productTypeRepository.findById(OTHER_TYPE_ID)).thenReturn(Optional.empty());
 
         assertThrows(
-                InvalidCategoryReferenceException.class,
+                InvalidProductTypeReferenceException.class,
                 () -> updateProduct.execute(new UpdateProductCommand(
-                        PRODUCT_ID, OTHER_CATEGORY_ID, "770999", "Leche", "Alpina", null, null)));
+                        PRODUCT_ID, OTHER_TYPE_ID, null, UNIT, "770999", "Leche", "Alpina", null, null)));
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectUpdateWhenVariantBelongsToAnotherType() {
+        when(productRepository.findById(PRODUCT_ID))
+                .thenReturn(Optional.of(product(PRODUCT_ID, CATEGORY_ID, ProductStatus.ACTIVE, 10, PRICE)));
+        when(productTypeRepository.findById(OTHER_TYPE_ID))
+                .thenReturn(Optional.of(productType(OTHER_TYPE_ID, OTHER_CATEGORY_ID)));
+        when(productVariantRepository.findById(VARIANT_ID))
+                .thenReturn(Optional.of(productVariant(VARIANT_ID, TYPE_ID)));
+
+        assertThrows(
+                InvalidProductVariantReferenceException.class,
+                () -> updateProduct.execute(new UpdateProductCommand(
+                        PRODUCT_ID,
+                        OTHER_TYPE_ID,
+                        VARIANT_ID,
+                        UNIT,
+                        "770999",
+                        "Leche",
+                        "Alpina",
+                        null,
+                        null)));
         verify(productRepository, never()).save(any());
     }
 
@@ -207,6 +315,17 @@ class ProductUseCasesTest {
     }
 
     @Test
+    void shouldRejectActivateWhenProductIsArchived() {
+        Product existing = product(PRODUCT_ID, CATEGORY_ID, ProductStatus.ARCHIVED, 10, PRICE);
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(existing));
+
+        assertThrows(
+                InvalidProductException.class,
+                () -> activateProduct.execute(new ActivateProductCommand(PRODUCT_ID)));
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
     void shouldDeactivateProduct() {
         Product existing = product(PRODUCT_ID, CATEGORY_ID, ProductStatus.ACTIVE, 10, PRICE);
         when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(existing));
@@ -217,6 +336,40 @@ class ProductUseCasesTest {
         assertEquals(ProductStatus.INACTIVE, result.status());
         assertEquals(10, result.stock());
         assertEquals(PRICE, result.price());
+    }
+
+    @Test
+    void shouldArchiveProduct() {
+        Product existing = product(PRODUCT_ID, CATEGORY_ID, ProductStatus.ACTIVE, 10, PRICE);
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(existing));
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ProductResult result = archiveProduct.execute(new ArchiveProductCommand(PRODUCT_ID));
+
+        assertEquals(ProductStatus.ARCHIVED, result.status());
+        assertEquals(NOW, result.updatedAt());
+    }
+
+    @Test
+    void shouldRestoreArchivedProductToInactive() {
+        Product existing = product(PRODUCT_ID, CATEGORY_ID, ProductStatus.ARCHIVED, 10, PRICE);
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(existing));
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ProductResult result = restoreProduct.execute(new RestoreProductCommand(PRODUCT_ID));
+
+        assertEquals(ProductStatus.INACTIVE, result.status());
+        assertEquals(NOW, result.updatedAt());
+    }
+
+    @Test
+    void shouldRejectRestoreWhenProductIsMissing() {
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.empty());
+
+        assertThrows(
+                ProductNotFoundException.class,
+                () -> restoreProduct.execute(new RestoreProductCommand(PRODUCT_ID)));
+        verify(productRepository, never()).save(any());
     }
 
     @Test
@@ -307,20 +460,21 @@ class ProductUseCasesTest {
 
     private CreateProductCommand createCommand() {
         return new CreateProductCommand(
-                CATEGORY_ID, "7701234567890", "Leche entera", "Alpina", "1L", PRICE, 10, null);
+                TYPE_ID, null, UNIT, "7701234567890", "Leche entera", "Alpina", "1L", PRICE, 10, null);
     }
 
     private UpdateProductCommand updateCommand() {
         return new UpdateProductCommand(
-                PRODUCT_ID, CATEGORY_ID, "7701234567890", "Leche entera", "Alpina", "1L", null);
+                PRODUCT_ID, TYPE_ID, null, UNIT, "7701234567890", "Leche entera", "Alpina", "1L", null);
     }
 
-    private static Category activeCategory() {
-        return activeCategory(CATEGORY_ID);
+    private static ProductType productType(UUID id, UUID categoryId) {
+        return ProductType.create(id, categoryId, "Lácteos", null, ProductTypeStatus.ACTIVE, CREATED_AT, CREATED_AT);
     }
 
-    private static Category activeCategory(UUID id) {
-        return Category.create(id, "Lácteos", null, CategoryStatus.ACTIVE, CREATED_AT, CREATED_AT);
+    private static ProductVariant productVariant(UUID id, UUID productTypeId) {
+        return ProductVariant.create(
+                id, productTypeId, "Entera", null, ProductVariantStatus.ACTIVE, CREATED_AT, CREATED_AT);
     }
 
     private static Product product(
@@ -328,6 +482,9 @@ class ProductUseCasesTest {
         return Product.create(
                 id,
                 categoryId,
+                TYPE_ID,
+                null,
+                UNIT,
                 "7701234567890",
                 "Leche entera",
                 "Alpina",

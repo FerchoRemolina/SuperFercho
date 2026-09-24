@@ -4,24 +4,29 @@ import com.superfercho.catalog.application.dto.ProductCardInfo;
 import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.application.port.ProductCardQueryPort;
 import com.superfercho.catalog.application.port.ProductRepository;
-import com.superfercho.catalog.domain.model.Category;
+import com.superfercho.catalog.application.port.ProductTypeRepository;
+import com.superfercho.catalog.application.port.ProductVariantRepository;
 import com.superfercho.catalog.domain.model.Product;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 public final class FindProductCardsUseCase implements ProductCardQueryPort {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final ProductTypeRepository productTypeRepository;
+    private final ProductVariantRepository productVariantRepository;
 
-    public FindProductCardsUseCase(ProductRepository productRepository, CategoryRepository categoryRepository) {
+    public FindProductCardsUseCase(
+            ProductRepository productRepository,
+            CategoryRepository categoryRepository,
+            ProductTypeRepository productTypeRepository,
+            ProductVariantRepository productVariantRepository) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
+        this.productTypeRepository = productTypeRepository;
+        this.productVariantRepository = productVariantRepository;
     }
 
     @Override
@@ -33,15 +38,14 @@ public final class FindProductCardsUseCase implements ProductCardQueryPort {
         if (products.isEmpty()) {
             return List.of();
         }
-        Set<UUID> categoryIds = products.stream().map(Product::categoryId).collect(Collectors.toSet());
-        Map<UUID, Category> categories = categoryRepository.findByIds(categoryIds).stream()
-                .collect(Collectors.toMap(Category::id, Function.identity(), (left, right) -> left));
+        CatalogVisibilityLookup visibility = CatalogVisibilityLookup.load(
+                products, categoryRepository, productTypeRepository, productVariantRepository);
         return products.stream()
-                .map(product -> toCard(product, categories.get(product.categoryId())))
+                .map(product -> toCard(product, visibility.isPubliclyVisible(product)))
                 .toList();
     }
 
-    private static ProductCardInfo toCard(Product product, Category category) {
+    private static ProductCardInfo toCard(Product product, boolean sellable) {
         return new ProductCardInfo(
                 product.id(),
                 product.name(),
@@ -50,6 +54,6 @@ public final class FindProductCardsUseCase implements ProductCardQueryPort {
                 product.imageUrl(),
                 product.categoryId(),
                 product.status(),
-                CatalogVisibility.isPubliclyVisible(product, category));
+                sellable);
     }
 }

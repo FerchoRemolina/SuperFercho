@@ -78,6 +78,10 @@ public class IdentitySecurityConfiguration {
                         .hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/categories/{categoryId}")
                         .hasRole("ADMIN")
+                        .requestMatchers("/api/v1/product-types", "/api/v1/product-types/**")
+                        .hasRole("ADMIN")
+                        .requestMatchers("/api/v1/product-variants", "/api/v1/product-variants/**")
+                        .hasRole("ADMIN")
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/v1/products",

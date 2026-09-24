@@ -6,9 +6,13 @@ import com.superfercho.catalog.application.exception.BarcodeLookupFailedExceptio
 import com.superfercho.catalog.application.exception.BarcodeLookupNotFoundException;
 import com.superfercho.catalog.application.exception.CategoryNotFoundException;
 import com.superfercho.catalog.application.exception.DuplicateBarcodeException;
+import com.superfercho.catalog.application.exception.DuplicateProductTypeException;
+import com.superfercho.catalog.application.exception.DuplicateProductVariantException;
 import com.superfercho.catalog.application.exception.InvalidBarcodeException;
 import com.superfercho.catalog.application.exception.InvalidCategoryReferenceException;
 import com.superfercho.catalog.application.exception.ProductNotFoundException;
+import com.superfercho.catalog.application.exception.ProductTypeNotFoundException;
+import com.superfercho.catalog.application.exception.ProductVariantNotFoundException;
 import com.superfercho.catalog.domain.exception.InvalidCategoryException;
 import com.superfercho.catalog.domain.exception.InvalidProductException;
 import java.util.UUID;
@@ -56,11 +60,43 @@ class CatalogExceptionHandlerTest {
     }
 
     @Test
+    void shouldMapDuplicateProductTypeTo409() {
+        assertProblem(
+                handler.handleDuplicateProductType(new DuplicateProductTypeException()),
+                HttpStatus.CONFLICT,
+                "DUPLICATE_PRODUCT_TYPE");
+    }
+
+    @Test
+    void shouldMapDuplicateProductVariantTo409() {
+        assertProblem(
+                handler.handleDuplicateProductVariant(new DuplicateProductVariantException()),
+                HttpStatus.CONFLICT,
+                "DUPLICATE_PRODUCT_VARIANT");
+    }
+
+    @Test
     void shouldMapCategoryNotFoundTo404() {
         assertProblem(
                 handler.handleCategoryNotFound(new CategoryNotFoundException(CATEGORY_ID)),
                 HttpStatus.NOT_FOUND,
                 "CATEGORY_NOT_FOUND");
+    }
+
+    @Test
+    void shouldMapProductTypeNotFoundTo404() {
+        assertProblem(
+                handler.handleProductTypeNotFound(new ProductTypeNotFoundException(CATEGORY_ID)),
+                HttpStatus.NOT_FOUND,
+                "PRODUCT_TYPE_NOT_FOUND");
+    }
+
+    @Test
+    void shouldMapProductVariantNotFoundTo404() {
+        assertProblem(
+                handler.handleProductVariantNotFound(new ProductVariantNotFoundException(PRODUCT_ID)),
+                HttpStatus.NOT_FOUND,
+                "PRODUCT_VARIANT_NOT_FOUND");
     }
 
     @Test

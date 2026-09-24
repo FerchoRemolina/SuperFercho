@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.superfercho.catalog.domain.model.Category;
 import com.superfercho.catalog.domain.model.CategoryStatus;
+import com.superfercho.catalog.domain.model.Presentation;
+import com.superfercho.catalog.domain.model.PresentationUnit;
 import com.superfercho.catalog.domain.model.Product;
 import com.superfercho.catalog.domain.model.ProductStatus;
 import com.superfercho.catalog.infrastructure.persistence.entity.CategoryJpaEntity;
@@ -19,7 +21,9 @@ class CategoryAndProductPersistenceMapperTest {
 
     private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
     private static final UUID CATEGORY_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private static final UUID TYPE_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
     private static final UUID PRODUCT_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+    private static final Presentation UNIT = Presentation.of(1, PresentationUnit.UNIT);
 
     private final CategoryPersistenceMapper categoryMapper = new CategoryPersistenceMapper();
     private final ProductPersistenceMapper productMapper = new ProductPersistenceMapper();
@@ -45,6 +49,9 @@ class CategoryAndProductPersistenceMapperTest {
         Product product = Product.create(
                 PRODUCT_ID,
                 CATEGORY_ID,
+                TYPE_ID,
+                null,
+                UNIT,
                 "7701234567890",
                 "Leche entera",
                 "Alpina",
@@ -61,6 +68,9 @@ class CategoryAndProductPersistenceMapperTest {
 
         assertEquals(product.id(), mapped.id());
         assertEquals(product.categoryId(), mapped.categoryId());
+        assertEquals(product.productTypeId(), mapped.productTypeId());
+        assertNull(mapped.productVariantId());
+        assertEquals(product.presentation(), mapped.presentation());
         assertEquals(product.barcode(), mapped.barcode());
         assertEquals(product.name(), mapped.name());
         assertEquals(product.brand(), mapped.brand());
@@ -78,6 +88,9 @@ class CategoryAndProductPersistenceMapperTest {
         Product product = Product.create(
                 PRODUCT_ID,
                 CATEGORY_ID,
+                TYPE_ID,
+                null,
+                UNIT,
                 null,
                 "Leche entera",
                 null,
@@ -95,6 +108,7 @@ class CategoryAndProductPersistenceMapperTest {
         assertNull(mapped.brand());
         assertNull(mapped.description());
         assertNull(mapped.imageUrl());
+        assertNull(mapped.productVariantId());
         assertEquals(ProductStatus.INACTIVE, mapped.status());
         assertEquals(0, mapped.stock());
     }

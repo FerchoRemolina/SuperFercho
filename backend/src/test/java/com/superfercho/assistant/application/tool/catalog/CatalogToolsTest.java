@@ -17,6 +17,8 @@ import com.superfercho.catalog.application.usecase.GetProductUseCase;
 import com.superfercho.catalog.application.usecase.ListCategoriesUseCase;
 import com.superfercho.catalog.application.usecase.ListProductsUseCase;
 import com.superfercho.catalog.application.usecase.SearchProductsUseCase;
+import com.superfercho.catalog.domain.model.Presentation;
+import com.superfercho.catalog.domain.model.PresentationUnit;
 import com.superfercho.catalog.domain.model.ProductStatus;
 import com.superfercho.platform.money.Money;
 import java.math.BigDecimal;
@@ -35,6 +37,8 @@ class CatalogToolsTest {
 
     private static final UUID PRODUCT_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
     private static final UUID CATEGORY_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private static final UUID TYPE_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+    private static final Presentation UNIT = Presentation.of(1, PresentationUnit.UNIT);
 
     @Mock
     private SearchProductsUseCase searchProductsUseCase;
@@ -103,6 +107,9 @@ class CatalogToolsTest {
         return new ProductResult(
                 PRODUCT_ID,
                 CATEGORY_ID,
+                TYPE_ID,
+                null,
+                UNIT,
                 "7701",
                 "Leche",
                 "Alpina",

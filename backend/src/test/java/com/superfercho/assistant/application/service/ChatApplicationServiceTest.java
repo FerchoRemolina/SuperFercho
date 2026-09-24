@@ -34,6 +34,8 @@ import com.superfercho.assistant.infrastructure.llm.FakeLlmAdapter;
 import com.superfercho.catalog.application.dto.GetProductCommand;
 import com.superfercho.catalog.application.dto.ProductResult;
 import com.superfercho.catalog.application.usecase.GetProductUseCase;
+import com.superfercho.catalog.domain.model.Presentation;
+import com.superfercho.catalog.domain.model.PresentationUnit;
 import com.superfercho.catalog.domain.model.ProductStatus;
 import com.superfercho.identity.application.exception.UnauthenticatedUserException;
 import com.superfercho.knowledge.application.dto.KnowledgeSearchResult;
@@ -339,6 +341,9 @@ class ChatApplicationServiceTest {
         return new ProductResult(
                 PRODUCT_ID,
                 UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                null,
+                Presentation.of(1, PresentationUnit.UNIT),
                 "7701",
                 "Leche",
                 "Alpina",

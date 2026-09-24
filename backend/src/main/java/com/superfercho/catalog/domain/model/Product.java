@@ -9,6 +9,9 @@ public final class Product {
 
     private final UUID id;
     private final UUID categoryId;
+    private final UUID productTypeId;
+    private final UUID productVariantId;
+    private final Presentation presentation;
     private final String barcode;
     private final String name;
     private final String brand;
@@ -23,6 +26,9 @@ public final class Product {
     private Product(
             UUID id,
             UUID categoryId,
+            UUID productTypeId,
+            UUID productVariantId,
+            Presentation presentation,
             String barcode,
             String name,
             String brand,
@@ -35,6 +41,9 @@ public final class Product {
             Instant updatedAt) {
         this.id = id;
         this.categoryId = categoryId;
+        this.productTypeId = productTypeId;
+        this.productVariantId = productVariantId;
+        this.presentation = presentation;
         this.barcode = barcode;
         this.name = name;
         this.brand = brand;
@@ -50,6 +59,9 @@ public final class Product {
     public static Product create(
             UUID id,
             UUID categoryId,
+            UUID productTypeId,
+            UUID productVariantId,
+            Presentation presentation,
             String barcode,
             String name,
             String brand,
@@ -62,6 +74,8 @@ public final class Product {
             Instant updatedAt) {
         requireNonNull(id, "id");
         requireNonNull(categoryId, "categoryId");
+        requireNonNull(productTypeId, "productTypeId");
+        requireNonNull(presentation, "presentation");
         requireText(name, "name");
         requireNonNull(price, "price");
         requireNonNull(status, "status");
@@ -77,6 +91,9 @@ public final class Product {
         return new Product(
                 id,
                 categoryId,
+                productTypeId,
+                productVariantId,
+                presentation,
                 barcode,
                 name,
                 brand,
@@ -91,6 +108,9 @@ public final class Product {
 
     public Product updateInformation(
             UUID categoryId,
+            UUID productTypeId,
+            UUID productVariantId,
+            Presentation presentation,
             String barcode,
             String name,
             String brand,
@@ -100,6 +120,9 @@ public final class Product {
         return create(
                 id,
                 categoryId,
+                productTypeId,
+                productVariantId,
+                presentation,
                 barcode,
                 name,
                 brand,
@@ -113,41 +136,40 @@ public final class Product {
     }
 
     public Product activate(Instant updatedAt) {
-        return create(
-                id,
-                categoryId,
-                barcode,
-                name,
-                brand,
-                description,
-                price,
-                stock,
-                imageUrl,
-                ProductStatus.ACTIVE,
-                createdAt,
-                updatedAt);
+        if (status != ProductStatus.INACTIVE) {
+            throw new InvalidProductException("product can only be activated when INACTIVE");
+        }
+        return withStatus(ProductStatus.ACTIVE, updatedAt);
     }
 
     public Product deactivate(Instant updatedAt) {
-        return create(
-                id,
-                categoryId,
-                barcode,
-                name,
-                brand,
-                description,
-                price,
-                stock,
-                imageUrl,
-                ProductStatus.INACTIVE,
-                createdAt,
-                updatedAt);
+        if (status != ProductStatus.ACTIVE) {
+            throw new InvalidProductException("product can only be deactivated when ACTIVE");
+        }
+        return withStatus(ProductStatus.INACTIVE, updatedAt);
+    }
+
+    public Product archive(Instant updatedAt) {
+        if (status == ProductStatus.ARCHIVED) {
+            throw new InvalidProductException("product is already ARCHIVED");
+        }
+        return withStatus(ProductStatus.ARCHIVED, updatedAt);
+    }
+
+    public Product restore(Instant updatedAt) {
+        if (status != ProductStatus.ARCHIVED) {
+            throw new InvalidProductException("product can only be restored when ARCHIVED");
+        }
+        return withStatus(ProductStatus.INACTIVE, updatedAt);
     }
 
     public Product changePrice(Money price, Instant updatedAt) {
         return create(
                 id,
                 categoryId,
+                productTypeId,
+                productVariantId,
+                presentation,
                 barcode,
                 name,
                 brand,
@@ -164,6 +186,9 @@ public final class Product {
         return create(
                 id,
                 categoryId,
+                productTypeId,
+                productVariantId,
+                presentation,
                 barcode,
                 name,
                 brand,
@@ -182,6 +207,18 @@ public final class Product {
 
     public UUID categoryId() {
         return categoryId;
+    }
+
+    public UUID productTypeId() {
+        return productTypeId;
+    }
+
+    public UUID productVariantId() {
+        return productVariantId;
+    }
+
+    public Presentation presentation() {
+        return presentation;
     }
 
     public String barcode() {
@@ -222,6 +259,25 @@ public final class Product {
 
     public Instant updatedAt() {
         return updatedAt;
+    }
+
+    private Product withStatus(ProductStatus newStatus, Instant updatedAt) {
+        return create(
+                id,
+                categoryId,
+                productTypeId,
+                productVariantId,
+                presentation,
+                barcode,
+                name,
+                brand,
+                description,
+                price,
+                stock,
+                imageUrl,
+                newStatus,
+                createdAt,
+                updatedAt);
     }
 
     private static void requireNonNull(Object value, String field) {

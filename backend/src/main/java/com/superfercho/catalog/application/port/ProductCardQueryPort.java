@@ -9,8 +9,9 @@ public interface ProductCardQueryPort {
 
     /**
      * Batch card projection for other modules. Returns every matching product,
-     * including INACTIVE ones. {@code sellable} is true only when the product and
-     * its category are both ACTIVE. Missing ids are omitted.
+     * including INACTIVE ones. {@code sellable} is true only when Product, Category
+     * and ProductType are ACTIVE, and if a ProductVariant is linked it is also ACTIVE.
+     * Missing ids are omitted.
      */
     List<ProductCardInfo> findCardsByIds(Collection<UUID> productIds);
 }
