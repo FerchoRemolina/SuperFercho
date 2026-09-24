@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { brandingAssets } from "@/shared/branding/assets";
 import { cx } from "@/shared/utils/cx";
 
 export function ProductImage({
@@ -19,7 +20,12 @@ export function ProductImage({
 
   return (
     <div className={cx("relative aspect-square", className)}>
-      <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-xl bg-sf-bg">
+      <div
+        className={cx(
+          "flex h-full w-full items-center justify-center overflow-hidden rounded-xl",
+          hasImage ? "bg-sf-bg" : "bg-gradient-to-br from-sf-bg via-sf-yellow-soft/40 to-sf-bg",
+        )}
+      >
         {hasImage ? (
           // eslint-disable-next-line @next/next/no-img-element -- catalog imageUrl is an arbitrary backend URL
           <img
@@ -29,7 +35,17 @@ export function ProductImage({
             onError={() => setFailed(true)}
           />
         ) : (
-          <span className="px-4 text-center text-sm text-sf-muted">Sin imagen</span>
+          <div className="flex flex-col items-center gap-2 px-4 text-center">
+            {/* eslint-disable-next-line @next/next/no-img-element -- static branding SVG from /public */}
+            <img
+              src={brandingAssets.mark}
+              alt=""
+              width={48}
+              height={48}
+              className="size-12 opacity-90"
+            />
+            <span className="text-xs font-medium text-sf-muted">Sin imagen</span>
+          </div>
         )}
       </div>
       {children}
