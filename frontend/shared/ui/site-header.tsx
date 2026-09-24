@@ -41,6 +41,7 @@ export function SiteHeader() {
   const menuId = useId();
   const isCustomer = session?.role === "CUSTOMER";
   const isAdmin = session?.role === "ADMIN";
+  const showHeaderSearch = pathname !== "/search";
 
   if (navPath !== pathname) {
     setNavPath(pathname);
@@ -96,9 +97,13 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="hidden flex-1 justify-center px-4 md:flex">
-          <SearchBar compact />
-        </div>
+        {showHeaderSearch ? (
+          <div className="hidden flex-1 justify-center px-4 md:flex">
+            <SearchBar compact />
+          </div>
+        ) : (
+          <div className="hidden flex-1 md:block" aria-hidden="true" />
+        )}
 
         <div className="hidden items-center gap-2 md:flex">
           {session ? (
