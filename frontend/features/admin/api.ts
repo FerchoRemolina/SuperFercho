@@ -49,6 +49,108 @@ export const ADMIN_SALES_ORDER_STATUSES: readonly OrderStatus[] = [
 
 export const ADMIN_CATALOG_VIEW = "ADMIN";
 
+/** Mirrors PresentationUnit (Catalog domain). */
+export type PresentationUnit =
+  | "G"
+  | "KG"
+  | "ML"
+  | "L"
+  | "UNIT"
+  | "PACK"
+  | "BOX"
+  | "ROLL";
+
+export const PRESENTATION_UNITS: readonly PresentationUnit[] = [
+  "G",
+  "KG",
+  "ML",
+  "L",
+  "UNIT",
+  "PACK",
+  "BOX",
+  "ROLL",
+] as const;
+
+/** Mirrors Presentation VO / REST body. quantity > 0, at most 3 decimal places. */
+export type Presentation = {
+  quantity: number;
+  unit: PresentationUnit;
+};
+
+export type ProductTypeStatus = "ACTIVE" | "INACTIVE";
+
+/** Mirrors ProductTypeRestResponse. */
+export type ProductType = {
+  id: string;
+  categoryId: string;
+  name: string;
+  description: string | null;
+  status: ProductTypeStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** Mirrors CreateProductTypeRequest. */
+export type CreateAdminProductTypeRequest = {
+  categoryId: string;
+  name: string;
+  description: string | null;
+};
+
+/** Mirrors UpdateProductTypeRequest. Does not include categoryId or status. */
+export type UpdateAdminProductTypeRequest = {
+  name: string;
+  description: string | null;
+};
+
+export type ProductVariantStatus = "ACTIVE" | "INACTIVE";
+
+/** Mirrors ProductVariantRestResponse. */
+export type ProductVariant = {
+  id: string;
+  productTypeId: string;
+  name: string;
+  description: string | null;
+  status: ProductVariantStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** Mirrors CreateProductVariantRequest. */
+export type CreateAdminProductVariantRequest = {
+  productTypeId: string;
+  name: string;
+  description: string | null;
+};
+
+/** Mirrors UpdateProductVariantRequest. Does not include productTypeId or status. */
+export type UpdateAdminProductVariantRequest = {
+  name: string;
+  description: string | null;
+};
+
+/**
+ * Admin Product view of ProductRestResponse (includes taxonomy + presentation).
+ * Customer catalog Product type stays narrower on purpose.
+ */
+export type AdminProduct = {
+  id: string;
+  categoryId: string;
+  productTypeId: string;
+  productVariantId: string | null;
+  presentation: Presentation;
+  barcode: string | null;
+  name: string;
+  brand: string | null;
+  description: string | null;
+  price: Money;
+  stock: number;
+  imageUrl: string | null;
+  status: ProductStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
 /** Mirrors CreateCategoryRequest. */
 export type CreateAdminCategoryRequest = {
   name: string;
@@ -61,9 +163,11 @@ export type UpdateAdminCategoryRequest = {
   description: string | null;
 };
 
-/** Mirrors CreateProductRequest. */
+/** Mirrors CreateProductRequest. Does not accept categoryId. */
 export type CreateAdminProductRequest = {
-  categoryId: string;
+  productTypeId: string;
+  productVariantId: string | null;
+  presentation: Presentation;
   barcode: string | null;
   name: string;
   brand: string | null;
@@ -73,9 +177,11 @@ export type CreateAdminProductRequest = {
   imageUrl: string | null;
 };
 
-/** Mirrors UpdateProductRequest. Does not include price, stock, or status. */
+/** Mirrors UpdateProductRequest. Does not include price, stock, status, or categoryId. */
 export type UpdateAdminProductRequest = {
-  categoryId: string;
+  productTypeId: string;
+  productVariantId: string | null;
+  presentation: Presentation;
   barcode: string | null;
   name: string;
   brand: string | null;
@@ -100,6 +206,14 @@ export type ListAdminProductsQuery = {
 
 export type SearchAdminProductsQuery = {
   text: string;
+};
+
+export type ListAdminProductTypesQuery = {
+  categoryId: string;
+};
+
+export type ListAdminProductVariantsQuery = {
+  productTypeId: string;
 };
 
 /** Query for GET /api/v1/admin/orders. */
@@ -156,6 +270,16 @@ export function adminKeys() {
     categoriesRoot: () => ["admin", "categories"] as const,
     categories: () => ["admin", "categories", "list"] as const,
     category: (categoryId: string) => ["admin", "category", categoryId] as const,
+    productTypesRoot: () => ["admin", "product-types"] as const,
+    productTypes: (categoryId: string) =>
+      ["admin", "product-types", "list", categoryId] as const,
+    productType: (productTypeId: string) =>
+      ["admin", "product-type", productTypeId] as const,
+    productVariantsRoot: () => ["admin", "product-variants"] as const,
+    productVariants: (productTypeId: string) =>
+      ["admin", "product-variants", "list", productTypeId] as const,
+    productVariant: (productVariantId: string) =>
+      ["admin", "product-variant", productVariantId] as const,
     productsRoot: () => ["admin", "products"] as const,
     products: (query: ListAdminProductsQuery = {}) =>
       ["admin", "products", "list", query.categoryId ?? "all", query.status ?? "all"] as const,
@@ -228,8 +352,8 @@ export async function deactivateAdminCategory(categoryId: string): Promise<Categ
 
 export async function listAdminProducts(
   query: ListAdminProductsQuery = {},
-): Promise<Product[]> {
-  return request<Product[]>(
+): Promise<AdminProduct[]> {
+  return request<AdminProduct[]>(
     `/products${toQuery({
       view: ADMIN_CATALOG_VIEW,
       categoryId: query.categoryId,
@@ -240,8 +364,8 @@ export async function listAdminProducts(
 
 export async function searchAdminProducts(
   query: SearchAdminProductsQuery,
-): Promise<Product[]> {
-  return request<Product[]>(
+): Promise<AdminProduct[]> {
+  return request<AdminProduct[]>(
     `/products/search${toQuery({
       view: ADMIN_CATALOG_VIEW,
       text: query.text,
@@ -249,16 +373,16 @@ export async function searchAdminProducts(
   );
 }
 
-export async function getAdminProduct(productId: string): Promise<Product> {
-  return request<Product>(
+export async function getAdminProduct(productId: string): Promise<AdminProduct> {
+  return request<AdminProduct>(
     `/products/${encodeURIComponent(productId)}${toQuery({ view: ADMIN_CATALOG_VIEW })}`,
   );
 }
 
 export async function createAdminProduct(
   body: CreateAdminProductRequest,
-): Promise<Product> {
-  return request<Product>("/products", {
+): Promise<AdminProduct> {
+  return request<AdminProduct>("/products", {
     method: "POST",
     body,
   });
@@ -267,8 +391,8 @@ export async function createAdminProduct(
 export async function updateAdminProduct(
   productId: string,
   body: UpdateAdminProductRequest,
-): Promise<Product> {
-  return request<Product>(`/products/${encodeURIComponent(productId)}`, {
+): Promise<AdminProduct> {
+  return request<AdminProduct>(`/products/${encodeURIComponent(productId)}`, {
     method: "PUT",
     body,
   });
@@ -277,8 +401,8 @@ export async function updateAdminProduct(
 export async function changeAdminProductPrice(
   productId: string,
   body: ChangeAdminProductPriceRequest,
-): Promise<Product> {
-  return request<Product>(`/products/${encodeURIComponent(productId)}/price`, {
+): Promise<AdminProduct> {
+  return request<AdminProduct>(`/products/${encodeURIComponent(productId)}/price`, {
     method: "POST",
     body,
   });
@@ -288,23 +412,142 @@ export async function changeAdminProductPrice(
 export async function adjustAdminProductStock(
   productId: string,
   body: AdjustAdminProductStockRequest,
-): Promise<Product> {
-  return request<Product>(`/products/${encodeURIComponent(productId)}/stock`, {
+): Promise<AdminProduct> {
+  return request<AdminProduct>(`/products/${encodeURIComponent(productId)}/stock`, {
     method: "POST",
     body,
   });
 }
 
-export async function activateAdminProduct(productId: string): Promise<Product> {
-  return request<Product>(
+export async function activateAdminProduct(productId: string): Promise<AdminProduct> {
+  return request<AdminProduct>(
     `/products/${encodeURIComponent(productId)}/activate`,
     { method: "POST" },
   );
 }
 
-export async function deactivateAdminProduct(productId: string): Promise<Product> {
-  return request<Product>(
+export async function deactivateAdminProduct(productId: string): Promise<AdminProduct> {
+  return request<AdminProduct>(
     `/products/${encodeURIComponent(productId)}/deactivate`,
+    { method: "POST" },
+  );
+}
+
+export async function archiveAdminProduct(productId: string): Promise<AdminProduct> {
+  return request<AdminProduct>(
+    `/products/${encodeURIComponent(productId)}/archive`,
+    { method: "POST" },
+  );
+}
+
+export async function restoreAdminProduct(productId: string): Promise<AdminProduct> {
+  return request<AdminProduct>(
+    `/products/${encodeURIComponent(productId)}/restore`,
+    { method: "POST" },
+  );
+}
+
+export async function listAdminProductTypes(
+  query: ListAdminProductTypesQuery,
+): Promise<ProductType[]> {
+  return request<ProductType[]>(
+    `/product-types${toQuery({ categoryId: query.categoryId })}`,
+  );
+}
+
+export async function getAdminProductType(productTypeId: string): Promise<ProductType> {
+  return request<ProductType>(`/product-types/${encodeURIComponent(productTypeId)}`);
+}
+
+export async function createAdminProductType(
+  body: CreateAdminProductTypeRequest,
+): Promise<ProductType> {
+  return request<ProductType>("/product-types", {
+    method: "POST",
+    body,
+  });
+}
+
+export async function updateAdminProductType(
+  productTypeId: string,
+  body: UpdateAdminProductTypeRequest,
+): Promise<ProductType> {
+  return request<ProductType>(`/product-types/${encodeURIComponent(productTypeId)}`, {
+    method: "PUT",
+    body,
+  });
+}
+
+export async function activateAdminProductType(
+  productTypeId: string,
+): Promise<ProductType> {
+  return request<ProductType>(
+    `/product-types/${encodeURIComponent(productTypeId)}/activate`,
+    { method: "POST" },
+  );
+}
+
+export async function deactivateAdminProductType(
+  productTypeId: string,
+): Promise<ProductType> {
+  return request<ProductType>(
+    `/product-types/${encodeURIComponent(productTypeId)}/deactivate`,
+    { method: "POST" },
+  );
+}
+
+export async function listAdminProductVariants(
+  query: ListAdminProductVariantsQuery,
+): Promise<ProductVariant[]> {
+  return request<ProductVariant[]>(
+    `/product-variants${toQuery({ productTypeId: query.productTypeId })}`,
+  );
+}
+
+export async function getAdminProductVariant(
+  productVariantId: string,
+): Promise<ProductVariant> {
+  return request<ProductVariant>(
+    `/product-variants/${encodeURIComponent(productVariantId)}`,
+  );
+}
+
+export async function createAdminProductVariant(
+  body: CreateAdminProductVariantRequest,
+): Promise<ProductVariant> {
+  return request<ProductVariant>("/product-variants", {
+    method: "POST",
+    body,
+  });
+}
+
+export async function updateAdminProductVariant(
+  productVariantId: string,
+  body: UpdateAdminProductVariantRequest,
+): Promise<ProductVariant> {
+  return request<ProductVariant>(
+    `/product-variants/${encodeURIComponent(productVariantId)}`,
+    {
+      method: "PUT",
+      body,
+    },
+  );
+}
+
+export async function activateAdminProductVariant(
+  productVariantId: string,
+): Promise<ProductVariant> {
+  return request<ProductVariant>(
+    `/product-variants/${encodeURIComponent(productVariantId)}/activate`,
+    { method: "POST" },
+  );
+}
+
+export async function deactivateAdminProductVariant(
+  productVariantId: string,
+): Promise<ProductVariant> {
+  return request<ProductVariant>(
+    `/product-variants/${encodeURIComponent(productVariantId)}/deactivate`,
     { method: "POST" },
   );
 }

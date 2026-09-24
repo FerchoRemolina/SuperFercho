@@ -1,12 +1,22 @@
 "use client";
 
 import { useId, useState, type FormEvent } from "react";
+import { PRESENTATION_UNITS } from "@/features/admin/api";
 import type { Category } from "@/features/catalog/api";
+import {
+  useAdminProductTypesQuery,
+  useAdminProductVariantsQuery,
+} from "@/features/admin/hooks";
 import {
   type AdminProductFieldErrors,
   type AdminProductFormValues,
+  withAdminProductCategoryId,
+  withAdminProductTypeId,
 } from "@/features/admin/payloads";
-import { productStatusLabel } from "@/features/admin/presentation";
+import {
+  productStatusLabel,
+  productTypeStatusLabel,
+} from "@/features/admin/presentation";
 import { Button } from "@/shared/ui/button";
 import { SelectField } from "@/shared/ui/select-field";
 import { TextField } from "@/shared/ui/text-field";
@@ -34,6 +44,15 @@ export function AdminProductForm({
 }) {
   const formId = useId();
   const [fieldErrors, setFieldErrors] = useState<AdminProductFieldErrors>({});
+  const typesQuery = useAdminProductTypesQuery(values.categoryId);
+  const variantsQuery = useAdminProductVariantsQuery(values.productTypeId);
+
+  const hasCategory = values.categoryId.trim().length > 0;
+  const hasType = values.productTypeId.trim().length > 0;
+  const types = typesQuery.data ?? [];
+  const variants = variantsQuery.data ?? [];
+  const typesReady = hasCategory && typesQuery.isSuccess;
+  const variantsReady = hasType && variantsQuery.isSuccess;
 
   function update<K extends keyof AdminProductFormValues>(
     key: K,
@@ -54,20 +73,14 @@ export function AdminProductForm({
 
   return (
     <form className="grid gap-4" onSubmit={handleSubmit} noValidate>
-      <TextField
-        id={`${formId}-name`}
-        label="Nombre"
-        value={values.name}
-        error={fieldErrors.name}
-        autoComplete="off"
-        onChange={(event) => update("name", event.target.value)}
-      />
       <SelectField
         id={`${formId}-category`}
         label="Categoría"
         value={values.categoryId}
         error={fieldErrors.categoryId}
-        onChange={(event) => update("categoryId", event.target.value)}
+        onChange={(event) =>
+          onChange(withAdminProductCategoryId(values, event.target.value))
+        }
       >
         <option value="">Selecciona una categoría</option>
         {categories.map((category) => (
@@ -78,6 +91,118 @@ export function AdminProductForm({
           </option>
         ))}
       </SelectField>
+
+      <SelectField
+        id={`${formId}-product-type`}
+        label="Tipo de producto"
+        value={values.productTypeId}
+        error={fieldErrors.productTypeId}
+        disabled={!hasCategory || typesQuery.isPending}
+        onChange={(event) =>
+          onChange(withAdminProductTypeId(values, event.target.value))
+        }
+      >
+        <option value="">
+          {!hasCategory
+            ? "Selecciona primero una categoría"
+            : typesQuery.isPending
+              ? "Cargando tipos…"
+              : "Selecciona un tipo"}
+        </option>
+        {types.map((productType) => (
+          <option key={productType.id} value={productType.id}>
+            {productType.status === "INACTIVE"
+              ? `${productType.name} — ${productTypeStatusLabel("INACTIVE")}`
+              : productType.name}
+          </option>
+        ))}
+      </SelectField>
+      {typesReady && types.length === 0 ? (
+        <p className="text-sm text-sf-muted">
+          Esta categoría no tiene tipos de producto. Crea un tipo en el detalle
+          de la categoría antes de continuar.
+        </p>
+      ) : null}
+      {hasCategory && typesQuery.isError ? (
+        <p className="text-sm text-sf-error">
+          No se pudieron cargar los tipos de producto.
+        </p>
+      ) : null}
+
+      <SelectField
+        id={`${formId}-product-variant`}
+        label="Variante (opcional)"
+        value={values.productVariantId}
+        error={fieldErrors.productVariantId}
+        disabled={!hasType || variantsQuery.isPending}
+        onChange={(event) => update("productVariantId", event.target.value)}
+      >
+        <option value="">
+          {!hasType
+            ? "Selecciona primero un tipo"
+            : variantsQuery.isPending
+              ? "Cargando variantes…"
+              : "Sin variante"}
+        </option>
+        {variants.map((productVariant) => (
+          <option key={productVariant.id} value={productVariant.id}>
+            {productVariant.status === "INACTIVE"
+              ? `${productVariant.name} — Inactiva`
+              : productVariant.name}
+          </option>
+        ))}
+      </SelectField>
+      {variantsReady && variants.length === 0 ? (
+        <p className="text-sm text-sf-muted">
+          Este tipo no tiene variantes. Puedes guardar el producto sin variante.
+        </p>
+      ) : null}
+      {hasType && variantsQuery.isError ? (
+        <p className="text-sm text-sf-error">
+          No se pudieron cargar las variantes.
+        </p>
+      ) : null}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <TextField
+          id={`${formId}-presentation-quantity`}
+          label="Cantidad de presentación"
+          inputMode="decimal"
+          value={values.presentationQuantity}
+          error={fieldErrors.presentationQuantity}
+          onChange={(event) =>
+            update("presentationQuantity", event.target.value)
+          }
+        />
+        <SelectField
+          id={`${formId}-presentation-unit`}
+          label="Unidad"
+          value={values.presentationUnit}
+          error={fieldErrors.presentationUnit}
+          onChange={(event) =>
+            update(
+              "presentationUnit",
+              event.target.value as AdminProductFormValues["presentationUnit"],
+            )
+          }
+        >
+          <option value="">Selecciona una unidad</option>
+          {PRESENTATION_UNITS.map((unit) => (
+            <option key={unit} value={unit}>
+              {unit}
+            </option>
+          ))}
+        </SelectField>
+      </div>
+
+      <TextField
+        id={`${formId}-name`}
+        label="Nombre"
+        value={values.name}
+        error={fieldErrors.name}
+        autoComplete="off"
+        onChange={(event) => update("name", event.target.value)}
+      />
       <TextField
         id={`${formId}-brand`}
         label="Marca (opcional)"

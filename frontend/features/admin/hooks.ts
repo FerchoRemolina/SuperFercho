@@ -4,24 +4,34 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   activateAdminCategory,
   activateAdminProduct,
+  activateAdminProductType,
+  activateAdminProductVariant,
   adjustAdminProductStock,
   adminKeys,
   changeAdminProductPrice,
   createAdminCategory,
   createAdminKnowledgeDocument,
   createAdminProduct,
+  createAdminProductType,
+  createAdminProductVariant,
   deactivateAdminCategory,
   deactivateAdminKnowledgeDocument,
   deactivateAdminProduct,
+  deactivateAdminProductType,
+  deactivateAdminProductVariant,
   getAdminCategory,
   getAdminKnowledgeDocument,
   getAdminOrder,
   getAdminPayment,
   getAdminProduct,
+  getAdminProductType,
+  getAdminProductVariant,
   listAdminCategories,
   listAdminKnowledgeDocuments,
   listAdminOrders,
   listAdminProducts,
+  listAdminProductTypes,
+  listAdminProductVariants,
   processAdminKnowledgeDocument,
   reactivateAdminKnowledgeDocument,
   replaceAdminKnowledgeDocumentContent,
@@ -30,11 +40,15 @@ import {
   updateAdminCategory,
   updateAdminOrderStatus,
   updateAdminProduct,
+  updateAdminProductType,
+  updateAdminProductVariant,
   type AdjustAdminProductStockRequest,
   type ChangeAdminProductPriceRequest,
   type CreateAdminCategoryRequest,
   type CreateAdminKnowledgeDocumentRequest,
   type CreateAdminProductRequest,
+  type CreateAdminProductTypeRequest,
+  type CreateAdminProductVariantRequest,
   type ListAdminOrdersQuery,
   type ListAdminProductsQuery,
   type ReplaceAdminKnowledgeDocumentContentRequest,
@@ -42,6 +56,8 @@ import {
   type UpdateAdminCategoryRequest,
   type UpdateAdminOrderStatusRequest,
   type UpdateAdminProductRequest,
+  type UpdateAdminProductTypeRequest,
+  type UpdateAdminProductVariantRequest,
 } from "@/features/admin/api";
 import {
   isAdminRole,
@@ -126,6 +142,181 @@ export function useDeactivateAdminCategoryMutation() {
       queryClient.setQueryData(keys.category(category.id), category);
       void queryClient.invalidateQueries({ queryKey: keys.categoriesRoot() });
       void queryClient.invalidateQueries({ queryKey: keys.category(category.id) });
+    },
+  });
+}
+
+export function useAdminProductTypesQuery(categoryId: string) {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.productTypes(categoryId),
+    queryFn: () => listAdminProductTypes({ categoryId }),
+    enabled: isAdminRole(session?.role) && categoryId.length > 0,
+  });
+}
+
+export function useAdminProductTypeQuery(productTypeId: string) {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.productType(productTypeId),
+    queryFn: () => getAdminProductType(productTypeId),
+    enabled: isAdminRole(session?.role) && productTypeId.length > 0,
+  });
+}
+
+export function useCreateAdminProductTypeMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: CreateAdminProductTypeRequest) => createAdminProductType(body),
+    onSuccess: (productType) => {
+      queryClient.setQueryData(keys.productType(productType.id), productType);
+      void queryClient.invalidateQueries({ queryKey: keys.productTypesRoot() });
+      void queryClient.invalidateQueries({
+        queryKey: keys.productTypes(productType.categoryId),
+      });
+    },
+  });
+}
+
+export function useUpdateAdminProductTypeMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      productTypeId,
+      body,
+    }: {
+      productTypeId: string;
+      body: UpdateAdminProductTypeRequest;
+    }) => updateAdminProductType(productTypeId, body),
+    onSuccess: (productType) => {
+      queryClient.setQueryData(keys.productType(productType.id), productType);
+      void queryClient.invalidateQueries({ queryKey: keys.productTypesRoot() });
+      void queryClient.invalidateQueries({
+        queryKey: keys.productTypes(productType.categoryId),
+      });
+    },
+  });
+}
+
+export function useActivateAdminProductTypeMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (productTypeId: string) => activateAdminProductType(productTypeId),
+    onSuccess: (productType) => {
+      queryClient.setQueryData(keys.productType(productType.id), productType);
+      void queryClient.invalidateQueries({ queryKey: keys.productTypesRoot() });
+      void queryClient.invalidateQueries({
+        queryKey: keys.productTypes(productType.categoryId),
+      });
+    },
+  });
+}
+
+export function useDeactivateAdminProductTypeMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (productTypeId: string) => deactivateAdminProductType(productTypeId),
+    onSuccess: (productType) => {
+      queryClient.setQueryData(keys.productType(productType.id), productType);
+      void queryClient.invalidateQueries({ queryKey: keys.productTypesRoot() });
+      void queryClient.invalidateQueries({
+        queryKey: keys.productTypes(productType.categoryId),
+      });
+    },
+  });
+}
+
+export function useAdminProductVariantsQuery(productTypeId: string) {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.productVariants(productTypeId),
+    queryFn: () => listAdminProductVariants({ productTypeId }),
+    enabled: isAdminRole(session?.role) && productTypeId.length > 0,
+  });
+}
+
+export function useAdminProductVariantQuery(productVariantId: string) {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.productVariant(productVariantId),
+    queryFn: () => getAdminProductVariant(productVariantId),
+    enabled: isAdminRole(session?.role) && productVariantId.length > 0,
+  });
+}
+
+export function useCreateAdminProductVariantMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: CreateAdminProductVariantRequest) =>
+      createAdminProductVariant(body),
+    onSuccess: (productVariant) => {
+      queryClient.setQueryData(keys.productVariant(productVariant.id), productVariant);
+      void queryClient.invalidateQueries({ queryKey: keys.productVariantsRoot() });
+      void queryClient.invalidateQueries({
+        queryKey: keys.productVariants(productVariant.productTypeId),
+      });
+    },
+  });
+}
+
+export function useUpdateAdminProductVariantMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      productVariantId,
+      body,
+    }: {
+      productVariantId: string;
+      body: UpdateAdminProductVariantRequest;
+    }) => updateAdminProductVariant(productVariantId, body),
+    onSuccess: (productVariant) => {
+      queryClient.setQueryData(keys.productVariant(productVariant.id), productVariant);
+      void queryClient.invalidateQueries({ queryKey: keys.productVariantsRoot() });
+      void queryClient.invalidateQueries({
+        queryKey: keys.productVariants(productVariant.productTypeId),
+      });
+    },
+  });
+}
+
+export function useActivateAdminProductVariantMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (productVariantId: string) =>
+      activateAdminProductVariant(productVariantId),
+    onSuccess: (productVariant) => {
+      queryClient.setQueryData(keys.productVariant(productVariant.id), productVariant);
+      void queryClient.invalidateQueries({ queryKey: keys.productVariantsRoot() });
+      void queryClient.invalidateQueries({
+        queryKey: keys.productVariants(productVariant.productTypeId),
+      });
+    },
+  });
+}
+
+export function useDeactivateAdminProductVariantMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (productVariantId: string) =>
+      deactivateAdminProductVariant(productVariantId),
+    onSuccess: (productVariant) => {
+      queryClient.setQueryData(keys.productVariant(productVariant.id), productVariant);
+      void queryClient.invalidateQueries({ queryKey: keys.productVariantsRoot() });
+      void queryClient.invalidateQueries({
+        queryKey: keys.productVariants(productVariant.productTypeId),
+      });
     },
   });
 }

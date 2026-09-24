@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   activateAdminCategory,
   activateAdminProduct,
+  activateAdminProductType,
+  activateAdminProductVariant,
   adjustAdminProductStock,
   adminKeys,
   ADMIN_SALES_ORDER_STATUSES,
@@ -9,18 +11,26 @@ import {
   createAdminCategory,
   createAdminKnowledgeDocument,
   createAdminProduct,
+  createAdminProductType,
+  createAdminProductVariant,
   deactivateAdminCategory,
   deactivateAdminKnowledgeDocument,
   deactivateAdminProduct,
+  deactivateAdminProductType,
+  deactivateAdminProductVariant,
   getAdminCategory,
   getAdminKnowledgeDocument,
   getAdminOrder,
   getAdminPayment,
   getAdminProduct,
+  getAdminProductType,
+  getAdminProductVariant,
   listAdminCategories,
   listAdminKnowledgeDocuments,
   listAdminOrders,
   listAdminProducts,
+  listAdminProductTypes,
+  listAdminProductVariants,
   processAdminKnowledgeDocument,
   reactivateAdminKnowledgeDocument,
   replaceAdminKnowledgeDocumentContent,
@@ -29,6 +39,8 @@ import {
   updateAdminCategory,
   updateAdminOrderStatus,
   updateAdminProduct,
+  updateAdminProductType,
+  updateAdminProductVariant,
   type AdminPayment,
   type KnowledgeDocument,
 } from "@/features/admin/api";
@@ -68,6 +80,9 @@ const category = {
 const product = {
   id: "33333333-3333-3333-3333-333333333333",
   categoryId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  productTypeId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  productVariantId: null as string | null,
+  presentation: { quantity: 1, unit: "UNIT" as const },
   barcode: null,
   name: "Leche",
   brand: null,
@@ -75,6 +90,26 @@ const product = {
   price: { amount: 10.5, currency: "COP" as const },
   stock: 8,
   imageUrl: null,
+  status: "ACTIVE" as const,
+  createdAt: "2026-03-01T10:00:00Z",
+  updatedAt: "2026-03-01T10:30:00Z",
+};
+
+const productType = {
+  id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  categoryId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  name: "Leche",
+  description: "Lácteos líquidos",
+  status: "ACTIVE" as const,
+  createdAt: "2026-03-01T10:00:00Z",
+  updatedAt: "2026-03-01T10:30:00Z",
+};
+
+const productVariant = {
+  id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+  productTypeId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  name: "Entera",
+  description: null,
   status: "ACTIVE" as const,
   createdAt: "2026-03-01T10:00:00Z",
   updatedAt: "2026-03-01T10:30:00Z",
@@ -131,12 +166,14 @@ describe("admin catalog api", () => {
     );
   });
 
-  it("creates product with POST body including stock", async () => {
+  it("creates product with POST body including type, presentation, and stock", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(product, 201));
     vi.stubGlobal("fetch", fetchMock);
 
     await createAdminProduct({
-      categoryId: product.categoryId,
+      productTypeId: product.productTypeId,
+      productVariantId: null,
+      presentation: { quantity: 1, unit: "L" },
       barcode: null,
       name: "Leche",
       brand: null,
@@ -150,7 +187,9 @@ describe("admin catalog api", () => {
     expect(init.method).toBe("POST");
     expect(init.body).toBe(
       JSON.stringify({
-        categoryId: product.categoryId,
+        productTypeId: product.productTypeId,
+        productVariantId: null,
+        presentation: { quantity: 1, unit: "L" },
         barcode: null,
         name: "Leche",
         brand: null,
@@ -160,14 +199,17 @@ describe("admin catalog api", () => {
         imageUrl: null,
       }),
     );
+    expect(init.body).not.toContain("categoryId");
   });
 
-  it("updates product with PUT without stock or price", async () => {
+  it("updates product with PUT without stock, price, or categoryId", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(product));
     vi.stubGlobal("fetch", fetchMock);
 
     await updateAdminProduct(product.id, {
-      categoryId: product.categoryId,
+      productTypeId: product.productTypeId,
+      productVariantId: productVariant.id,
+      presentation: { quantity: 900, unit: "ML" },
       barcode: null,
       name: "Leche entera",
       brand: null,
@@ -177,9 +219,118 @@ describe("admin catalog api", () => {
 
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
     expect(init.method).toBe("PUT");
-    expect(String(init.body)).not.toContain("stock");
-    expect(String(init.body)).not.toContain("price");
-    expect(String(init.body)).not.toContain("status");
+    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    expect(body).toEqual({
+      productTypeId: product.productTypeId,
+      productVariantId: productVariant.id,
+      presentation: { quantity: 900, unit: "ML" },
+      barcode: null,
+      name: "Leche entera",
+      brand: null,
+      description: null,
+      imageUrl: null,
+    });
+    expect(body).not.toHaveProperty("categoryId");
+    expect(body).not.toHaveProperty("stock");
+    expect(body).not.toHaveProperty("price");
+  });
+
+  it("lists product types by categoryId and variants by productTypeId", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([productType]))
+      .mockResolvedValueOnce(jsonResponse([productVariant]))
+      .mockResolvedValueOnce(jsonResponse(productType))
+      .mockResolvedValueOnce(jsonResponse(productVariant));
+    vi.stubGlobal("fetch", fetchMock);
+    configureSessionPersistence(new MemoryPersistence());
+    setSession({
+      accessToken: "admin-token",
+      userId: "u1",
+      role: "ADMIN",
+      expiresAt: "2099-01-01T00:00:00Z",
+    });
+
+    await listAdminProductTypes({ categoryId: category.id });
+    await listAdminProductVariants({ productTypeId: productType.id });
+    await getAdminProductType(productType.id);
+    await getAdminProductVariant(productVariant.id);
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      `http://localhost:8080/api/v1/product-types?categoryId=${category.id}`,
+    );
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      `http://localhost:8080/api/v1/product-variants?productTypeId=${productType.id}`,
+    );
+    expect(fetchMock.mock.calls[2]?.[0]).toBe(
+      `http://localhost:8080/api/v1/product-types/${productType.id}`,
+    );
+    expect(fetchMock.mock.calls[3]?.[0]).toBe(
+      `http://localhost:8080/api/v1/product-variants/${productVariant.id}`,
+    );
+  });
+
+  it("creates and mutates product types and variants", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(productType, 201))
+      .mockResolvedValueOnce(jsonResponse(productType))
+      .mockResolvedValueOnce(jsonResponse({ ...productType, status: "INACTIVE" }))
+      .mockResolvedValueOnce(jsonResponse({ ...productType, status: "ACTIVE" }))
+      .mockResolvedValueOnce(jsonResponse(productVariant, 201))
+      .mockResolvedValueOnce(jsonResponse(productVariant))
+      .mockResolvedValueOnce(jsonResponse({ ...productVariant, status: "INACTIVE" }))
+      .mockResolvedValueOnce(jsonResponse({ ...productVariant, status: "ACTIVE" }));
+    vi.stubGlobal("fetch", fetchMock);
+    configureSessionPersistence(new MemoryPersistence());
+    setSession({
+      accessToken: "admin-token",
+      userId: "u1",
+      role: "ADMIN",
+      expiresAt: "2099-01-01T00:00:00Z",
+    });
+
+    await createAdminProductType({
+      categoryId: category.id,
+      name: "Leche",
+      description: "Lácteos líquidos",
+    });
+    await updateAdminProductType(productType.id, {
+      name: "Leche",
+      description: null,
+    });
+    await deactivateAdminProductType(productType.id);
+    await activateAdminProductType(productType.id);
+    await createAdminProductVariant({
+      productTypeId: productType.id,
+      name: "Entera",
+      description: null,
+    });
+    await updateAdminProductVariant(productVariant.id, {
+      name: "Entera",
+      description: null,
+    });
+    await deactivateAdminProductVariant(productVariant.id);
+    await activateAdminProductVariant(productVariant.id);
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "http://localhost:8080/api/v1/product-types",
+    );
+    expect(fetchMock.mock.calls[4]?.[0]).toBe(
+      "http://localhost:8080/api/v1/product-variants",
+    );
+    expect(adminKeys().productTypes(category.id)).toEqual([
+      "admin",
+      "product-types",
+      "list",
+      category.id,
+    ]);
+    expect(adminKeys().productVariants(productType.id)).toEqual([
+      "admin",
+      "product-variants",
+      "list",
+      productType.id,
+    ]);
   });
 
   it("changes price with POST /price only", async () => {

@@ -2,6 +2,8 @@ import type {
   DocumentStatus,
   ListAdminOrdersQuery,
   ListAdminProductsQuery,
+  ProductTypeStatus,
+  ProductVariantStatus,
 } from "@/features/admin/api";
 import {
   ADMIN_DOCUMENT_STATUSES,
@@ -38,6 +40,14 @@ export function productStatusLabel(status: ProductStatus | CategoryStatus): stri
 
 export function categoryStatusLabel(status: CategoryStatus): string {
   return productStatusLabel(status);
+}
+
+export function productTypeStatusLabel(status: ProductTypeStatus): string {
+  return status === "ACTIVE" ? "Activo" : "Inactivo";
+}
+
+export function productVariantStatusLabel(status: ProductVariantStatus): string {
+  return status === "ACTIVE" ? "Activo" : "Inactivo";
 }
 
 export function formatAdminInstant(iso: string): string {

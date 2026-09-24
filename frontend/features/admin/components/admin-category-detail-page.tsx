@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AdminCategoryForm } from "@/features/admin/components/admin-category-form";
+import { AdminProductTypeSection } from "@/features/admin/components/admin-product-type-section";
 import { CategoryStatusActions } from "@/features/admin/components/category-status-actions";
 import { CategoryStatusBadge } from "@/features/admin/components/category-status-badge";
 import {
@@ -194,6 +195,8 @@ export function AdminCategoryDetailPageContent({
           <h2 className="text-xl font-semibold text-sf-ink">Estado</h2>
           <CategoryStatusActions category={category} />
         </Card>
+
+        <AdminProductTypeSection categoryId={category.id} />
       </div>
 
       <div className="mt-8">

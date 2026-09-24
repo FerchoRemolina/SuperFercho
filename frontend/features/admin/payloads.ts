@@ -1,16 +1,24 @@
 import type {
   AdjustAdminProductStockRequest,
+  AdminProduct,
   BarcodeProductSuggestion,
   ChangeAdminProductPriceRequest,
   CreateAdminCategoryRequest,
   CreateAdminKnowledgeDocumentRequest,
   CreateAdminProductRequest,
+  CreateAdminProductTypeRequest,
+  CreateAdminProductVariantRequest,
+  PresentationUnit,
+  ProductType,
+  ProductVariant,
   ReplaceAdminKnowledgeDocumentContentRequest,
   UpdateAdminCategoryRequest,
   UpdateAdminProductRequest,
+  UpdateAdminProductTypeRequest,
+  UpdateAdminProductVariantRequest,
 } from "@/features/admin/api";
-import { copMoney } from "@/features/admin/api";
-import type { Category, Product } from "@/features/catalog/api";
+import { copMoney, PRESENTATION_UNITS } from "@/features/admin/api";
+import type { Category } from "@/features/catalog/api";
 
 export type AdminCategoryFormValues = {
   name: string;
@@ -65,8 +73,126 @@ export function adminCategoryFormValuesFromCategory(
   };
 }
 
+export type AdminProductTypeFormValues = {
+  name: string;
+  description: string;
+};
+
+export type AdminProductTypeFieldErrors = Partial<
+  Record<keyof AdminProductTypeFormValues, string>
+>;
+
+export function emptyAdminProductTypeFormValues(): AdminProductTypeFormValues {
+  return {
+    name: "",
+    description: "",
+  };
+}
+
+export function validateAdminProductType(
+  values: AdminProductTypeFormValues,
+): AdminProductTypeFieldErrors {
+  const errors: AdminProductTypeFieldErrors = {};
+  if (values.name.trim().length === 0) {
+    errors.name = "Escribe el nombre del tipo de producto.";
+  }
+  return errors;
+}
+
+/** categoryId comes from Category Detail context; never from the form. */
+export function createAdminProductTypeRequestFromValues(
+  categoryId: string,
+  values: AdminProductTypeFormValues,
+): CreateAdminProductTypeRequest {
+  return {
+    categoryId,
+    name: values.name.trim(),
+    description: optionalText(values.description),
+  };
+}
+
+export function updateAdminProductTypeRequestFromValues(
+  values: AdminProductTypeFormValues,
+): UpdateAdminProductTypeRequest {
+  return {
+    name: values.name.trim(),
+    description: optionalText(values.description),
+  };
+}
+
+export function adminProductTypeFormValuesFromProductType(
+  productType: ProductType,
+): AdminProductTypeFormValues {
+  return {
+    name: productType.name,
+    description: productType.description ?? "",
+  };
+}
+
+export type AdminProductVariantFormValues = {
+  name: string;
+  description: string;
+};
+
+export type AdminProductVariantFieldErrors = Partial<
+  Record<keyof AdminProductVariantFormValues, string>
+>;
+
+export function emptyAdminProductVariantFormValues(): AdminProductVariantFormValues {
+  return {
+    name: "",
+    description: "",
+  };
+}
+
+export function validateAdminProductVariant(
+  values: AdminProductVariantFormValues,
+): AdminProductVariantFieldErrors {
+  const errors: AdminProductVariantFieldErrors = {};
+  if (values.name.trim().length === 0) {
+    errors.name = "Escribe el nombre de la variante.";
+  }
+  return errors;
+}
+
+/** productTypeId comes from the parent ProductType; never from the form. */
+export function createAdminProductVariantRequestFromValues(
+  productTypeId: string,
+  values: AdminProductVariantFormValues,
+): CreateAdminProductVariantRequest {
+  return {
+    productTypeId,
+    name: values.name.trim(),
+    description: optionalText(values.description),
+  };
+}
+
+export function updateAdminProductVariantRequestFromValues(
+  values: AdminProductVariantFormValues,
+): UpdateAdminProductVariantRequest {
+  return {
+    name: values.name.trim(),
+    description: optionalText(values.description),
+  };
+}
+
+export function adminProductVariantFormValuesFromProductVariant(
+  productVariant: ProductVariant,
+): AdminProductVariantFormValues {
+  return {
+    name: productVariant.name,
+    description: productVariant.description ?? "",
+  };
+}
+
 export type AdminProductFormValues = {
+  /** UI filter only; not sent on Product create/update (category comes from ProductType). */
   categoryId: string;
+  productTypeId: string;
+  /** Empty string means no variant (serialized as null). */
+  productVariantId: string;
+  presentationQuantity: string;
+  presentationUnit: PresentationUnit | "";
   barcode: string;
   name: string;
   brand: string;
@@ -83,6 +209,10 @@ export type AdminProductFieldErrors = Partial<
 export function emptyAdminProductFormValues(): AdminProductFormValues {
   return {
     categoryId: "",
+    productTypeId: "",
+    productVariantId: "",
+    presentationQuantity: "1",
+    presentationUnit: "UNIT",
     barcode: "",
     name: "",
     brand: "",
@@ -95,7 +225,7 @@ export function emptyAdminProductFormValues(): AdminProductFormValues {
 
 /**
  * Prefills only barcode metadata fields from Open Food Facts.
- * Never touches price, stock, categoryId (or any status — not in this form).
+ * Never touches price, stock, categoryId, productTypeId, presentation (or status).
  */
 export function applyBarcodeSuggestion(
   values: AdminProductFormValues,
@@ -145,6 +275,25 @@ export function parseNonNegativeInt(raw: string): number | null {
   return value;
 }
 
+export function parsePresentationQuantity(raw: string): number | null {
+  const trimmed = raw.trim().replace(",", ".");
+  if (trimmed.length === 0) {
+    return null;
+  }
+  if (!/^\d+(\.\d{1,3})?$/.test(trimmed)) {
+    return null;
+  }
+  const quantity = Number(trimmed);
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    return null;
+  }
+  return quantity;
+}
+
+export function isPresentationUnit(value: string): value is PresentationUnit {
+  return (PRESENTATION_UNITS as readonly string[]).includes(value);
+}
+
 export function validateCreateAdminProduct(
   values: AdminProductFormValues,
 ): AdminProductFieldErrors {
@@ -154,6 +303,16 @@ export function validateCreateAdminProduct(
   }
   if (values.categoryId.trim().length === 0) {
     errors.categoryId = "Elige una categoría.";
+  }
+  if (values.productTypeId.trim().length === 0) {
+    errors.productTypeId = "Elige un tipo de producto.";
+  }
+  if (parsePresentationQuantity(values.presentationQuantity) === null) {
+    errors.presentationQuantity =
+      "Indica una cantidad mayor que 0, con hasta tres decimales.";
+  }
+  if (!isPresentationUnit(values.presentationUnit)) {
+    errors.presentationUnit = "Elige una unidad de presentación.";
   }
   if (parseNonNegativeAmount(values.price) === null) {
     errors.price = "Indica un precio mayor o igual a 0, con hasta dos decimales.";
@@ -173,6 +332,16 @@ export function validateUpdateAdminProduct(
   }
   if (values.categoryId.trim().length === 0) {
     errors.categoryId = "Elige una categoría.";
+  }
+  if (values.productTypeId.trim().length === 0) {
+    errors.productTypeId = "Elige un tipo de producto.";
+  }
+  if (parsePresentationQuantity(values.presentationQuantity) === null) {
+    errors.presentationQuantity =
+      "Indica una cantidad mayor que 0, con hasta tres decimales.";
+  }
+  if (!isPresentationUnit(values.presentationUnit)) {
+    errors.presentationUnit = "Elige una unidad de presentación.";
   }
   return errors;
 }
@@ -196,11 +365,24 @@ export function createAdminProductRequestFromValues(
 ): CreateAdminProductRequest {
   const amount = parseNonNegativeAmount(values.price);
   const stock = parseNonNegativeInt(values.stock);
-  if (amount === null || stock === null) {
-    throw new Error("createAdminProductRequestFromValues requires valid price and stock");
+  const quantity = parsePresentationQuantity(values.presentationQuantity);
+  if (
+    amount === null ||
+    stock === null ||
+    quantity === null ||
+    !isPresentationUnit(values.presentationUnit)
+  ) {
+    throw new Error(
+      "createAdminProductRequestFromValues requires valid price, stock, and presentation",
+    );
+  }
+  if (values.productTypeId.trim().length === 0) {
+    throw new Error("createAdminProductRequestFromValues requires productTypeId");
   }
   return {
-    categoryId: values.categoryId.trim(),
+    productTypeId: values.productTypeId.trim(),
+    productVariantId: optionalText(values.productVariantId),
+    presentation: { quantity, unit: values.presentationUnit },
     barcode: optionalText(values.barcode),
     name: values.name.trim(),
     brand: optionalText(values.brand),
@@ -214,8 +396,19 @@ export function createAdminProductRequestFromValues(
 export function updateAdminProductRequestFromValues(
   values: AdminProductFormValues,
 ): UpdateAdminProductRequest {
+  const quantity = parsePresentationQuantity(values.presentationQuantity);
+  if (quantity === null || !isPresentationUnit(values.presentationUnit)) {
+    throw new Error(
+      "updateAdminProductRequestFromValues requires valid presentation",
+    );
+  }
+  if (values.productTypeId.trim().length === 0) {
+    throw new Error("updateAdminProductRequestFromValues requires productTypeId");
+  }
   return {
-    categoryId: values.categoryId.trim(),
+    productTypeId: values.productTypeId.trim(),
+    productVariantId: optionalText(values.productVariantId),
+    presentation: { quantity, unit: values.presentationUnit },
     barcode: optionalText(values.barcode),
     name: values.name.trim(),
     brand: optionalText(values.brand),
@@ -245,10 +438,14 @@ export function adjustAdminProductStockRequestFromValue(
 }
 
 export function adminProductFormValuesFromProduct(
-  product: Product,
+  product: AdminProduct,
 ): AdminProductFormValues {
   return {
     categoryId: product.categoryId,
+    productTypeId: product.productTypeId,
+    productVariantId: product.productVariantId ?? "",
+    presentationQuantity: formatPresentationQuantityInput(product.presentation.quantity),
+    presentationUnit: product.presentation.unit,
     barcode: product.barcode ?? "",
     name: product.name,
     brand: product.brand ?? "",
@@ -257,6 +454,35 @@ export function adminProductFormValuesFromProduct(
     stock: String(product.stock),
     imageUrl: product.imageUrl ?? "",
   };
+}
+
+/** Category is UI-only; changing it clears Type and Variant immediately. */
+export function withAdminProductCategoryId(
+  values: AdminProductFormValues,
+  categoryId: string,
+): AdminProductFormValues {
+  return {
+    ...values,
+    categoryId,
+    productTypeId: "",
+    productVariantId: "",
+  };
+}
+
+/** Changing Type clears Variant so a stale Variant of the previous Type is never kept. */
+export function withAdminProductTypeId(
+  values: AdminProductFormValues,
+  productTypeId: string,
+): AdminProductFormValues {
+  return {
+    ...values,
+    productTypeId,
+    productVariantId: "",
+  };
+}
+
+function formatPresentationQuantityInput(quantity: number): string {
+  return String(quantity);
 }
 
 export type AdminKnowledgeDocumentFormValues = {

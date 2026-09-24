@@ -56,7 +56,7 @@ export function AdminCreateProductPageContent() {
       setLookupBarcode(suggestion.barcode);
       setLookupState("found");
       setLookupMessage(
-        "Datos cargados desde Open Food Facts. Revisa precio, stock y categoría antes de guardar.",
+        "Datos cargados desde Open Food Facts. Revisa precio, stock, categoría, tipo y presentación antes de guardar.",
       );
     } catch (caught) {
       if (isApiError(caught) && caught.problem.code === "BARCODE_LOOKUP_NOT_FOUND") {
@@ -86,9 +86,9 @@ export function AdminCreateProductPageContent() {
       </h1>
       <p className="mt-2 max-w-2xl text-base text-sf-muted">
         Puedes buscar un código de barras en Open Food Facts para prellenar
-        algunos campos. El precio, el stock y la categoría los defines tú. El
-        stock inicial se define aquí; después también puedes ajustarlo desde el
-        detalle del producto.
+        algunos campos. La categoría, el tipo, la variante y la presentación
+        los defines tú. El stock inicial se define aquí; después también puedes
+        ajustarlo desde el detalle del producto.
       </p>
 
       {categoriesQuery.isPending ? (
@@ -113,7 +113,7 @@ export function AdminCreateProductPageContent() {
             </h2>
             <p className="mt-1 text-sm text-sf-muted">
               Solo prellena nombre, marca, descripción e imagen. No guarda el
-              producto.
+              producto ni modifica la taxonomía.
             </p>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
               <div className="min-w-0 flex-1">
