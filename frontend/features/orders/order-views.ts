@@ -126,13 +126,28 @@ export function orderStatusTone(status: OrderStatus): OrderStatusTone {
   switch (status) {
     case "PENDING":
       return "accent";
-    case "CANCELLED":
-      return "danger";
     case "CONFIRMED":
+      return "neutral";
     case "PREPARING":
     case "READY":
     case "DELIVERED":
       return "primary";
+    case "CANCELLED":
+      return "danger";
+  }
+}
+
+/** Presentation-only accents on top of Badge tones (existing sf-* utilities). */
+export function orderStatusBadgeClassName(
+  status: OrderStatus,
+): string | undefined {
+  switch (status) {
+    case "READY":
+      return "ring-1 ring-inset ring-sf-primary/35";
+    case "DELIVERED":
+      return "!bg-sf-primary !text-white";
+    default:
+      return undefined;
   }
 }
 

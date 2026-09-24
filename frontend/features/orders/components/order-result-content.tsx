@@ -26,25 +26,24 @@ export function OrderResultContent({ orderId }: { orderId: string }) {
 
   if (view.kind === "loading") {
     return (
-      <Container as="main" className="py-10 md:py-16">
-        <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
-          Pedido
-        </h1>
-        <div className="mt-8 grid gap-4">
-          <Skeleton className="h-40 w-full" />
-          <Skeleton className="h-32 w-full" />
-        </div>
+      <Container as="main" className="py-8 md:py-16">
+        <Skeleton className="mb-3 h-5 w-24 md:mb-4" />
+        <Skeleton className="h-9 w-48 md:h-11" />
+        <OrderDetailSkeleton />
       </Container>
     );
   }
 
   if (view.kind === "error") {
     return (
-      <Container as="main" className="py-10 md:py-16">
-        <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
-          {view.title}
-        </h1>
-        <div className="mt-8 grid gap-4">
+      <Container as="main" className="py-8 md:py-16">
+        <Link
+          href="/orders"
+          className="mb-3 inline-flex min-h-11 items-center text-sm font-semibold text-sf-muted hover:text-sf-primary md:mb-4"
+        >
+          ← Pedidos
+        </Link>
+        <div className="mt-2 grid gap-4">
           <Alert tone="error" title={view.title}>
             {view.message}
           </Alert>
@@ -71,101 +70,120 @@ export function OrderResultContent({ orderId }: { orderId: string }) {
   const refundLabel = paymentRefundLabel(payment);
 
   return (
-    <Container as="main" className="py-10 md:py-16">
-      <p className="text-sm font-semibold text-sf-muted">Pedido</p>
-      <h1 className="mt-1 text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
-        {order.orderNumber}
-      </h1>
-      <div className="mt-3">
+    <Container as="main" className="py-8 md:py-16">
+      <Link
+        href="/orders"
+        className="mb-3 inline-flex min-h-11 items-center text-sm font-semibold text-sf-muted hover:text-sf-primary md:mb-4"
+      >
+        ← Pedidos
+      </Link>
+
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
+          {order.orderNumber}
+        </h1>
         <OrderStatusBadge status={order.status} showHint />
       </div>
 
-      <div className="mt-8 grid gap-6">
-        <Card className="grid gap-4">
-          <dl className="grid gap-3 text-sm md:grid-cols-2">
-            <div>
-              <dt className="text-sf-muted">Número de pedido</dt>
-              <dd className="mt-1 text-lg font-semibold text-sf-ink">
-                {order.orderNumber}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sf-muted">Total</dt>
-              <dd className="mt-1 text-lg font-bold text-sf-ink">
-                {formatMoney(order.total)}
-              </dd>
-            </div>
-            <div>
+      <p className="mt-3 text-2xl font-bold text-sf-ink md:text-3xl">
+        {formatMoney(order.total)}
+      </p>
+      <p className="mt-1 text-sm text-sf-muted">
+        {formatOrderDate(order.createdAt)}
+      </p>
+
+      <div className="mt-6 grid gap-4 md:mt-8 md:gap-5">
+        <Card className="grid gap-3 !p-4 md:gap-4 md:!p-5">
+          <h2 className="text-lg font-semibold text-sf-ink md:text-xl">
+            Productos
+          </h2>
+          <ul className="grid gap-2.5">
+            {order.items.map((item) => (
+              <li
+                key={item.id}
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 border-b border-sf-border pb-2.5 last:border-b-0 last:pb-0"
+              >
+                <div className="min-w-0">
+                  <p className="line-clamp-2 text-sm font-semibold leading-snug text-sf-ink md:text-base">
+                    {item.productName}
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-sf-ink">
+                    Cantidad: {item.quantity}
+                  </p>
+                  <p className="mt-0.5 text-xs text-sf-muted">
+                    {formatMoney(item.unitPrice)} c/u
+                  </p>
+                </div>
+                <p className="pt-0.5 text-sm font-bold text-sf-ink md:text-base">
+                  {formatMoney(item.subtotal)}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </Card>
+
+        <Card className="grid gap-3 !p-4 md:gap-3 md:!p-5">
+          <h2 className="text-lg font-semibold text-sf-ink md:text-xl">
+            Resumen
+          </h2>
+          <dl className="grid gap-2 text-sm">
+            <div className="flex justify-between gap-4">
               <dt className="text-sf-muted">Subtotal</dt>
-              <dd className="mt-1 font-semibold text-sf-ink">
+              <dd className="font-semibold text-sf-ink">
                 {formatMoney(order.subtotal)}
               </dd>
             </div>
-            <div>
-              <dt className="text-sf-muted">Creado</dt>
-              <dd className="mt-1 font-semibold text-sf-ink">
-                {formatOrderDate(order.createdAt)}
+            <div className="flex justify-between gap-4 border-t border-sf-border pt-3">
+              <dt className="text-base font-semibold text-sf-ink">Total</dt>
+              <dd className="text-lg font-bold text-sf-ink">
+                {formatMoney(order.total)}
               </dd>
             </div>
-            {order.confirmedAt ? (
-              <div>
-                <dt className="text-sf-muted">Confirmado</dt>
-                <dd className="mt-1 font-semibold text-sf-ink">
-                  {formatOrderDate(order.confirmedAt)}
-                </dd>
-              </div>
-            ) : null}
-            {order.cancelledAt ? (
-              <div>
-                <dt className="text-sf-muted">Cancelado</dt>
-                <dd className="mt-1 font-semibold text-sf-ink">
-                  {formatOrderDate(order.cancelledAt)}
-                </dd>
-              </div>
-            ) : null}
           </dl>
-        </Card>
 
-        <Card className="grid gap-4">
-          <h2 className="text-xl font-semibold text-sf-ink">Pago</h2>
           {payment ? (
-            <dl className="grid gap-3 text-sm md:grid-cols-2">
-              <div>
-                <dt className="text-sf-muted">Estado del pago</dt>
-                <dd className="mt-1 text-lg font-semibold text-sf-ink">
-                  {paymentStatusLabel(payment.status)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sf-muted">Método</dt>
-                <dd className="mt-1 font-semibold text-sf-ink">
+            <div className="grid gap-1.5 border-t border-sf-border pt-3 text-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-sf-muted">
+                Pago
+              </p>
+              <p className="text-sf-ink">
+                <span className="font-semibold">
                   {paymentMethodLabel(payment.paymentMethod)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sf-muted">Monto</dt>
-                <dd className="mt-1 font-semibold text-sf-ink">
-                  {formatMoney(payment.amount)}
-                </dd>
-              </div>
+                </span>
+                <span className="text-sf-muted">
+                  {" "}
+                  · {paymentStatusLabel(payment.status)}
+                </span>
+              </p>
+              <p className="text-sm text-sf-muted">
+                Monto: {formatMoney(payment.amount)}
+              </p>
               {refundLabel ? (
-                <div className="md:col-span-2">
-                  <dt className="text-sf-muted">Reembolso</dt>
-                  <dd className="mt-1 font-semibold text-sf-ink">
-                    {refundLabel}
-                  </dd>
-                </div>
+                <p className="text-xs text-sf-muted">{refundLabel}</p>
               ) : null}
-            </dl>
+            </div>
           ) : (
-            <p className="text-sm text-sf-muted">
+            <p className="border-t border-sf-border pt-3 text-sm text-sf-muted">
               No hay información de pago disponible para este pedido.
             </p>
           )}
+
+          {(order.confirmedAt || order.cancelledAt) && (
+            <div className="grid gap-1 border-t border-sf-border pt-3 text-xs text-sf-muted">
+              {order.confirmedAt ? (
+                <p>Confirmado: {formatOrderDate(order.confirmedAt)}</p>
+              ) : null}
+              {order.cancelledAt ? (
+                <p>Cancelado: {formatOrderDate(order.cancelledAt)}</p>
+              ) : null}
+            </div>
+          )}
         </Card>
 
-        <Card className="grid gap-4">
-          <h2 className="text-xl font-semibold text-sf-ink">Entrega</h2>
+        <Card className="grid gap-2 !p-4 md:!p-5">
+          <h2 className="text-lg font-semibold text-sf-ink md:text-xl">
+            Entrega
+          </h2>
           <p className="font-semibold text-sf-ink">{address.recipientName}</p>
           <p className="text-sm text-sf-muted">
             {address.addressLine}
@@ -177,39 +195,47 @@ export function OrderResultContent({ orderId }: { orderId: string }) {
           <p className="text-sm text-sf-muted">{address.phone}</p>
         </Card>
 
-        <Card className="grid gap-4">
-          <h2 className="text-xl font-semibold text-sf-ink">Productos</h2>
-          <ul className="grid gap-3">
-            {order.items.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-start justify-between gap-4 border-b border-sf-border pb-3 last:border-0 last:pb-0"
-              >
-                <div>
-                  <p className="font-semibold text-sf-ink">{item.productName}</p>
-                  <p className="mt-1 text-sm text-sf-muted">
-                    {item.quantity} × {formatMoney(item.unitPrice)}
-                  </p>
-                </div>
-                <p className="font-semibold text-sf-ink">
-                  {formatMoney(item.subtotal)}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </Card>
-
         <CancelOrderPanel order={order} />
 
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Link href="/orders" className={buttonClassName("primary")}>
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
+          <Link
+            href="/orders"
+            className={buttonClassName("secondary")}
+          >
             Volver a mis pedidos
           </Link>
-          <Link href="/catalog" className={buttonClassName("secondary")}>
+          <Link
+            href="/catalog"
+            className="inline-flex min-h-11 items-center justify-center text-sm font-semibold text-sf-muted hover:text-sf-primary hover:underline"
+          >
             Seguir comprando
           </Link>
         </div>
       </div>
     </Container>
+  );
+}
+
+function OrderDetailSkeleton() {
+  return (
+    <div className="mt-6 grid gap-4 md:mt-8" aria-hidden="true">
+      <Skeleton className="h-7 w-36" />
+      <Skeleton className="h-4 w-44" />
+      <Card className="grid gap-3 !p-4">
+        <Skeleton className="h-5 w-24" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-12 w-full" />
+      </Card>
+      <Card className="grid gap-3 !p-4">
+        <Skeleton className="h-5 w-28" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-2/3" />
+      </Card>
+      <Card className="grid gap-2 !p-4">
+        <Skeleton className="h-5 w-20" />
+        <Skeleton className="h-4 w-48" />
+        <Skeleton className="h-4 w-56" />
+      </Card>
+    </div>
   );
 }

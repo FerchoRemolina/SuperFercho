@@ -15,6 +15,8 @@ import {
 } from "@/features/orders/order-views";
 import { Alert } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
+import { Card } from "@/shared/ui/card";
+import { cx } from "@/shared/utils/cx";
 
 export function CancelOrderPanel({ order }: { order: Order }) {
   const cancelMutation = useCancelOrderMutation();
@@ -44,9 +46,16 @@ export function CancelOrderPanel({ order }: { order: Order }) {
     ? cancelErrorCopy(cancelMutation.error)
     : null;
   const remaining = cancellationRemainingLabel(order.createdAt, now);
+  const actionable =
+    state === "idle" || state === "confirming" || state === "pending";
 
   return (
-    <div className="grid gap-3 rounded-2xl border border-dashed border-sf-border bg-sf-surface p-4">
+    <Card
+      className={cx(
+        "grid gap-2.5 !p-4 md:!p-4",
+        !actionable && "border-sf-border bg-sf-bg/60 shadow-none",
+      )}
+    >
       {error ? (
         <Alert tone="error" title={error.title}>
           {error.message}
@@ -54,12 +63,16 @@ export function CancelOrderPanel({ order }: { order: Order }) {
       ) : null}
 
       {state === "expired" ? (
-        <p className="text-sm text-sf-muted">{CANCEL_WINDOW_EXPIRED_COPY}</p>
+        <p className="text-xs leading-relaxed text-sf-muted md:text-sm">
+          {CANCEL_WINDOW_EXPIRED_COPY}
+        </p>
       ) : null}
 
       {state === "idle" ? (
         <>
-          <p className="text-sm text-sf-muted">{CANCEL_WINDOW_IDLE_COPY}</p>
+          <p className="text-xs leading-relaxed text-sf-muted md:text-sm">
+            {CANCEL_WINDOW_IDLE_COPY}
+          </p>
           {remaining ? (
             <p className="text-sm font-semibold text-sf-ink">{remaining}</p>
           ) : null}
@@ -83,7 +96,9 @@ export function CancelOrderPanel({ order }: { order: Order }) {
           <p className="text-sm font-semibold text-sf-ink">
             {CANCEL_CONFIRMATION_TITLE}
           </p>
-          <p className="text-sm text-sf-muted">{CANCEL_CONFIRMATION_BODY}</p>
+          <p className="text-xs leading-relaxed text-sf-muted md:text-sm">
+            {CANCEL_CONFIRMATION_BODY}
+          </p>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               type="button"
@@ -111,6 +126,6 @@ export function CancelOrderPanel({ order }: { order: Order }) {
           </div>
         </>
       ) : null}
-    </div>
+    </Card>
   );
 }

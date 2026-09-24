@@ -236,6 +236,10 @@ describe("order status presentation", () => {
     expect(orderStatusLabel("DELIVERED")).toBe("Entregado");
     expect(orderStatusLabel("CANCELLED")).toBe("Cancelado");
     expect(orderStatusTone("PENDING")).toBe("accent");
+    expect(orderStatusTone("CONFIRMED")).toBe("neutral");
+    expect(orderStatusTone("PREPARING")).toBe("primary");
+    expect(orderStatusTone("READY")).toBe("primary");
+    expect(orderStatusTone("DELIVERED")).toBe("primary");
     expect(orderStatusTone("CANCELLED")).toBe("danger");
     expect(orderStatusHint("PENDING")).toContain("15 minutos");
     expect(orderStatusHint("CANCELLED")).toContain("cancelado");
