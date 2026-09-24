@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   adjustAdminProductStockRequestFromValue,
+  adminProductFormValuesFromProduct,
   changeAdminProductPriceRequestFromAmount,
   createAdminKnowledgeDocumentRequestFromValues,
   createAdminProductRequestFromValues,
   emptyAdminKnowledgeDocumentContentFormValues,
   emptyAdminKnowledgeDocumentFormValues,
   emptyAdminProductFormValues,
+  parsePresentationQuantity,
   replaceAdminKnowledgeDocumentContentRequestFromValues,
   updateAdminProductRequestFromValues,
   validateAdminKnowledgeDocument,
@@ -14,20 +16,30 @@ import {
   validateAdminProductStock,
   validateCreateAdminProduct,
   validateUpdateAdminProduct,
+  withAdminProductCategoryId,
+  withAdminProductTypeId,
 } from "@/features/admin/payloads";
 
+const TYPE_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+const VARIANT_ID = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+
 describe("admin product payloads", () => {
-  it("create payload includes stock and price", () => {
+  it("create payload includes type, nullable variant, presentation, stock and price", () => {
     const body = createAdminProductRequestFromValues({
       ...emptyAdminProductFormValues(),
-      categoryId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      productTypeId: TYPE_ID,
+      productVariantId: "",
+      presentationQuantity: "1.5",
+      presentationUnit: "L",
       name: "Leche",
       price: "10.50",
       stock: "12",
     });
 
     expect(body).toEqual({
-      categoryId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      productTypeId: TYPE_ID,
+      productVariantId: null,
+      presentation: { quantity: 1.5, unit: "L" },
       barcode: null,
       name: "Leche",
       brand: null,
@@ -36,12 +48,32 @@ describe("admin product payloads", () => {
       stock: 12,
       imageUrl: null,
     });
+    expect(body).not.toHaveProperty("categoryId");
   });
 
-  it("update payload excludes stock, price, and status", () => {
+  it("create payload keeps productVariantId when present", () => {
+    const body = createAdminProductRequestFromValues({
+      ...emptyAdminProductFormValues(),
+      productTypeId: TYPE_ID,
+      productVariantId: VARIANT_ID,
+      presentationQuantity: "1",
+      presentationUnit: "UNIT",
+      name: "Leche",
+      price: "10",
+      stock: "1",
+    });
+
+    expect(body.productVariantId).toBe(VARIANT_ID);
+    expect(body.presentation).toEqual({ quantity: 1, unit: "UNIT" });
+  });
+
+  it("update payload excludes stock, price, status, and categoryId", () => {
     const body = updateAdminProductRequestFromValues({
       ...emptyAdminProductFormValues(),
-      categoryId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      productTypeId: TYPE_ID,
+      productVariantId: VARIANT_ID,
+      presentationQuantity: "900",
+      presentationUnit: "ML",
       name: "Leche entera",
       brand: "Marca",
       barcode: "770123",
@@ -52,7 +84,9 @@ describe("admin product payloads", () => {
     });
 
     expect(body).toEqual({
-      categoryId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      productTypeId: TYPE_ID,
+      productVariantId: VARIANT_ID,
+      presentation: { quantity: 900, unit: "ML" },
       barcode: "770123",
       name: "Leche entera",
       brand: "Marca",
@@ -62,6 +96,7 @@ describe("admin product payloads", () => {
     expect(JSON.stringify(body)).not.toContain("stock");
     expect(JSON.stringify(body)).not.toContain("price");
     expect(JSON.stringify(body)).not.toContain("status");
+    expect(JSON.stringify(body)).not.toContain("categoryId");
   });
 
   it("change price payload uses only the price field", () => {
@@ -77,24 +112,112 @@ describe("admin product payloads", () => {
     expect(validateAdminProductStock("1.5")).toMatch(/stock/i);
   });
 
-  it("validates create requires name, category, price, and stock", () => {
+  it("validates create requires category, name, productType, presentation, price, and stock", () => {
     expect(validateCreateAdminProduct(emptyAdminProductFormValues())).toMatchObject({
       name: expect.any(String),
       categoryId: expect.any(String),
+      productTypeId: expect.any(String),
       price: expect.any(String),
       stock: expect.any(String),
     });
+    expect(
+      validateCreateAdminProduct({
+        ...emptyAdminProductFormValues(),
+        presentationQuantity: "0",
+        presentationUnit: "",
+      }),
+    ).toMatchObject({
+      presentationQuantity: expect.any(String),
+      presentationUnit: expect.any(String),
+    });
   });
 
-  it("validates update requires name and category only", () => {
+  it("validates update requires category, name, productType and presentation only", () => {
     const errors = validateUpdateAdminProduct({
       ...emptyAdminProductFormValues(),
-      name: "Ok",
       categoryId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      name: "Ok",
+      productTypeId: TYPE_ID,
+      presentationQuantity: "1",
+      presentationUnit: "UNIT",
       price: "",
       stock: "",
     });
     expect(errors).toEqual({});
+  });
+
+  it("parses presentation quantity with up to three decimals and rejects zero", () => {
+    expect(parsePresentationQuantity("1.125")).toBe(1.125);
+    expect(parsePresentationQuantity("1.1234")).toBeNull();
+    expect(parsePresentationQuantity("0")).toBeNull();
+  });
+
+  it("clears type and variant when category changes", () => {
+    const next = withAdminProductCategoryId(
+      {
+        ...emptyAdminProductFormValues(),
+        categoryId: "cat-old",
+        productTypeId: TYPE_ID,
+        productVariantId: VARIANT_ID,
+      },
+      "cat-new",
+    );
+    expect(next.categoryId).toBe("cat-new");
+    expect(next.productTypeId).toBe("");
+    expect(next.productVariantId).toBe("");
+  });
+
+  it("clears variant when type changes", () => {
+    const next = withAdminProductTypeId(
+      {
+        ...emptyAdminProductFormValues(),
+        categoryId: "cat-1",
+        productTypeId: TYPE_ID,
+        productVariantId: VARIANT_ID,
+      },
+      "type-new",
+    );
+    expect(next.productTypeId).toBe("type-new");
+    expect(next.productVariantId).toBe("");
+  });
+
+  it("maps product with and without variant into edit form values", () => {
+    const baseProduct = {
+      id: "p1",
+      categoryId: "cat-1",
+      productTypeId: TYPE_ID,
+      presentation: { quantity: 1, unit: "L" as const },
+      barcode: null,
+      name: "Leche",
+      brand: null,
+      description: null,
+      price: { amount: 10, currency: "COP" as const },
+      stock: 1,
+      imageUrl: null,
+      status: "ACTIVE" as const,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    };
+
+    const withVariant = adminProductFormValuesFromProduct({
+      ...baseProduct,
+      productVariantId: VARIANT_ID,
+    });
+    expect(withVariant.categoryId).toBe("cat-1");
+    expect(withVariant.productTypeId).toBe(TYPE_ID);
+    expect(withVariant.productVariantId).toBe(VARIANT_ID);
+    expect(withVariant.presentationUnit).toBe("L");
+
+    const withoutVariant = adminProductFormValuesFromProduct({
+      ...baseProduct,
+      id: "p2",
+      productVariantId: null,
+      presentation: { quantity: 500, unit: "G" },
+      name: "Harina",
+    });
+    expect(withoutVariant.productVariantId).toBe("");
+    expect(withoutVariant.presentationQuantity).toBe("500");
+    expect(withoutVariant.presentationUnit).toBe("G");
   });
 });
 

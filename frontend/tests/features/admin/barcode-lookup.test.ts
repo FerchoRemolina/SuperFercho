@@ -105,10 +105,14 @@ describe("admin barcode lookup api", () => {
 });
 
 describe("applyBarcodeSuggestion", () => {
-  it("fills suggestion fields without changing price, stock or categoryId", () => {
+  it("fills suggestion fields without changing price, stock, categoryId or taxonomy", () => {
     const current = {
       ...emptyAdminProductFormValues(),
       categoryId: "cat-1",
+      productTypeId: "type-1",
+      productVariantId: "var-1",
+      presentationQuantity: "2",
+      presentationUnit: "L" as const,
       price: "4500",
       stock: "12",
       name: "Viejo",
@@ -129,6 +133,10 @@ describe("applyBarcodeSuggestion", () => {
     expect(next.description).toBe("Crema");
     expect(next.imageUrl).toBe("https://img.test/n.png");
     expect(next.categoryId).toBe("cat-1");
+    expect(next.productTypeId).toBe("type-1");
+    expect(next.productVariantId).toBe("var-1");
+    expect(next.presentationQuantity).toBe("2");
+    expect(next.presentationUnit).toBe("L");
     expect(next.price).toBe("4500");
     expect(next.stock).toBe("12");
   });
