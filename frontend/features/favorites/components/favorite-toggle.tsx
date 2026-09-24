@@ -86,12 +86,12 @@ export function FavoriteToggle({
         ) : null}
         <Button
           type="button"
-          variant="secondary"
+          variant="ghost"
           onClick={onToggle}
           disabled={mutating}
           aria-pressed={favorited}
           aria-label={label}
-          className="w-full"
+          className="min-h-11 justify-start px-0 text-sm font-semibold text-sf-muted hover:bg-transparent hover:text-sf-error"
         >
           {label}
         </Button>
