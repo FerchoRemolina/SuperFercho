@@ -6,6 +6,8 @@ import java.util.UUID;
 
 public final class ProductType {
 
+    public static final int MAX_NAME_LENGTH = 30;
+
     private final UUID id;
     private final UUID categoryId;
     private final String name;
@@ -42,6 +44,7 @@ public final class ProductType {
         requireNonNull(id, "id");
         requireNonNull(categoryId, "categoryId");
         requireText(name, "name");
+        requireMaxLength(name, "name", MAX_NAME_LENGTH);
         requireNonNull(status, "status");
         requireNonNull(createdAt, "createdAt");
         requireNonNull(updatedAt, "updatedAt");
@@ -101,6 +104,13 @@ public final class ProductType {
     private static void requireText(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new InvalidProductTypeException(field + " cannot be null or blank");
+        }
+    }
+
+    private static void requireMaxLength(String value, String field, int maxLength) {
+        if (value.length() > maxLength) {
+            throw new InvalidProductTypeException(
+                    field + " cannot exceed " + maxLength + " characters");
         }
     }
 }

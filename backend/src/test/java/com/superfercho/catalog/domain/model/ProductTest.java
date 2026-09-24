@@ -95,6 +95,56 @@ class ProductTest {
     }
 
     @Test
+    void shouldAcceptProductWhenNameIsAtMaxLength() {
+        String name = "a".repeat(Product.MAX_NAME_LENGTH);
+
+        assertEquals(name, validProduct().name(name).build().name());
+    }
+
+    @Test
+    void shouldRejectProductWhenNameExceedsMaxLength() {
+        InvalidProductException error = assertThrows(
+                InvalidProductException.class,
+                () -> validProduct().name("a".repeat(Product.MAX_NAME_LENGTH + 1)).build());
+
+        assertEquals("name cannot exceed 30 characters", error.getMessage());
+    }
+
+    @Test
+    void shouldAcceptProductWhenBrandIsAtMaxLength() {
+        String brand = "b".repeat(Product.MAX_BRAND_LENGTH);
+
+        assertEquals(brand, validProduct().brand(brand).build().brand());
+    }
+
+    @Test
+    void shouldRejectProductWhenBrandExceedsMaxLength() {
+        InvalidProductException error = assertThrows(
+                InvalidProductException.class,
+                () -> validProduct().brand("b".repeat(Product.MAX_BRAND_LENGTH + 1)).build());
+
+        assertEquals("brand cannot exceed 30 characters", error.getMessage());
+    }
+
+    @Test
+    void shouldAcceptProductWhenDescriptionIsAtMaxLength() {
+        String description = "d".repeat(Product.MAX_DESCRIPTION_LENGTH);
+
+        assertEquals(description, validProduct().description(description).build().description());
+    }
+
+    @Test
+    void shouldRejectProductWhenDescriptionExceedsMaxLength() {
+        InvalidProductException error = assertThrows(
+                InvalidProductException.class,
+                () -> validProduct()
+                        .description("d".repeat(Product.MAX_DESCRIPTION_LENGTH + 1))
+                        .build());
+
+        assertEquals("description cannot exceed 200 characters", error.getMessage());
+    }
+
+    @Test
     void shouldRejectProductWhenPriceIsNull() {
         assertThrows(InvalidProductException.class, () -> validProduct().price(null).build());
     }

@@ -54,4 +54,30 @@ class ProductVariantTest {
                 InvalidProductVariantException.class,
                 () -> ProductVariant.create(ID, TYPE_ID, blank, null, ProductVariantStatus.ACTIVE, NOW, NOW));
     }
+
+    @Test
+    void shouldAcceptNameAtMaxLength() {
+        String name = "n".repeat(ProductVariant.MAX_NAME_LENGTH);
+
+        assertEquals(
+                name,
+                ProductVariant.create(ID, TYPE_ID, name, null, ProductVariantStatus.ACTIVE, NOW, NOW)
+                        .name());
+    }
+
+    @Test
+    void shouldRejectNameExceedingMaxLength() {
+        InvalidProductVariantException error = assertThrows(
+                InvalidProductVariantException.class,
+                () -> ProductVariant.create(
+                        ID,
+                        TYPE_ID,
+                        "n".repeat(ProductVariant.MAX_NAME_LENGTH + 1),
+                        null,
+                        ProductVariantStatus.ACTIVE,
+                        NOW,
+                        NOW));
+
+        assertEquals("name cannot exceed 30 characters", error.getMessage());
+    }
 }

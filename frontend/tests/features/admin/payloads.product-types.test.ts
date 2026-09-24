@@ -63,6 +63,21 @@ describe("admin product type payloads", () => {
     ).toEqual({});
   });
 
+  it("rejects product type name longer than 30 characters", () => {
+    expect(
+      validateAdminProductType({
+        name: "n".repeat(31),
+        description: "",
+      }),
+    ).toMatchObject({ name: expect.stringMatching(/30/i) });
+    expect(
+      validateAdminProductType({
+        name: "n".repeat(30),
+        description: "any length description is allowed",
+      }),
+    ).toEqual({});
+  });
+
   it("maps product type into form values without status", () => {
     const values = adminProductTypeFormValuesFromProductType(productType);
     expect(values).toEqual({

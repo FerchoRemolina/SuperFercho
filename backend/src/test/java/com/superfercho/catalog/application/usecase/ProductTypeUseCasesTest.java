@@ -104,6 +104,17 @@ class ProductTypeUseCasesTest {
     }
 
     @Test
+    void shouldRejectCreateWhenNameExceedsMaxLength() {
+        when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category()));
+
+        assertThrows(
+                InvalidProductTypeException.class,
+                () -> createProductType.execute(new CreateProductTypeCommand(
+                        CATEGORY_ID, "n".repeat(ProductType.MAX_NAME_LENGTH + 1), null)));
+        verify(productTypeRepository, never()).save(any());
+    }
+
+    @Test
     void shouldListProductTypesByCategory() {
         when(productTypeRepository.findByCategoryId(CATEGORY_ID))
                 .thenReturn(List.of(productType(TYPE_ID, ProductTypeStatus.ACTIVE)));

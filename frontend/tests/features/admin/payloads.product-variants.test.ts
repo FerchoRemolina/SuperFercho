@@ -63,6 +63,21 @@ describe("admin product variant payloads", () => {
     ).toEqual({});
   });
 
+  it("rejects product variant name longer than 30 characters", () => {
+    expect(
+      validateAdminProductVariant({
+        name: "n".repeat(31),
+        description: "",
+      }),
+    ).toMatchObject({ name: expect.stringMatching(/30/i) });
+    expect(
+      validateAdminProductVariant({
+        name: "n".repeat(30),
+        description: "any length description is allowed",
+      }),
+    ).toEqual({});
+  });
+
   it("maps inactive variant into form values without dropping it from admin", () => {
     expect(productVariant.status).toBe("INACTIVE");
     const values = adminProductVariantFormValuesFromProductVariant(productVariant);

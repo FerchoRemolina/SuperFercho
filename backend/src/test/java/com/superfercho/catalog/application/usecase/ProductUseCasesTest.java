@@ -189,6 +189,47 @@ class ProductUseCasesTest {
     }
 
     @Test
+    void shouldRejectCreateWhenNameExceedsMaxLength() {
+        when(productTypeRepository.findById(TYPE_ID)).thenReturn(Optional.of(productType(TYPE_ID, CATEGORY_ID)));
+
+        CreateProductCommand command = new CreateProductCommand(
+                TYPE_ID,
+                null,
+                UNIT,
+                "7701234567890",
+                "n".repeat(Product.MAX_NAME_LENGTH + 1),
+                "Alpina",
+                "1L",
+                PRICE,
+                10,
+                null);
+
+        assertThrows(InvalidProductException.class, () -> createProduct.execute(command));
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectUpdateWhenBrandExceedsMaxLength() {
+        when(productRepository.findById(PRODUCT_ID))
+                .thenReturn(Optional.of(product(PRODUCT_ID, CATEGORY_ID, ProductStatus.ACTIVE, 10, PRICE)));
+        when(productTypeRepository.findById(TYPE_ID)).thenReturn(Optional.of(productType(TYPE_ID, CATEGORY_ID)));
+
+        UpdateProductCommand command = new UpdateProductCommand(
+                PRODUCT_ID,
+                TYPE_ID,
+                null,
+                UNIT,
+                "7701234567890",
+                "Leche entera",
+                "b".repeat(Product.MAX_BRAND_LENGTH + 1),
+                "1L",
+                null);
+
+        assertThrows(InvalidProductException.class, () -> updateProduct.execute(command));
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
     void shouldRejectGetWhenProductIsMissing() {
         when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.empty());
 

@@ -106,6 +106,17 @@ class ProductVariantUseCasesTest {
     }
 
     @Test
+    void shouldRejectCreateWhenNameExceedsMaxLength() {
+        when(productTypeRepository.findById(TYPE_ID)).thenReturn(Optional.of(productType()));
+
+        assertThrows(
+                InvalidProductVariantException.class,
+                () -> createProductVariant.execute(new CreateProductVariantCommand(
+                        TYPE_ID, "n".repeat(ProductVariant.MAX_NAME_LENGTH + 1), null)));
+        verify(productVariantRepository, never()).save(any());
+    }
+
+    @Test
     void shouldListProductVariantsByType() {
         when(productVariantRepository.findByProductTypeId(TYPE_ID))
                 .thenReturn(List.of(productVariant(VARIANT_ID, ProductVariantStatus.ACTIVE)));

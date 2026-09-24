@@ -272,7 +272,7 @@ class PendingOrderTransitionConcurrencyIntegrationTest {
         ProductType type = productTypeRepository.save(ProductType.create(
                 UUID.randomUUID(),
                 category.id(),
-                "RaceType-" + UUID.randomUUID(),
+                "RaceType-" + UUID.randomUUID().toString().substring(0, 8),
                 null,
                 ProductTypeStatus.ACTIVE,
                 NOW,

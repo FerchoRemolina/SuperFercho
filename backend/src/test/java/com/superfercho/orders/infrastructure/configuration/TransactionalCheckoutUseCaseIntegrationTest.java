@@ -434,7 +434,7 @@ class TransactionalCheckoutUseCaseIntegrationTest {
         ProductType type = productTypeRepository.save(ProductType.create(
                 UUID.randomUUID(),
                 category.id(),
-                "CheckoutType-" + UUID.randomUUID(),
+                "CheckoutType-" + UUID.randomUUID().toString().substring(0, 8),
                 null,
                 ProductTypeStatus.ACTIVE,
                 NOW,

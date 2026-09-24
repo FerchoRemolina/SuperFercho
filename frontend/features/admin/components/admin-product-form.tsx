@@ -10,6 +10,9 @@ import {
 import {
   type AdminProductFieldErrors,
   type AdminProductFormValues,
+  PRODUCT_BRAND_MAX_LENGTH,
+  PRODUCT_DESCRIPTION_MAX_LENGTH,
+  PRODUCT_NAME_MAX_LENGTH,
   withAdminProductCategoryId,
   withAdminProductTypeId,
 } from "@/features/admin/payloads";
@@ -20,6 +23,7 @@ import {
 import { Button } from "@/shared/ui/button";
 import { SelectField } from "@/shared/ui/select-field";
 import { TextField } from "@/shared/ui/text-field";
+import { cx } from "@/shared/utils/cx";
 
 export function AdminProductForm({
   mode,
@@ -201,13 +205,16 @@ export function AdminProductForm({
         value={values.name}
         error={fieldErrors.name}
         autoComplete="off"
+        maxLength={PRODUCT_NAME_MAX_LENGTH}
         onChange={(event) => update("name", event.target.value)}
       />
       <TextField
         id={`${formId}-brand`}
         label="Marca (opcional)"
         value={values.brand}
+        error={fieldErrors.brand}
         autoComplete="off"
+        maxLength={PRODUCT_BRAND_MAX_LENGTH}
         onChange={(event) => update("brand", event.target.value)}
       />
       <TextField
@@ -225,9 +232,22 @@ export function AdminProductForm({
           id={`${formId}-description`}
           value={values.description}
           rows={4}
-          className="rounded-lg border border-sf-border bg-sf-surface px-3 py-2 text-base text-sf-ink"
+          maxLength={PRODUCT_DESCRIPTION_MAX_LENGTH}
+          aria-invalid={fieldErrors.description ? true : undefined}
+          aria-describedby={
+            fieldErrors.description ? `${formId}-description-error` : undefined
+          }
+          className={cx(
+            "rounded-lg border border-sf-border bg-sf-surface px-3 py-2 text-base text-sf-ink",
+            fieldErrors.description && "border-sf-error",
+          )}
           onChange={(event) => update("description", event.target.value)}
         />
+        {fieldErrors.description ? (
+          <p id={`${formId}-description-error`} className="text-sm text-sf-error">
+            {fieldErrors.description}
+          </p>
+        ) : null}
       </div>
       <TextField
         id={`${formId}-image`}

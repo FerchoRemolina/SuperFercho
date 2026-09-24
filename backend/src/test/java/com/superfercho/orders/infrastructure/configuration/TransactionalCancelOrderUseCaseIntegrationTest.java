@@ -316,7 +316,7 @@ class TransactionalCancelOrderUseCaseIntegrationTest {
         ProductType type = productTypeRepository.save(ProductType.create(
                 UUID.randomUUID(),
                 category.id(),
-                "CancelType-" + UUID.randomUUID(),
+                "CancelType-" + UUID.randomUUID().toString().substring(0, 8),
                 null,
                 ProductTypeStatus.ACTIVE,
                 NOW,

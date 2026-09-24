@@ -68,4 +68,30 @@ class ProductTypeTest {
                 InvalidProductTypeException.class,
                 () -> ProductType.create(ID, CATEGORY_ID, blank, null, ProductTypeStatus.ACTIVE, NOW, NOW));
     }
+
+    @Test
+    void shouldAcceptNameAtMaxLength() {
+        String name = "n".repeat(ProductType.MAX_NAME_LENGTH);
+
+        assertEquals(
+                name,
+                ProductType.create(ID, CATEGORY_ID, name, null, ProductTypeStatus.ACTIVE, NOW, NOW)
+                        .name());
+    }
+
+    @Test
+    void shouldRejectNameExceedingMaxLength() {
+        InvalidProductTypeException error = assertThrows(
+                InvalidProductTypeException.class,
+                () -> ProductType.create(
+                        ID,
+                        CATEGORY_ID,
+                        "n".repeat(ProductType.MAX_NAME_LENGTH + 1),
+                        null,
+                        ProductTypeStatus.ACTIVE,
+                        NOW,
+                        NOW));
+
+        assertEquals("name cannot exceed 30 characters", error.getMessage());
+    }
 }

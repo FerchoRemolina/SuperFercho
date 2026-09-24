@@ -5,6 +5,7 @@ import type {
   AdminProductTypeFieldErrors,
   AdminProductTypeFormValues,
 } from "@/features/admin/payloads";
+import { PRODUCT_TYPE_NAME_MAX_LENGTH } from "@/features/admin/payloads";
 import { Button } from "@/shared/ui/button";
 import { TextField } from "@/shared/ui/text-field";
 
@@ -57,6 +58,7 @@ export function AdminProductTypeForm({
         value={values.name}
         error={fieldErrors.name}
         autoComplete="off"
+        maxLength={PRODUCT_TYPE_NAME_MAX_LENGTH}
         onChange={(event) => update("name", event.target.value)}
       />
       <div className="grid gap-1">

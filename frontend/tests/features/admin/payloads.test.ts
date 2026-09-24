@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyBarcodeSuggestion,
   adjustAdminProductStockRequestFromValue,
   adminProductFormValuesFromProduct,
   changeAdminProductPriceRequestFromAmount,
@@ -144,6 +145,78 @@ describe("admin product payloads", () => {
       stock: "",
     });
     expect(errors).toEqual({});
+  });
+
+  it("rejects product content fields that exceed catalog limits", () => {
+    const base = {
+      ...emptyAdminProductFormValues(),
+      categoryId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      productTypeId: TYPE_ID,
+      presentationQuantity: "1",
+      presentationUnit: "UNIT" as const,
+      price: "1000",
+      stock: "1",
+    };
+    expect(
+      validateCreateAdminProduct({
+        ...base,
+        name: "n".repeat(31),
+      }),
+    ).toMatchObject({ name: expect.stringMatching(/30/i) });
+    expect(
+      validateCreateAdminProduct({
+        ...base,
+        name: "Ok",
+        brand: "b".repeat(31),
+      }),
+    ).toMatchObject({ brand: expect.stringMatching(/30/i) });
+    expect(
+      validateUpdateAdminProduct({
+        ...base,
+        name: "Ok",
+        description: "d".repeat(201),
+      }),
+    ).toMatchObject({ description: expect.stringMatching(/200/i) });
+    expect(
+      validateCreateAdminProduct({
+        ...base,
+        name: "n".repeat(30),
+        brand: "b".repeat(30),
+        description: "d".repeat(200),
+      }),
+    ).toEqual({});
+  });
+
+  it("keeps overlong barcode suggestions and blocks save via validation", () => {
+    const longName = "n".repeat(40);
+    const longBrand = "b".repeat(40);
+    const longDescription = "d".repeat(250);
+    const values = applyBarcodeSuggestion(emptyAdminProductFormValues(), {
+      barcode: "7701234567890",
+      name: longName,
+      brand: longBrand,
+      description: longDescription,
+      imageUrl: null,
+    });
+
+    expect(values.name).toBe(longName);
+    expect(values.brand).toBe(longBrand);
+    expect(values.description).toBe(longDescription);
+    expect(
+      validateCreateAdminProduct({
+        ...values,
+        categoryId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        productTypeId: TYPE_ID,
+        presentationQuantity: "1",
+        presentationUnit: "UNIT",
+        price: "1000",
+        stock: "1",
+      }),
+    ).toMatchObject({
+      name: expect.any(String),
+      brand: expect.any(String),
+      description: expect.any(String),
+    });
   });
 
   it("parses presentation quantity with up to three decimals and rejects zero", () => {

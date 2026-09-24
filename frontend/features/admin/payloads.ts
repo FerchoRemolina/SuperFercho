@@ -20,6 +20,13 @@ import type {
 import { copMoney, PRESENTATION_UNITS } from "@/features/admin/api";
 import type { Category } from "@/features/catalog/api";
 
+/** Catalog content limits (aligned with domain). */
+export const PRODUCT_NAME_MAX_LENGTH = 30;
+export const PRODUCT_BRAND_MAX_LENGTH = 30;
+export const PRODUCT_DESCRIPTION_MAX_LENGTH = 200;
+export const PRODUCT_TYPE_NAME_MAX_LENGTH = 30;
+export const PRODUCT_VARIANT_NAME_MAX_LENGTH = 30;
+
 export type AdminCategoryFormValues = {
   name: string;
   description: string;
@@ -93,8 +100,11 @@ export function validateAdminProductType(
   values: AdminProductTypeFormValues,
 ): AdminProductTypeFieldErrors {
   const errors: AdminProductTypeFieldErrors = {};
-  if (values.name.trim().length === 0) {
+  const name = values.name.trim();
+  if (name.length === 0) {
     errors.name = "Escribe el nombre del tipo de producto.";
+  } else if (name.length > PRODUCT_TYPE_NAME_MAX_LENGTH) {
+    errors.name = `El nombre no puede superar ${PRODUCT_TYPE_NAME_MAX_LENGTH} caracteres.`;
   }
   return errors;
 }
@@ -149,8 +159,11 @@ export function validateAdminProductVariant(
   values: AdminProductVariantFormValues,
 ): AdminProductVariantFieldErrors {
   const errors: AdminProductVariantFieldErrors = {};
-  if (values.name.trim().length === 0) {
+  const name = values.name.trim();
+  if (name.length === 0) {
     errors.name = "Escribe el nombre de la variante.";
+  } else if (name.length > PRODUCT_VARIANT_NAME_MAX_LENGTH) {
+    errors.name = `El nombre no puede superar ${PRODUCT_VARIANT_NAME_MAX_LENGTH} caracteres.`;
   }
   return errors;
 }
@@ -294,13 +307,33 @@ export function isPresentationUnit(value: string): value is PresentationUnit {
   return (PRESENTATION_UNITS as readonly string[]).includes(value);
 }
 
+function validateAdminProductContentFields(
+  values: AdminProductFormValues,
+  errors: AdminProductFieldErrors,
+): void {
+  const name = values.name.trim();
+  if (name.length === 0) {
+    errors.name = "Escribe el nombre del producto.";
+  } else if (name.length > PRODUCT_NAME_MAX_LENGTH) {
+    errors.name = `El nombre no puede superar ${PRODUCT_NAME_MAX_LENGTH} caracteres.`;
+  }
+
+  const brand = values.brand.trim();
+  if (brand.length > PRODUCT_BRAND_MAX_LENGTH) {
+    errors.brand = `La marca no puede superar ${PRODUCT_BRAND_MAX_LENGTH} caracteres.`;
+  }
+
+  const description = values.description.trim();
+  if (description.length > PRODUCT_DESCRIPTION_MAX_LENGTH) {
+    errors.description = `La descripción no puede superar ${PRODUCT_DESCRIPTION_MAX_LENGTH} caracteres.`;
+  }
+}
+
 export function validateCreateAdminProduct(
   values: AdminProductFormValues,
 ): AdminProductFieldErrors {
   const errors: AdminProductFieldErrors = {};
-  if (values.name.trim().length === 0) {
-    errors.name = "Escribe el nombre del producto.";
-  }
+  validateAdminProductContentFields(values, errors);
   if (values.categoryId.trim().length === 0) {
     errors.categoryId = "Elige una categoría.";
   }
@@ -327,9 +360,7 @@ export function validateUpdateAdminProduct(
   values: AdminProductFormValues,
 ): AdminProductFieldErrors {
   const errors: AdminProductFieldErrors = {};
-  if (values.name.trim().length === 0) {
-    errors.name = "Escribe el nombre del producto.";
-  }
+  validateAdminProductContentFields(values, errors);
   if (values.categoryId.trim().length === 0) {
     errors.categoryId = "Elige una categoría.";
   }
