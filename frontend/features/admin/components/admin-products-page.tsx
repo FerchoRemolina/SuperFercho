@@ -145,6 +145,7 @@ export function AdminProductsPageContent() {
           <option value="">Todos</option>
           <option value="ACTIVE">Activo</option>
           <option value="INACTIVE">Inactivo</option>
+          <option value="ARCHIVED">Archivado</option>
         </SelectField>
       </div>
       {searching ? (

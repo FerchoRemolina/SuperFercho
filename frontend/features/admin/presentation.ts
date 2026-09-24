@@ -35,7 +35,38 @@ export function shouldSearchAdminProducts(text: string): boolean {
 }
 
 export function productStatusLabel(status: ProductStatus | CategoryStatus): string {
+  if (status === "ARCHIVED") {
+    return "Archivado";
+  }
   return status === "ACTIVE" ? "Activo" : "Inactivo";
+}
+
+export function productStatusTone(
+  status: ProductStatus,
+): "primary" | "neutral" | "danger" {
+  if (status === "ACTIVE") {
+    return "primary";
+  }
+  if (status === "ARCHIVED") {
+    return "danger";
+  }
+  return "neutral";
+}
+
+export function canActivateProduct(status: ProductStatus): boolean {
+  return status === "INACTIVE";
+}
+
+export function canDeactivateProduct(status: ProductStatus): boolean {
+  return status === "ACTIVE";
+}
+
+export function canArchiveProduct(status: ProductStatus): boolean {
+  return status === "ACTIVE" || status === "INACTIVE";
+}
+
+export function canRestoreProduct(status: ProductStatus): boolean {
+  return status === "ARCHIVED";
 }
 
 export function categoryStatusLabel(status: CategoryStatus): string {
@@ -72,7 +103,11 @@ export function adminProductsHref(query: {
     if (query.categoryId) {
       search.set("categoryId", query.categoryId);
     }
-    if (query.status === "ACTIVE" || query.status === "INACTIVE") {
+    if (
+      query.status === "ACTIVE" ||
+      query.status === "INACTIVE" ||
+      query.status === "ARCHIVED"
+    ) {
       search.set("status", query.status);
     }
   }
@@ -85,9 +120,12 @@ export function listQueryFromSearchParams(params: {
   status?: string;
 }): ListAdminProductsQuery {
   const categoryId = params.categoryId?.trim();
-  const status = params.status === "ACTIVE" || params.status === "INACTIVE"
-    ? params.status
-    : undefined;
+  const status =
+    params.status === "ACTIVE" ||
+    params.status === "INACTIVE" ||
+    params.status === "ARCHIVED"
+      ? params.status
+      : undefined;
   return {
     categoryId: categoryId && categoryId.length > 0 ? categoryId : undefined,
     status,

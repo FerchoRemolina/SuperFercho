@@ -8,6 +8,7 @@ import {
   activateAdminProductVariant,
   adjustAdminProductStock,
   adminKeys,
+  archiveAdminProduct,
   changeAdminProductPrice,
   createAdminCategory,
   createAdminKnowledgeDocument,
@@ -34,6 +35,7 @@ import {
   listAdminProductVariants,
   processAdminKnowledgeDocument,
   reactivateAdminKnowledgeDocument,
+  restoreAdminProduct,
   replaceAdminKnowledgeDocumentContent,
   searchAdminKnowledge,
   searchAdminProducts,
@@ -437,6 +439,32 @@ export function useDeactivateAdminProductMutation() {
 
   return useMutation({
     mutationFn: (productId: string) => deactivateAdminProduct(productId),
+    onSuccess: (product) => {
+      queryClient.setQueryData(keys.product(product.id), product);
+      void queryClient.invalidateQueries({ queryKey: keys.productsRoot() });
+      void queryClient.invalidateQueries({ queryKey: keys.product(product.id) });
+    },
+  });
+}
+
+export function useArchiveAdminProductMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (productId: string) => archiveAdminProduct(productId),
+    onSuccess: (product) => {
+      queryClient.setQueryData(keys.product(product.id), product);
+      void queryClient.invalidateQueries({ queryKey: keys.productsRoot() });
+      void queryClient.invalidateQueries({ queryKey: keys.product(product.id) });
+    },
+  });
+}
+
+export function useRestoreAdminProductMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (productId: string) => restoreAdminProduct(productId),
     onSuccess: (product) => {
       queryClient.setQueryData(keys.product(product.id), product);
       void queryClient.invalidateQueries({ queryKey: keys.productsRoot() });
