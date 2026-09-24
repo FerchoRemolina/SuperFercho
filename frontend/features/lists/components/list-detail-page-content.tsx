@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useProductsQuery } from "@/features/catalog/hooks";
 import {
   shoppingListItemCount,
@@ -10,6 +11,7 @@ import {
 import { ListItemCard } from "@/features/lists/components/list-item-card";
 import {
   useClearShoppingListMutation,
+  useDeleteShoppingListMutation,
   useRenameShoppingListMutation,
   useShoppingListQuery,
 } from "@/features/lists/hooks";
@@ -32,10 +34,13 @@ export function ListDetailPageContent({
 }: {
   shoppingListId: string;
 }) {
+  const router = useRouter();
   const listQuery = useShoppingListQuery(shoppingListId);
   const productsQuery = useProductsQuery();
   const clearMutation = useClearShoppingListMutation(shoppingListId);
+  const deleteMutation = useDeleteShoppingListMutation(shoppingListId);
   const [renaming, setRenaming] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   if (listQuery.isPending) {
     return (
@@ -100,6 +105,21 @@ export function ListDetailPageContent({
       : clearMutation.isError
         ? "No se pudo limpiar la lista."
         : null;
+  const deleteError =
+    deleteMutation.isError && isApiError(deleteMutation.error)
+      ? messageForApiProblem(deleteMutation.error.problem)
+      : deleteMutation.isError
+        ? "No se pudo eliminar la lista."
+        : null;
+
+  async function handleDelete() {
+    try {
+      await deleteMutation.mutateAsync();
+      router.push("/lists");
+    } catch {
+      // surfaced below
+    }
+  }
 
   return (
     <Container as="main" className="py-8 md:py-16">
@@ -134,7 +154,7 @@ export function ListDetailPageContent({
             type="button"
             variant="ghost"
             className="min-h-11 justify-start px-0 text-sm font-semibold text-sf-muted hover:bg-transparent hover:text-sf-error"
-            disabled={clearMutation.isPending || mutating}
+            disabled={clearMutation.isPending || mutating || deleteMutation.isPending}
             onClick={() => void clearMutation.mutateAsync()}
           >
             {clearMutation.isPending ? "Limpiando…" : "Limpiar lista"}
@@ -159,6 +179,58 @@ export function ListDetailPageContent({
           </Alert>
         </div>
       ) : null}
+
+      {deleteError ? (
+        <div className="mt-4 md:mt-5">
+          <Alert tone="error" title="No se pudo eliminar">
+            {deleteError}
+          </Alert>
+        </div>
+      ) : null}
+
+      <div className="mt-4 md:mt-5">
+        {confirmingDelete ? (
+          <div className="grid gap-2 rounded-xl border border-sf-border bg-sf-surface p-4">
+            <p className="text-sm font-semibold text-sf-ink">
+              ¿Eliminar esta lista?
+            </p>
+            <p className="text-sm text-sf-muted">
+              Se borrarán la lista y sus productos guardados. Los productos del
+              catálogo no se eliminan.
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                type="button"
+                variant="destructive"
+                className="flex-1"
+                disabled={deleteMutation.isPending}
+                onClick={() => void handleDelete()}
+              >
+                {deleteMutation.isPending ? "Eliminando…" : "Sí, eliminar"}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="flex-1"
+                disabled={deleteMutation.isPending}
+                onClick={() => setConfirmingDelete(false)}
+              >
+                Conservar lista
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            className="min-h-11 justify-start px-0 text-sm font-semibold text-sf-muted hover:bg-transparent hover:text-sf-error"
+            disabled={mutating || clearMutation.isPending}
+            onClick={() => setConfirmingDelete(true)}
+          >
+            Eliminar lista
+          </Button>
+        )}
+      </div>
 
       {itemCount === 0 ? (
         <div className="mt-6 md:mt-8">

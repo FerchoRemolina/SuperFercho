@@ -6,6 +6,7 @@ import {
   changeShoppingListItemQuantity,
   clearShoppingList,
   createShoppingList,
+  deleteShoppingList,
   getShoppingList,
   listShoppingLists,
   removeShoppingListItem,
@@ -128,6 +129,18 @@ export function useClearShoppingListMutation(shoppingListId: string) {
       void queryClient.invalidateQueries({
         queryKey: keys.detail(shoppingListId),
       });
+      void queryClient.invalidateQueries({ queryKey: keys.root() });
+    },
+  });
+}
+
+export function useDeleteShoppingListMutation(shoppingListId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => deleteShoppingList(shoppingListId),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: keys.detail(shoppingListId) });
       void queryClient.invalidateQueries({ queryKey: keys.root() });
     },
   });

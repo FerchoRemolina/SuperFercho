@@ -121,6 +121,28 @@ class ShoppingListPersistenceAdapterTest {
     }
 
     @Test
+    void shouldDeleteShoppingListAndItemsWithoutRemovingCatalogProduct() {
+        UUID catalogProductId = insertCatalogProduct("Leche delete");
+        UUID customerId = UUID.randomUUID();
+        ShoppingList saved = shoppingListRepository.save(list(
+                customerId,
+                "To delete",
+                List.of(ShoppingListItem.create(UUID.randomUUID(), catalogProductId, 2, ITEM_CREATED_AT))));
+
+        shoppingListRepository.delete(saved.id());
+
+        assertThat(shoppingListRepository.findById(saved.id())).isEmpty();
+        Integer remainingItems = jdbcTemplate.queryForObject(
+                "select count(*) from shopping.shopping_list_items where shopping_list_id = ?",
+                Integer.class,
+                saved.id());
+        assertThat(remainingItems).isZero();
+        Integer remainingProducts = jdbcTemplate.queryForObject(
+                "select count(*) from catalog.products where id = ?", Integer.class, catalogProductId);
+        assertThat(remainingProducts).isEqualTo(1);
+    }
+
+    @Test
     void shouldRejectInvalidQuantityAtDatabase() {
         UUID listId = UUID.randomUUID();
         insertListHeader(listId, UUID.randomUUID());
@@ -180,5 +202,46 @@ class ShoppingListPersistenceAdapterTest {
                     statement.setTimestamp(5, Timestamp.from(ITEM_CREATED_AT));
                     return statement;
                 });
+    }
+
+    private UUID insertCatalogProduct(String name) {
+        UUID categoryId = UUID.randomUUID();
+        UUID productTypeId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        Instant now = CREATED_AT;
+        jdbcTemplate.update(
+                """
+                insert into catalog.categories (id, name, description, status, created_at, updated_at)
+                values (?, ?, null, 'ACTIVE', ?, ?)
+                """,
+                categoryId,
+                "Cat-" + categoryId.toString().substring(0, 8),
+                Timestamp.from(now),
+                Timestamp.from(now));
+        jdbcTemplate.update(
+                """
+                insert into catalog.product_types (
+                    id, category_id, name, description, status, created_at, updated_at
+                ) values (?, ?, ?, null, 'ACTIVE', ?, ?)
+                """,
+                productTypeId,
+                categoryId,
+                "Type-" + productTypeId.toString().substring(0, 8),
+                Timestamp.from(now),
+                Timestamp.from(now));
+        jdbcTemplate.update(
+                """
+                insert into catalog.products (
+                    id, category_id, product_type_id, presentation_quantity, presentation_unit,
+                    name, price_amount, currency, stock, status, created_at, updated_at
+                ) values (?, ?, ?, 1, 'UNIT', ?, 1000.00, 'COP', 5, 'ACTIVE', ?, ?)
+                """,
+                productId,
+                categoryId,
+                productTypeId,
+                name,
+                Timestamp.from(now),
+                Timestamp.from(now));
+        return productId;
     }
 }

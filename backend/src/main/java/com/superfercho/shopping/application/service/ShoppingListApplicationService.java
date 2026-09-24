@@ -4,6 +4,7 @@ import com.superfercho.shopping.application.dto.shoppinglist.AddProductToShoppin
 import com.superfercho.shopping.application.dto.shoppinglist.ChangeShoppingListItemQuantityCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.ClearShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.CreateShoppingListCommand;
+import com.superfercho.shopping.application.dto.shoppinglist.DeleteShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.GetShoppingListQuery;
 import com.superfercho.shopping.application.dto.shoppinglist.RemoveProductFromShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.RenameShoppingListCommand;
@@ -15,6 +16,7 @@ import com.superfercho.shopping.application.port.in.AddProductToShoppingListUseC
 import com.superfercho.shopping.application.port.in.ChangeShoppingListItemQuantityUseCase;
 import com.superfercho.shopping.application.port.in.ClearShoppingListUseCase;
 import com.superfercho.shopping.application.port.in.CreateShoppingListUseCase;
+import com.superfercho.shopping.application.port.in.DeleteShoppingListUseCase;
 import com.superfercho.shopping.application.port.in.GetShoppingListUseCase;
 import com.superfercho.shopping.application.port.in.ListShoppingListsUseCase;
 import com.superfercho.shopping.application.port.in.RemoveProductFromShoppingListUseCase;
@@ -35,7 +37,8 @@ public final class ShoppingListApplicationService
                 AddProductToShoppingListUseCase,
                 ChangeShoppingListItemQuantityUseCase,
                 RemoveProductFromShoppingListUseCase,
-                ClearShoppingListUseCase {
+                ClearShoppingListUseCase,
+                DeleteShoppingListUseCase {
 
     private final CurrentUserProvider currentUserProvider;
     private final ShoppingListRepositoryPort shoppingListRepository;
@@ -119,6 +122,13 @@ public final class ShoppingListApplicationService
         Instant now = clockPort.currentTime();
         ShoppingList updated = requireList(currentUserId, command.shoppingListId()).clear(now);
         return ShoppingListResponse.from(shoppingListRepository.save(updated));
+    }
+
+    @Override
+    public void execute(DeleteShoppingListCommand command) {
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
+        ShoppingList shoppingList = requireList(currentUserId, command.shoppingListId());
+        shoppingListRepository.delete(shoppingList.id());
     }
 
     private ShoppingList requireList(UUID customerId, UUID shoppingListId) {

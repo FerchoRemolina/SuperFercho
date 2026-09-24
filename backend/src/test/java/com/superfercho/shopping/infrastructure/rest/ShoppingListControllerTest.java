@@ -16,6 +16,7 @@ import com.superfercho.shopping.application.dto.shoppinglist.AddProductToShoppin
 import com.superfercho.shopping.application.dto.shoppinglist.ChangeShoppingListItemQuantityCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.ClearShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.CreateShoppingListCommand;
+import com.superfercho.shopping.application.dto.shoppinglist.DeleteShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.GetShoppingListQuery;
 import com.superfercho.shopping.application.dto.shoppinglist.RemoveProductFromShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.RenameShoppingListCommand;
@@ -27,6 +28,7 @@ import com.superfercho.shopping.application.port.in.AddProductToShoppingListUseC
 import com.superfercho.shopping.application.port.in.ChangeShoppingListItemQuantityUseCase;
 import com.superfercho.shopping.application.port.in.ClearShoppingListUseCase;
 import com.superfercho.shopping.application.port.in.CreateShoppingListUseCase;
+import com.superfercho.shopping.application.port.in.DeleteShoppingListUseCase;
 import com.superfercho.shopping.application.port.in.GetShoppingListUseCase;
 import com.superfercho.shopping.application.port.in.ListShoppingListsUseCase;
 import com.superfercho.shopping.application.port.in.RemoveProductFromShoppingListUseCase;
@@ -82,6 +84,9 @@ class ShoppingListControllerTest {
 
     @MockitoBean
     private ClearShoppingListUseCase clearShoppingListUseCase;
+
+    @MockitoBean
+    private DeleteShoppingListUseCase deleteShoppingListUseCase;
 
     @Test
     void shouldCreateShoppingList() throws Exception {
@@ -194,6 +199,25 @@ class ShoppingListControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(clearShoppingListUseCase).execute(new ClearShoppingListCommand(LIST_ID));
+    }
+
+    @Test
+    void shouldDeleteShoppingList() throws Exception {
+        mockMvc.perform(delete("/api/v1/shopping-lists/{shoppingListId}", LIST_ID))
+                .andExpect(status().isNoContent());
+
+        verify(deleteShoppingListUseCase).execute(new DeleteShoppingListCommand(LIST_ID));
+    }
+
+    @Test
+    void shouldMapShoppingListNotFoundOnDeleteTo404() throws Exception {
+        org.mockito.Mockito.doThrow(new ShoppingListNotFoundException(LIST_ID))
+                .when(deleteShoppingListUseCase)
+                .execute(any());
+
+        mockMvc.perform(delete("/api/v1/shopping-lists/{shoppingListId}", LIST_ID))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SHOPPING_LIST_NOT_FOUND"));
     }
 
     @Test

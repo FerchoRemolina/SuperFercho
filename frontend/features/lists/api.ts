@@ -122,6 +122,15 @@ export async function clearShoppingList(
   );
 }
 
+export async function deleteShoppingList(
+  shoppingListId: string,
+): Promise<void> {
+  await request<void>(
+    `/shopping-lists/${encodeURIComponent(shoppingListId)}`,
+    { method: "DELETE" },
+  );
+}
+
 export function shoppingListItemCount(list: ShoppingList): number {
   return list.items.length;
 }

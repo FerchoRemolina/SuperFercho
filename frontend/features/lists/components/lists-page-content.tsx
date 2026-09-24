@@ -68,9 +68,11 @@ export function ListsPageContent() {
           <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
             Mis listas
           </h1>
-          <p className="mt-2 max-w-2xl text-sm text-sf-muted md:text-base">
-            Guarda productos y arma tu mercado a tu ritmo.
-          </p>
+          {!hasLists ? (
+            <p className="mt-2 max-w-2xl text-sm text-sf-muted md:text-base">
+              Guarda productos y arma tu mercado a tu ritmo.
+            </p>
+          ) : null}
         </div>
         {!creating && hasLists ? (
           <Button type="button" onClick={() => setCreating(true)}>
@@ -93,7 +95,7 @@ export function ListsPageContent() {
         <div className="mt-6 md:mt-8">
           <EmptyState
             title="Todavía no tienes listas"
-            description="Crea una lista para guardar productos y armar tu mercado con calma."
+            description="Crea listas para cumpleaños, asados, ocasiones especiales o tu mercado semanal, y guarda productos a tu ritmo."
             action={
               <Button type="button" onClick={() => setCreating(true)}>
                 Crear lista

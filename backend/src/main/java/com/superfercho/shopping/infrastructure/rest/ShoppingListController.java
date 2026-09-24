@@ -4,6 +4,7 @@ import com.superfercho.shopping.application.dto.shoppinglist.AddProductToShoppin
 import com.superfercho.shopping.application.dto.shoppinglist.ChangeShoppingListItemQuantityCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.ClearShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.CreateShoppingListCommand;
+import com.superfercho.shopping.application.dto.shoppinglist.DeleteShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.GetShoppingListQuery;
 import com.superfercho.shopping.application.dto.shoppinglist.RemoveProductFromShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.RenameShoppingListCommand;
@@ -11,6 +12,7 @@ import com.superfercho.shopping.application.port.in.AddProductToShoppingListUseC
 import com.superfercho.shopping.application.port.in.ChangeShoppingListItemQuantityUseCase;
 import com.superfercho.shopping.application.port.in.ClearShoppingListUseCase;
 import com.superfercho.shopping.application.port.in.CreateShoppingListUseCase;
+import com.superfercho.shopping.application.port.in.DeleteShoppingListUseCase;
 import com.superfercho.shopping.application.port.in.GetShoppingListUseCase;
 import com.superfercho.shopping.application.port.in.ListShoppingListsUseCase;
 import com.superfercho.shopping.application.port.in.RemoveProductFromShoppingListUseCase;
@@ -49,6 +51,7 @@ public class ShoppingListController {
     private final ChangeShoppingListItemQuantityUseCase changeShoppingListItemQuantityUseCase;
     private final RemoveProductFromShoppingListUseCase removeProductFromShoppingListUseCase;
     private final ClearShoppingListUseCase clearShoppingListUseCase;
+    private final DeleteShoppingListUseCase deleteShoppingListUseCase;
 
     public ShoppingListController(
             CreateShoppingListUseCase createShoppingListUseCase,
@@ -58,7 +61,8 @@ public class ShoppingListController {
             AddProductToShoppingListUseCase addProductToShoppingListUseCase,
             ChangeShoppingListItemQuantityUseCase changeShoppingListItemQuantityUseCase,
             RemoveProductFromShoppingListUseCase removeProductFromShoppingListUseCase,
-            ClearShoppingListUseCase clearShoppingListUseCase) {
+            ClearShoppingListUseCase clearShoppingListUseCase,
+            DeleteShoppingListUseCase deleteShoppingListUseCase) {
         this.createShoppingListUseCase = createShoppingListUseCase;
         this.listShoppingListsUseCase = listShoppingListsUseCase;
         this.getShoppingListUseCase = getShoppingListUseCase;
@@ -67,6 +71,7 @@ public class ShoppingListController {
         this.changeShoppingListItemQuantityUseCase = changeShoppingListItemQuantityUseCase;
         this.removeProductFromShoppingListUseCase = removeProductFromShoppingListUseCase;
         this.clearShoppingListUseCase = clearShoppingListUseCase;
+        this.deleteShoppingListUseCase = deleteShoppingListUseCase;
     }
 
     @PostMapping
@@ -95,6 +100,12 @@ public class ShoppingListController {
             @PathVariable UUID shoppingListId, @RequestBody RenameShoppingListRequest request) {
         return ShoppingListRestResponse.from(renameShoppingListUseCase.execute(
                 new RenameShoppingListCommand(shoppingListId, request.name())));
+    }
+
+    @DeleteMapping("/{shoppingListId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable UUID shoppingListId) {
+        deleteShoppingListUseCase.execute(new DeleteShoppingListCommand(shoppingListId));
     }
 
     @PostMapping("/{shoppingListId}/items")

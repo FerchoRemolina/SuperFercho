@@ -12,4 +12,6 @@ public interface ShoppingListRepositoryPort {
     Optional<ShoppingList> findById(UUID shoppingListId);
 
     List<ShoppingList> findAllByCustomerId(UUID customerId);
+
+    void delete(UUID shoppingListId);
 }

@@ -15,6 +15,7 @@ import com.superfercho.shopping.application.dto.shoppinglist.AddProductToShoppin
 import com.superfercho.shopping.application.dto.shoppinglist.ChangeShoppingListItemQuantityCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.ClearShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.CreateShoppingListCommand;
+import com.superfercho.shopping.application.dto.shoppinglist.DeleteShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.GetShoppingListQuery;
 import com.superfercho.shopping.application.dto.shoppinglist.RemoveProductFromShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.RenameShoppingListCommand;
@@ -227,6 +228,41 @@ class ShoppingListApplicationServiceTest {
         assertEquals(LIST_ID, response.id());
         assertEquals(NOW, response.updatedAt());
         verify(shoppingListRepository).save(any(ShoppingList.class));
+    }
+
+    @Test
+    void shouldDeleteShoppingListForCurrentUser() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(listWithMilk()));
+
+        shoppingListService.execute(new DeleteShoppingListCommand(LIST_ID));
+
+        verify(shoppingListRepository).delete(LIST_ID);
+        verify(shoppingListRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectDeleteWhenShoppingListBelongsToAnotherCustomer() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(OTHER_CUSTOMER_ID);
+        when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(emptyList()));
+
+        assertThrows(
+                ShoppingListNotFoundException.class,
+                () -> shoppingListService.execute(new DeleteShoppingListCommand(LIST_ID)));
+        verify(shoppingListRepository, never()).delete(any());
+        verify(shoppingListRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectDeleteWhenShoppingListDoesNotExist() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.empty());
+
+        assertThrows(
+                ShoppingListNotFoundException.class,
+                () -> shoppingListService.execute(new DeleteShoppingListCommand(LIST_ID)));
+        verify(shoppingListRepository, never()).delete(any());
+        verify(shoppingListRepository, never()).save(any());
     }
 
     @Test

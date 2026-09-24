@@ -2,6 +2,7 @@ package com.superfercho.identity.infrastructure.security;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -233,6 +234,8 @@ class HttpAuthorizationSecurityTest {
     void shouldRejectShoppingCustomerRoutesWithoutJwt() throws Exception {
         mockMvc.perform(get("/api/v1/cart")).andExpect(unauthenticated());
         mockMvc.perform(get("/api/v1/shopping-lists")).andExpect(unauthenticated());
+        mockMvc.perform(delete("/api/v1/shopping-lists/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"))
+                .andExpect(unauthenticated());
         mockMvc.perform(get("/api/v1/favorites")).andExpect(unauthenticated());
         mockMvc.perform(post("/api/v1/favorites/cccccccc-cccc-cccc-cccc-cccccccccccc"))
                 .andExpect(unauthenticated());
@@ -244,6 +247,9 @@ class HttpAuthorizationSecurityTest {
                 .andExpect(notBlockedBySecurity());
         mockMvc.perform(get("/api/v1/shopping-lists").header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
                 .andExpect(notBlockedBySecurity());
+        mockMvc.perform(delete("/api/v1/shopping-lists/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(notBlockedBySecurity());
         mockMvc.perform(get("/api/v1/favorites").header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
                 .andExpect(notBlockedBySecurity());
     }
@@ -253,6 +259,9 @@ class HttpAuthorizationSecurityTest {
         mockMvc.perform(get("/api/v1/cart").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
                 .andExpect(accessDenied());
         mockMvc.perform(get("/api/v1/shopping-lists").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(accessDenied());
+        mockMvc.perform(delete("/api/v1/shopping-lists/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
                 .andExpect(accessDenied());
         mockMvc.perform(get("/api/v1/favorites").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
                 .andExpect(accessDenied());

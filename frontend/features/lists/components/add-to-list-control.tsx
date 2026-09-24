@@ -2,13 +2,10 @@
 
 import { useId, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   useAddShoppingListItemMutation,
-  useCreateShoppingListMutation,
   useShoppingListsQuery,
 } from "@/features/lists/hooks";
-import { shoppingListHref } from "@/features/lists/presentation";
 import { isApiError } from "@/shared/errors/api-problem";
 import { messageForApiProblem } from "@/shared/errors/messages";
 import { useSession } from "@/shared/session/session-provider";
@@ -23,10 +20,8 @@ export function AddToListControl({
   className?: string;
 }) {
   const { session } = useSession();
-  const router = useRouter();
   const listsQuery = useShoppingListsQuery();
   const addMutation = useAddShoppingListItemMutation();
-  const createMutation = useCreateShoppingListMutation();
   const [open, setOpen] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const menuId = useId();
@@ -47,19 +42,18 @@ export function AddToListControl({
   }
 
   const lists = listsQuery.data ?? [];
-  const busy = addMutation.isPending || createMutation.isPending;
+  if (!listsQuery.isPending && lists.length === 0) {
+    return null;
+  }
+
+  const busy = addMutation.isPending;
 
   const errorMessage =
-    (addMutation.isError && isApiError(addMutation.error)
+    addMutation.isError && isApiError(addMutation.error)
       ? messageForApiProblem(addMutation.error.problem)
       : addMutation.isError
         ? "No se pudo agregar a la lista."
-        : null) ??
-    (createMutation.isError && isApiError(createMutation.error)
-      ? messageForApiProblem(createMutation.error.problem)
-      : createMutation.isError
-        ? "No se pudo crear la lista."
-        : null);
+        : null;
 
   async function addToList(shoppingListId: string) {
     setFeedback(null);
@@ -71,23 +65,6 @@ export function AddToListControl({
       setFeedback("Agregado a la lista.");
       setOpen(false);
       window.setTimeout(() => setFeedback(null), 2000);
-    } catch {
-      // surfaced below
-    }
-  }
-
-  async function createAndAdd() {
-    setFeedback(null);
-    try {
-      const list = await createMutation.mutateAsync({
-        name: "Mi lista",
-      });
-      await addMutation.mutateAsync({
-        shoppingListId: list.id,
-        body: { productId, quantity: 1 },
-      });
-      setOpen(false);
-      router.push(shoppingListHref(list.id));
     } catch {
       // surfaced below
     }
@@ -124,39 +101,20 @@ export function AddToListControl({
               No se pudieron cargar tus listas.
             </p>
           ) : null}
-          {lists.length === 0 ? (
-            <button
-              type="button"
-              className="flex min-h-11 w-full items-center rounded-lg px-3 text-left text-sm font-semibold text-sf-ink hover:bg-sf-bg"
-              disabled={busy}
-              onClick={() => void createAndAdd()}
-            >
-              Crear lista y agregar
-            </button>
-          ) : (
-            <ul className="grid gap-1">
-              {lists.map((list) => (
-                <li key={list.id}>
-                  <button
-                    type="button"
-                    className="flex min-h-11 w-full items-center rounded-lg px-3 text-left text-sm font-semibold text-sf-ink hover:bg-sf-bg"
-                    disabled={busy}
-                    onClick={() => void addToList(list.id)}
-                  >
-                    {list.name}
-                  </button>
-                </li>
-              ))}
-              <li>
-                <Link
-                  href="/lists"
-                  className="flex min-h-11 w-full items-center rounded-lg px-3 text-sm font-semibold text-sf-primary hover:bg-sf-bg"
+          <ul className="grid gap-1">
+            {lists.map((list) => (
+              <li key={list.id}>
+                <button
+                  type="button"
+                  className="flex min-h-11 w-full items-center rounded-lg px-3 text-left text-sm font-semibold text-sf-ink hover:bg-sf-bg"
+                  disabled={busy}
+                  onClick={() => void addToList(list.id)}
                 >
-                  Gestionar listas
-                </Link>
+                  {list.name}
+                </button>
               </li>
-            </ul>
-          )}
+            ))}
+          </ul>
         </div>
       ) : null}
     </div>

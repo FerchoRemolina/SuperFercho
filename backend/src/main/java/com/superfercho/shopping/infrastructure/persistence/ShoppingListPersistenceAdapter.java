@@ -41,4 +41,10 @@ public class ShoppingListPersistenceAdapter implements ShoppingListRepositoryPor
                 .map(shoppingListPersistenceMapper::toDomain)
                 .toList();
     }
+
+    @Override
+    public void delete(UUID shoppingListId) {
+        shoppingListJpaRepository.deleteById(shoppingListId);
+        shoppingListJpaRepository.flush();
+    }
 }
