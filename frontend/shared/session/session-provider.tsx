@@ -6,12 +6,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
 import { setUnauthenticatedHandler } from "@/shared/api/client";
+import { InactivityWarning } from "@/shared/session/inactivity-warning";
 import {
   clearSession,
   getSession,
@@ -20,6 +22,7 @@ import {
   subscribeToSession,
   type Session,
 } from "@/shared/session/session";
+import { useInactivitySession } from "@/shared/session/use-inactivity-session";
 
 type SessionContextValue = {
   session: Session;
@@ -56,8 +59,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
+  const logoutInFlightRef = useRef(false);
+
+  useEffect(() => {
+    if (session) {
+      logoutInFlightRef.current = false;
+    }
+  }, [session]);
 
   const logout = useCallback(() => {
+    if (logoutInFlightRef.current) {
+      return;
+    }
+    logoutInFlightRef.current = true;
     clearSession();
     queryClient.removeQueries();
     if (pathname !== "/login") {
@@ -83,8 +97,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [logout, session],
   );
 
+  const { warningVisible, continueSession } = useInactivitySession({
+    session,
+    logout,
+    pathname,
+  });
+
   return (
-    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+    <SessionContext.Provider value={value}>
+      {warningVisible ? (
+        <InactivityWarning onContinue={continueSession} />
+      ) : null}
+      {children}
+    </SessionContext.Provider>
   );
 }
 
