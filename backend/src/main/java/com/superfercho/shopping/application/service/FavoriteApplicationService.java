@@ -4,7 +4,6 @@ import com.superfercho.shopping.application.dto.favorite.AddFavoriteCommand;
 import com.superfercho.shopping.application.dto.favorite.AddFavoriteResult;
 import com.superfercho.shopping.application.dto.favorite.FavoriteItemResponse;
 import com.superfercho.shopping.application.dto.favorite.FavoriteListResult;
-import com.superfercho.shopping.application.dto.favorite.FavoriteProductView;
 import com.superfercho.shopping.application.dto.favorite.RemoveFavoriteCommand;
 import com.superfercho.shopping.application.exception.DuplicateFavoriteException;
 import com.superfercho.shopping.application.exception.ProductNotFoundException;
@@ -77,18 +76,24 @@ public final class FavoriteApplicationService
     @Override
     public FavoriteListResult execute() {
         UUID customerId = currentUserProvider.getCurrentUserId();
-        List<Favorite> favorites = favoriteRepository.findAllByCustomerIdOrderedByCreatedAtDesc(customerId);
+        List<Favorite> favorites = favoriteRepository.findAllByCustomerId(customerId);
         if (favorites.isEmpty()) {
             return new FavoriteListResult(List.of());
         }
-        List<UUID> productIds = favorites.stream().map(Favorite::productId).toList();
-        Map<UUID, FavoriteProductView> cardsById = new LinkedHashMap<>();
-        for (FavoriteProductView card : productCardCatalogPort.findCardsByIds(productIds)) {
-            cardsById.putIfAbsent(card.id(), card);
+        Map<UUID, Favorite> favoritesByProductId = new LinkedHashMap<>();
+        for (Favorite favorite : favorites) {
+            favoritesByProductId.putIfAbsent(favorite.productId(), favorite);
         }
-        List<FavoriteItemResponse> items = favorites.stream()
-                .map(favorite -> new FavoriteItemResponse(
-                        favorite.productId(), favorite.createdAt(), cardsById.get(favorite.productId())))
+        List<UUID> productIds = favoritesByProductId.keySet().stream().toList();
+        List<FavoriteItemResponse> items = productCardCatalogPort.findCardsByIds(productIds).stream()
+                .map(card -> {
+                    Favorite favorite = favoritesByProductId.get(card.id());
+                    if (favorite == null) {
+                        return null;
+                    }
+                    return new FavoriteItemResponse(favorite.productId(), favorite.createdAt(), card);
+                })
+                .filter(item -> item != null)
                 .toList();
         return new FavoriteListResult(items);
     }

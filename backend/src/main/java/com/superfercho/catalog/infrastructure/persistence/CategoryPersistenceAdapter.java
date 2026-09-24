@@ -54,14 +54,14 @@ public class CategoryPersistenceAdapter implements CategoryRepository {
 
     @Override
     public List<Category> findAll() {
-        return categoryJpaRepository.findAll().stream()
+        return categoryJpaRepository.findAllByOrderByNameIgnoreCaseAsc().stream()
                 .map(categoryPersistenceMapper::toDomain)
                 .toList();
     }
 
     @Override
     public List<Category> findByStatus(CategoryStatus status) {
-        return categoryJpaRepository.findByStatus(status).stream()
+        return categoryJpaRepository.findByStatusOrderByNameIgnoreCaseAsc(status).stream()
                 .map(categoryPersistenceMapper::toDomain)
                 .toList();
     }

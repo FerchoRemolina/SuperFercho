@@ -54,28 +54,30 @@ public class ProductTypePersistenceAdapter implements ProductTypeRepository {
 
     @Override
     public List<ProductType> findAll() {
-        return productTypeJpaRepository.findAll().stream()
+        return productTypeJpaRepository.findAllByOrderByNameIgnoreCaseAsc().stream()
                 .map(productTypePersistenceMapper::toDomain)
                 .toList();
     }
 
     @Override
     public List<ProductType> findByCategoryId(UUID categoryId) {
-        return productTypeJpaRepository.findByCategoryId(categoryId).stream()
+        return productTypeJpaRepository.findByCategoryIdOrderByNameIgnoreCaseAsc(categoryId).stream()
                 .map(productTypePersistenceMapper::toDomain)
                 .toList();
     }
 
     @Override
     public List<ProductType> findByStatus(ProductTypeStatus status) {
-        return productTypeJpaRepository.findByStatus(status).stream()
+        return productTypeJpaRepository.findByStatusOrderByNameIgnoreCaseAsc(status).stream()
                 .map(productTypePersistenceMapper::toDomain)
                 .toList();
     }
 
     @Override
     public List<ProductType> findByCategoryIdAndStatus(UUID categoryId, ProductTypeStatus status) {
-        return productTypeJpaRepository.findByCategoryIdAndStatus(categoryId, status).stream()
+        return productTypeJpaRepository
+                .findByCategoryIdAndStatusOrderByNameIgnoreCaseAsc(categoryId, status)
+                .stream()
                 .map(productTypePersistenceMapper::toDomain)
                 .toList();
     }

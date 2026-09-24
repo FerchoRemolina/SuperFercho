@@ -107,15 +107,16 @@ class ShoppingListPersistenceAdapterTest {
     }
 
     @Test
-    void shouldFindShoppingListsByCustomerId() {
+    void shouldFindShoppingListsByCustomerIdOrderedByNameIgnoreCase() {
         UUID customerId = UUID.randomUUID();
         UUID otherCustomerId = UUID.randomUUID();
-        ShoppingList own = shoppingListRepository.save(list(customerId, "Mine", List.of(milk())));
+        ShoppingList zeta = shoppingListRepository.save(list(customerId, "zeta", List.of(milk())));
+        ShoppingList alpha = shoppingListRepository.save(list(customerId, "Alpha", List.of(bread())));
         shoppingListRepository.save(list(otherCustomerId, "Other", List.of(bread())));
 
         assertThat(shoppingListRepository.findAllByCustomerId(customerId))
                 .extracting(ShoppingList::id)
-                .containsExactly(own.id());
+                .containsExactly(alpha.id(), zeta.id());
         assertThat(shoppingListRepository.findAllByCustomerId(UUID.randomUUID())).isEmpty();
     }
 

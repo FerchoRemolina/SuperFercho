@@ -37,7 +37,7 @@ public class ShoppingListPersistenceAdapter implements ShoppingListRepositoryPor
 
     @Override
     public List<ShoppingList> findAllByCustomerId(UUID customerId) {
-        return shoppingListJpaRepository.findAllByCustomerId(customerId).stream()
+        return shoppingListJpaRepository.findAllByCustomerIdOrderByNameIgnoreCaseAsc(customerId).stream()
                 .map(shoppingListPersistenceMapper::toDomain)
                 .toList();
     }

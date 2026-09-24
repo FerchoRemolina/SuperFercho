@@ -437,6 +437,7 @@ class ProductUseCasesTest {
         Product matching = product(PRODUCT_ID, CATEGORY_ID, ProductStatus.INACTIVE, 10, PRICE);
         when(productRepository.findByCategoryIdAndStatus(CATEGORY_ID, ProductStatus.INACTIVE))
                 .thenReturn(List.of(matching));
+        when(productTypeRepository.findByIds(any())).thenReturn(List.of(productType(TYPE_ID, CATEGORY_ID)));
 
         List<ProductResult> result = listProducts.execute(
                 new ListProductsCommand(CATEGORY_ID, ProductStatus.INACTIVE, CatalogView.ADMIN));
@@ -450,12 +451,63 @@ class ProductUseCasesTest {
     void shouldSearchProductsForAdmin() {
         Product matching = product(PRODUCT_ID, CATEGORY_ID, ProductStatus.INACTIVE, 10, PRICE);
         when(productRepository.searchByNameBrandOrBarcode("leche")).thenReturn(List.of(matching));
+        when(productTypeRepository.findByIds(any())).thenReturn(List.of(productType(TYPE_ID, CATEGORY_ID)));
 
         List<ProductResult> result =
                 searchProducts.execute(new SearchProductsCommand("leche", CatalogView.ADMIN));
 
         assertEquals(1, result.size());
         assertEquals(PRODUCT_ID, result.get(0).id());
+    }
+
+    @Test
+    void shouldListAndSearchProductsOrderedByCatalogRules() {
+        UUID idZ = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        UUID idA = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        Product laterName = Product.create(
+                idZ,
+                CATEGORY_ID,
+                TYPE_ID,
+                null,
+                Presentation.of(1, PresentationUnit.UNIT),
+                null,
+                "Zumo",
+                null,
+                null,
+                PRICE,
+                1,
+                null,
+                ProductStatus.ACTIVE,
+                CREATED_AT,
+                CREATED_AT);
+        Product earlierName = Product.create(
+                idA,
+                CATEGORY_ID,
+                TYPE_ID,
+                null,
+                Presentation.of(1, PresentationUnit.UNIT),
+                null,
+                "aceite",
+                null,
+                null,
+                PRICE,
+                1,
+                null,
+                ProductStatus.ACTIVE,
+                CREATED_AT,
+                CREATED_AT);
+        when(productRepository.findAll()).thenReturn(List.of(laterName, earlierName));
+        when(productRepository.searchByNameBrandOrBarcode("a"))
+                .thenReturn(List.of(laterName, earlierName));
+        when(productTypeRepository.findByIds(any())).thenReturn(List.of(productType(TYPE_ID, CATEGORY_ID)));
+
+        List<ProductResult> listed =
+                listProducts.execute(new ListProductsCommand(null, null, CatalogView.ADMIN));
+        List<ProductResult> searched =
+                searchProducts.execute(new SearchProductsCommand("a", CatalogView.ADMIN));
+
+        assertEquals(List.of(idA, idZ), listed.stream().map(ProductResult::id).toList());
+        assertEquals(List.of(idA, idZ), searched.stream().map(ProductResult::id).toList());
     }
 
     private CreateProductCommand createCommand() {

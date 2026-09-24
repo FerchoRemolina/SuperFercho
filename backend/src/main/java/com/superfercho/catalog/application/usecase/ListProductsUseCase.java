@@ -32,13 +32,14 @@ public final class ListProductsUseCase {
 
     public List<ProductResult> execute(ListProductsCommand command) {
         List<Product> products = load(command);
-        if (command.view() != CatalogView.PUBLIC) {
-            return products.stream().map(ProductResult::from).toList();
-        }
-        CatalogVisibilityLookup visibility = CatalogVisibilityLookup.load(
+        CatalogVisibilityLookup lookup = CatalogVisibilityLookup.load(
                 products, categoryRepository, productTypeRepository, productVariantRepository);
-        return products.stream()
-                .filter(visibility::isPubliclyVisible)
+        List<Product> visible = command.view() == CatalogView.PUBLIC
+                ? products.stream().filter(lookup::isPubliclyVisible).toList()
+                : products;
+        return ProductCatalogOrdering.sorted(
+                        visible, lookup.productTypesById(), lookup.productVariantsById())
+                .stream()
                 .map(ProductResult::from)
                 .toList();
     }

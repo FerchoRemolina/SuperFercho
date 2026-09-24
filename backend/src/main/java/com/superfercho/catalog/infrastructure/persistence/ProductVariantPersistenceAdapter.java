@@ -54,21 +54,23 @@ public class ProductVariantPersistenceAdapter implements ProductVariantRepositor
 
     @Override
     public List<ProductVariant> findAll() {
-        return productVariantJpaRepository.findAll().stream()
+        return productVariantJpaRepository.findAllByOrderByNameIgnoreCaseAsc().stream()
                 .map(productVariantPersistenceMapper::toDomain)
                 .toList();
     }
 
     @Override
     public List<ProductVariant> findByProductTypeId(UUID productTypeId) {
-        return productVariantJpaRepository.findByProductTypeId(productTypeId).stream()
+        return productVariantJpaRepository
+                .findByProductTypeIdOrderByNameIgnoreCaseAsc(productTypeId)
+                .stream()
                 .map(productVariantPersistenceMapper::toDomain)
                 .toList();
     }
 
     @Override
     public List<ProductVariant> findByStatus(ProductVariantStatus status) {
-        return productVariantJpaRepository.findByStatus(status).stream()
+        return productVariantJpaRepository.findByStatusOrderByNameIgnoreCaseAsc(status).stream()
                 .map(productVariantPersistenceMapper::toDomain)
                 .toList();
     }
@@ -76,7 +78,9 @@ public class ProductVariantPersistenceAdapter implements ProductVariantRepositor
     @Override
     public List<ProductVariant> findByProductTypeIdAndStatus(
             UUID productTypeId, ProductVariantStatus status) {
-        return productVariantJpaRepository.findByProductTypeIdAndStatus(productTypeId, status).stream()
+        return productVariantJpaRepository
+                .findByProductTypeIdAndStatusOrderByNameIgnoreCaseAsc(productTypeId, status)
+                .stream()
                 .map(productVariantPersistenceMapper::toDomain)
                 .toList();
     }

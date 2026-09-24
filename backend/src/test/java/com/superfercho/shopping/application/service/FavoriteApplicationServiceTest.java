@@ -2,7 +2,6 @@ package com.superfercho.shopping.application.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -185,14 +184,13 @@ class FavoriteApplicationServiceTest {
     }
 
     @Test
-    void shouldListFavoritesInCreatedAtOrderUsingBatchCatalogLookup() {
+    void shouldListFavoritesInCatalogProductOrderUsingBatchCatalogLookup() {
         Favorite newer = Favorite.create(FAVORITE_ID, CUSTOMER_ID, PRODUCT_ID, NOW);
         Favorite older =
                 Favorite.create(UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), CUSTOMER_ID, SECOND_PRODUCT_ID, EARLIER);
-        when(favoriteRepository.findAllByCustomerIdOrderedByCreatedAtDesc(CUSTOMER_ID))
-                .thenReturn(List.of(newer, older));
+        when(favoriteRepository.findAllByCustomerId(CUSTOMER_ID)).thenReturn(List.of(newer, older));
         when(productCardCatalogPort.findCardsByIds(List.of(PRODUCT_ID, SECOND_PRODUCT_ID)))
-                .thenReturn(List.of(inactiveCard(SECOND_PRODUCT_ID), activeCard(PRODUCT_ID)));
+                .thenReturn(List.of(activeCard(PRODUCT_ID), inactiveCard(SECOND_PRODUCT_ID)));
 
         FavoriteListResult result = favoriteService.execute();
 
@@ -211,22 +209,20 @@ class FavoriteApplicationServiceTest {
     }
 
     @Test
-    void shouldLeaveProductNullWhenCatalogDoesNotReturnTheProduct() {
+    void shouldOmitFavoriteWhenCatalogDoesNotReturnTheProduct() {
         Favorite favorite = Favorite.create(FAVORITE_ID, CUSTOMER_ID, PRODUCT_ID, NOW);
-        when(favoriteRepository.findAllByCustomerIdOrderedByCreatedAtDesc(CUSTOMER_ID)).thenReturn(List.of(favorite));
+        when(favoriteRepository.findAllByCustomerId(CUSTOMER_ID)).thenReturn(List.of(favorite));
         when(productCardCatalogPort.findCardsByIds(List.of(PRODUCT_ID))).thenReturn(List.of());
 
         FavoriteListResult result = favoriteService.execute();
 
-        assertEquals(1, result.items().size());
-        assertEquals(PRODUCT_ID, result.items().get(0).productId());
-        assertNull(result.items().get(0).product());
+        assertTrue(result.items().isEmpty());
         verify(favoriteRepository, never()).deleteByCustomerIdAndProductId(any(), any());
     }
 
     @Test
     void shouldSkipCatalogLookupWhenCustomerHasNoFavorites() {
-        when(favoriteRepository.findAllByCustomerIdOrderedByCreatedAtDesc(CUSTOMER_ID)).thenReturn(List.of());
+        when(favoriteRepository.findAllByCustomerId(CUSTOMER_ID)).thenReturn(List.of());
 
         FavoriteListResult result = favoriteService.execute();
 

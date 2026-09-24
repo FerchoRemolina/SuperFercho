@@ -12,7 +12,7 @@ public interface FavoriteJpaRepository extends JpaRepository<FavoriteJpaEntity, 
 
     Optional<FavoriteJpaEntity> findByCustomerIdAndProductId(UUID customerId, UUID productId);
 
-    List<FavoriteJpaEntity> findAllByCustomerIdOrderByCreatedAtDesc(UUID customerId);
+    List<FavoriteJpaEntity> findAllByCustomerId(UUID customerId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional

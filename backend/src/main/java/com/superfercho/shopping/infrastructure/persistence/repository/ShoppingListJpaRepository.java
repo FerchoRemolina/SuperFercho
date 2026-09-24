@@ -4,8 +4,14 @@ import com.superfercho.shopping.infrastructure.persistence.entity.ShoppingListJp
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface ShoppingListJpaRepository extends JpaRepository<ShoppingListJpaEntity, UUID> {
 
-    List<ShoppingListJpaEntity> findAllByCustomerId(UUID customerId);
+    @Query(
+            "SELECT s FROM ShoppingListJpaEntity s WHERE s.customerId = :customerId"
+                    + " ORDER BY LOWER(s.name) ASC")
+    List<ShoppingListJpaEntity> findAllByCustomerIdOrderByNameIgnoreCaseAsc(
+            @Param("customerId") UUID customerId);
 }

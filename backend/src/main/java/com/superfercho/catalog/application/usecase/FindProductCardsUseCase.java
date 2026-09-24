@@ -40,7 +40,9 @@ public final class FindProductCardsUseCase implements ProductCardQueryPort {
         }
         CatalogVisibilityLookup visibility = CatalogVisibilityLookup.load(
                 products, categoryRepository, productTypeRepository, productVariantRepository);
-        return products.stream()
+        return ProductCatalogOrdering.sorted(
+                        products, visibility.productTypesById(), visibility.productVariantsById())
+                .stream()
                 .map(product -> toCard(product, visibility.isPubliclyVisible(product)))
                 .toList();
     }

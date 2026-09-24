@@ -42,8 +42,8 @@ public class FavoritePersistenceAdapter implements FavoriteRepositoryPort {
     }
 
     @Override
-    public List<Favorite> findAllByCustomerIdOrderedByCreatedAtDesc(UUID customerId) {
-        return favoriteJpaRepository.findAllByCustomerIdOrderByCreatedAtDesc(customerId).stream()
+    public List<Favorite> findAllByCustomerId(UUID customerId) {
+        return favoriteJpaRepository.findAllByCustomerId(customerId).stream()
                 .map(favoritePersistenceMapper::toDomain)
                 .toList();
     }

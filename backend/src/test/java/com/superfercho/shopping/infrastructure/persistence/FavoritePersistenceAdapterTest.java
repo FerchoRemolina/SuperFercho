@@ -73,16 +73,17 @@ class FavoritePersistenceAdapterTest {
     }
 
     @Test
-    void shouldListFavoritesOrderedByCreatedAtDescending() {
+    void shouldListFavoritesForCustomer() {
         UUID customerId = UUID.randomUUID();
         favoriteRepository.save(favorite(customerId, PRODUCT_ID, CREATED_AT));
         favoriteRepository.save(favorite(customerId, SECOND_PRODUCT_ID, LATER));
 
-        List<Favorite> favorites = favoriteRepository.findAllByCustomerIdOrderedByCreatedAtDesc(customerId);
+        List<Favorite> favorites = favoriteRepository.findAllByCustomerId(customerId);
 
         assertThat(favorites).hasSize(2);
-        assertThat(favorites.get(0).productId()).isEqualTo(SECOND_PRODUCT_ID);
-        assertThat(favorites.get(1).productId()).isEqualTo(PRODUCT_ID);
+        assertThat(favorites)
+                .extracting(Favorite::productId)
+                .containsExactlyInAnyOrder(PRODUCT_ID, SECOND_PRODUCT_ID);
     }
 
     @Test

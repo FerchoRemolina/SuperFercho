@@ -65,4 +65,12 @@ final class CatalogVisibilityLookup {
                 productTypesById.get(product.productTypeId()),
                 variantId == null ? null : productVariantsById.get(variantId));
     }
+
+    Map<UUID, ProductType> productTypesById() {
+        return productTypesById;
+    }
+
+    Map<UUID, ProductVariant> productVariantsById() {
+        return productVariantsById;
+    }
 }

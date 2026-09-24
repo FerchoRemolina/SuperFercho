@@ -213,8 +213,13 @@ class CatalogPersistenceAdapterTest {
                 .extracting(Product::id)
                 .containsExactly(milk.id());
         assertThat(categoryRepository.findByStatus(CategoryStatus.ACTIVE))
-                .extracting(Category::id)
-                .contains(dairy.id(), fruit.id());
+                .extracting(Category::name)
+                .contains("Filtrar-frutas", "Filtrar-lacteos");
+        assertThat(categoryRepository.findByStatus(CategoryStatus.ACTIVE).stream()
+                        .map(Category::name)
+                        .filter(name -> name.startsWith("Filtrar-"))
+                        .toList())
+                .containsExactly("Filtrar-frutas", "Filtrar-lacteos");
     }
 
     @Test
