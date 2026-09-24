@@ -17,13 +17,17 @@ import {
   adminPaymentDetailErrorKind,
   adminPaymentHref,
   adminProductsHref,
+  canActivateProduct,
   canAdvanceAdminOrderStatus,
+  canArchiveProduct,
   canDeactivateKnowledgeDocument,
+  canDeactivateProduct,
   canGoToNextAdminOrdersPage,
   canGoToPreviousAdminOrdersPage,
   canProcessKnowledgeDocument,
   canReactivateKnowledgeDocument,
   canReplaceKnowledgeDocumentContent,
+  canRestoreProduct,
   documentStatusLabel,
   documentStatusTone,
   formatAdminInstant,
@@ -40,6 +44,8 @@ import {
   parseAdminOrdersPage,
   parseAdminOrdersStatusFilter,
   paymentStatusTone,
+  productStatusLabel,
+  productStatusTone,
   shouldSearchAdminKnowledge,
   shouldSearchAdminProducts,
   ADMIN_NAV_LINKS,
@@ -90,7 +96,40 @@ describe("admin presentation", () => {
       categoryId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
       status: "ACTIVE",
     });
+    expect(listQueryFromSearchParams({ status: "ARCHIVED" })).toEqual({
+      status: "ARCHIVED",
+    });
     expect(listQueryFromSearchParams({ status: "UNKNOWN" })).toEqual({});
+  });
+
+  it("labels and tones product statuses", () => {
+    expect(productStatusLabel("ACTIVE")).toBe("Activo");
+    expect(productStatusLabel("INACTIVE")).toBe("Inactivo");
+    expect(productStatusLabel("ARCHIVED")).toBe("Archivado");
+    expect(productStatusTone("ACTIVE")).toBe("primary");
+    expect(productStatusTone("INACTIVE")).toBe("neutral");
+    expect(productStatusTone("ARCHIVED")).toBe("danger");
+  });
+
+  it("gates product status transitions", () => {
+    expect(canActivateProduct("INACTIVE")).toBe(true);
+    expect(canActivateProduct("ACTIVE")).toBe(false);
+    expect(canActivateProduct("ARCHIVED")).toBe(false);
+    expect(canDeactivateProduct("ACTIVE")).toBe(true);
+    expect(canDeactivateProduct("INACTIVE")).toBe(false);
+    expect(canDeactivateProduct("ARCHIVED")).toBe(false);
+    expect(canArchiveProduct("ACTIVE")).toBe(true);
+    expect(canArchiveProduct("INACTIVE")).toBe(true);
+    expect(canArchiveProduct("ARCHIVED")).toBe(false);
+    expect(canRestoreProduct("ARCHIVED")).toBe(true);
+    expect(canRestoreProduct("ACTIVE")).toBe(false);
+    expect(canRestoreProduct("INACTIVE")).toBe(false);
+  });
+
+  it("builds archived status filter href", () => {
+    expect(adminProductsHref({ status: "ARCHIVED" })).toBe(
+      "/admin/products?status=ARCHIVED",
+    );
   });
 
   it("requires non-blank text to search", () => {

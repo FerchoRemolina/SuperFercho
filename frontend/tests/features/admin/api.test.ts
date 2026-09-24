@@ -7,6 +7,7 @@ import {
   adjustAdminProductStock,
   adminKeys,
   ADMIN_SALES_ORDER_STATUSES,
+  archiveAdminProduct,
   changeAdminProductPrice,
   createAdminCategory,
   createAdminKnowledgeDocument,
@@ -34,6 +35,7 @@ import {
   processAdminKnowledgeDocument,
   reactivateAdminKnowledgeDocument,
   replaceAdminKnowledgeDocumentContent,
+  restoreAdminProduct,
   searchAdminKnowledge,
   searchAdminProducts,
   updateAdminCategory,
@@ -384,6 +386,25 @@ describe("admin catalog api", () => {
     );
     expect(fetchMock.mock.calls[1]?.[0]).toBe(
       `http://localhost:8080/api/v1/products/${product.id}/deactivate`,
+    );
+  });
+
+  it("archives and restores with dedicated POST endpoints", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ ...product, status: "ARCHIVED" }))
+      .mockResolvedValueOnce(jsonResponse({ ...product, status: "INACTIVE" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await archiveAdminProduct(product.id);
+    await restoreAdminProduct(product.id);
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      `http://localhost:8080/api/v1/products/${product.id}/archive`,
+    );
+    expect((fetchMock.mock.calls[0]?.[1] as RequestInit).method).toBe("POST");
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      `http://localhost:8080/api/v1/products/${product.id}/restore`,
     );
   });
 
