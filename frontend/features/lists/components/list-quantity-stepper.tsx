@@ -42,11 +42,11 @@ export function ListQuantityStepper({
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex shrink-0 items-center gap-1.5">
       <Button
         type="button"
         variant="secondary"
-        className="min-h-11 w-11 px-0"
+        className="min-h-11 w-10 px-0 text-base"
         aria-label="Disminuir cantidad"
         disabled={busy || quantity <= 1}
         onClick={() => void commit(quantity - 1)}
@@ -59,7 +59,7 @@ export function ListQuantityStepper({
         inputMode="numeric"
         pattern="[0-9]*"
         className={cx(
-          "h-11 w-14 rounded-lg border border-sf-border bg-sf-surface text-center text-base font-semibold text-sf-ink",
+          "h-11 w-12 rounded-lg border border-sf-border bg-sf-bg text-center text-sm font-semibold text-sf-ink",
           "disabled:cursor-not-allowed disabled:text-sf-muted",
         )}
         value={draft}
@@ -78,7 +78,7 @@ export function ListQuantityStepper({
       <Button
         type="button"
         variant="secondary"
-        className="min-h-11 w-11 px-0"
+        className="min-h-11 w-10 px-0 text-base"
         aria-label="Aumentar cantidad"
         disabled={busy}
         onClick={() => void commit(quantity + 1)}

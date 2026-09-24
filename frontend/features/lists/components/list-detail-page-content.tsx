@@ -39,7 +39,7 @@ export function ListDetailPageContent({
 
   if (listQuery.isPending) {
     return (
-      <Container as="main" className="py-10 md:py-16">
+      <Container as="main" className="py-8 md:py-16">
         <DetailSkeleton />
       </Container>
     );
@@ -53,7 +53,13 @@ export function ListDetailPageContent({
       ? messageForApiProblem(listQuery.error.problem)
       : "No se pudo cargar la lista.";
     return (
-      <Container as="main" className="py-10 md:py-16">
+      <Container as="main" className="py-8 md:py-16">
+        <Link
+          href="/lists"
+          className="mb-3 inline-flex min-h-11 items-center text-sm font-semibold text-sf-muted hover:text-sf-primary md:mb-4"
+        >
+          ← Mis listas
+        </Link>
         {notFound ? (
           <EmptyState
             title="No encontramos esta lista"
@@ -96,47 +102,48 @@ export function ListDetailPageContent({
         : null;
 
   return (
-    <Container as="main" className="py-10 md:py-16">
+    <Container as="main" className="py-8 md:py-16">
       <Link
         href="/lists"
-        className="text-sm font-semibold text-sf-primary hover:underline"
+        className="mb-3 inline-flex min-h-11 items-center text-sm font-semibold text-sf-muted hover:text-sf-primary md:mb-4"
       >
         ← Mis listas
       </Link>
 
-      <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
-            {list.name}
-          </h1>
-          <p className="mt-2 text-sm text-sf-muted">
-            {shoppingListItemsLabel(itemCount)} · Actualizada{" "}
-            {formatListInstant(list.updatedAt)}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+      <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
+        {list.name}
+      </h1>
+      <p className="mt-2 text-sm text-sf-muted">
+        {shoppingListItemsLabel(itemCount)}
+      </p>
+      <p className="mt-1 text-xs text-sf-muted">
+        Actualizada {formatListInstant(list.updatedAt)}
+      </p>
+
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1">
+        <Button
+          type="button"
+          variant="ghost"
+          className="min-h-11 justify-start px-0 text-sm font-semibold text-sf-muted hover:bg-transparent hover:text-sf-primary"
+          onClick={() => setRenaming((open) => !open)}
+        >
+          {renaming ? "Cerrar" : "Renombrar"}
+        </Button>
+        {itemCount > 0 ? (
           <Button
             type="button"
-            variant="secondary"
-            onClick={() => setRenaming((open) => !open)}
+            variant="ghost"
+            className="min-h-11 justify-start px-0 text-sm font-semibold text-sf-muted hover:bg-transparent hover:text-sf-error"
+            disabled={clearMutation.isPending || mutating}
+            onClick={() => void clearMutation.mutateAsync()}
           >
-            {renaming ? "Cerrar" : "Renombrar"}
+            {clearMutation.isPending ? "Limpiando…" : "Limpiar lista"}
           </Button>
-          {itemCount > 0 ? (
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={clearMutation.isPending || mutating}
-              onClick={() => void clearMutation.mutateAsync()}
-            >
-              {clearMutation.isPending ? "Limpiando…" : "Limpiar lista"}
-            </Button>
-          ) : null}
-        </div>
+        ) : null}
       </div>
 
       {renaming ? (
-        <Card className="mt-6 p-4">
+        <Card className="mt-4 grid gap-3 !p-4 md:mt-5">
           <RenameListForm
             shoppingListId={list.id}
             initialName={list.name}
@@ -146,7 +153,7 @@ export function ListDetailPageContent({
       ) : null}
 
       {clearError ? (
-        <div className="mt-6">
+        <div className="mt-4 md:mt-5">
           <Alert tone="error" title="No se pudo limpiar">
             {clearError}
           </Alert>
@@ -154,7 +161,7 @@ export function ListDetailPageContent({
       ) : null}
 
       {itemCount === 0 ? (
-        <div className="mt-8">
+        <div className="mt-6 md:mt-8">
           <EmptyState
             title="Esta lista está vacía"
             description="Agrega productos desde el catálogo para armar tu mercado."
@@ -166,16 +173,15 @@ export function ListDetailPageContent({
           />
         </div>
       ) : (
-        <ul className="mt-8 grid gap-4">
+        <ul className="mt-6 grid gap-3 md:mt-8 md:gap-4">
           {list.items.map((item) => (
-            <li key={item.id}>
-              <ListItemCard
-                shoppingListId={list.id}
-                item={item}
-                product={productsById.get(item.productId)}
-                busy={mutating}
-              />
-            </li>
+            <ListItemCard
+              key={item.id}
+              shoppingListId={list.id}
+              item={item}
+              product={productsById.get(item.productId)}
+              busy={mutating}
+            />
           ))}
         </ul>
       )}
@@ -262,19 +268,26 @@ function RenameListForm({
 function DetailSkeleton() {
   return (
     <div aria-hidden="true">
-      <Skeleton className="h-4 w-24" />
-      <Skeleton className="mt-4 h-10 w-2/3" />
-      <Skeleton className="mt-3 h-4 w-1/3" />
-      <div className="mt-8 grid gap-4">
-        <Card className="grid gap-4 p-4 md:grid-cols-[8rem_1fr]">
-          <Skeleton className="aspect-square w-full" />
-          <div>
-            <Skeleton className="h-5 w-2/3" />
-            <Skeleton className="mt-3 h-4 w-1/3" />
-            <Skeleton className="mt-6 h-11 w-40" />
-          </div>
-        </Card>
-      </div>
+      <Skeleton className="mb-3 h-5 w-28" />
+      <Skeleton className="h-9 w-2/3 md:h-11" />
+      <Skeleton className="mt-2 h-4 w-28" />
+      <Skeleton className="mt-1 h-3 w-40" />
+      <ul className="mt-6 grid gap-3 md:mt-8 md:gap-4">
+        {Array.from({ length: 2 }, (_, index) => (
+          <li
+            key={index}
+            className="grid grid-cols-[3.75rem_minmax(0,1fr)] gap-3 rounded-2xl border border-sf-border bg-sf-surface p-3 md:grid-cols-[5rem_minmax(0,1fr)] md:gap-4 md:p-4"
+          >
+            <Skeleton className="aspect-square w-full rounded-xl" />
+            <div className="min-w-0">
+              <Skeleton className="h-5 w-2/3" />
+              <Skeleton className="mt-1.5 h-3 w-1/3" />
+              <Skeleton className="mt-2 h-5 w-24" />
+              <Skeleton className="mt-3 h-11 w-40" />
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

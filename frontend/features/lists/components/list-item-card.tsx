@@ -20,7 +20,7 @@ import { messageForApiProblem } from "@/shared/errors/messages";
 import { formatMoney } from "@/shared/money/money";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Card } from "@/shared/ui/card";
+import { cx } from "@/shared/utils/cx";
 
 export function ListItemCard({
   shoppingListId,
@@ -42,6 +42,12 @@ export function ListItemCard({
   const offerAddToCart = canOfferAddToCart(purchasable, stock);
   const outOfStock = stock !== undefined && stock <= 0;
   const stockLabel = product ? productStockLabel(product.stock) : null;
+  const showStockDetail =
+    purchasable &&
+    !outOfStock &&
+    product !== undefined &&
+    isProductAvailable(product) &&
+    (stock ?? 0) > 0;
 
   const removeError =
     removeMutation.isError && isApiError(removeMutation.error)
@@ -69,124 +75,151 @@ export function ListItemCard({
     }
   }
 
-  return (
-    <Card className="grid gap-4 p-4 md:grid-cols-[8rem_1fr]">
-      <div>
-        {product ? (
-          <Link href={`/products/${product.id}`} aria-label={product.name}>
-            <ProductImage src={product.imageUrl} alt="" />
-          </Link>
-        ) : (
-          <ProductImage src={null} alt="" />
-        )}
-      </div>
+  const name = product?.name ?? "Producto no disponible";
 
-      <div className="flex min-w-0 flex-col gap-3">
-        {product ? (
-          <>
-            {product.brand ? (
-              <p className="text-sm text-sf-muted">{product.brand}</p>
-            ) : null}
-            <h2 className="text-lg font-semibold text-sf-ink">
+  return (
+    <li
+      className={cx(
+        "grid gap-3 rounded-2xl border border-sf-border bg-sf-surface p-3",
+        "md:grid-cols-[5rem_minmax(0,1fr)] md:items-start md:gap-4 md:p-4",
+      )}
+    >
+      <div className="flex gap-3 md:contents">
+        <div className="w-[3.75rem] shrink-0 sm:w-[4.5rem] md:w-full">
+          {product ? (
+            <Link href={`/products/${product.id}`} aria-label={name}>
+              <ProductImage src={product.imageUrl} alt="" />
+            </Link>
+          ) : (
+            <ProductImage src={null} alt="" />
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          {product ? (
+            <>
               {purchasable ? (
                 <Link
                   href={`/products/${product.id}`}
-                  className="hover:text-sf-primary"
+                  className="line-clamp-2 text-base font-semibold text-sf-ink hover:text-sf-primary"
                 >
-                  {product.name}
+                  {name}
                 </Link>
               ) : (
-                product.name
+                <p className="line-clamp-2 text-base font-semibold text-sf-ink">
+                  {name}
+                </p>
               )}
-            </h2>
-            <p className="text-base font-bold text-sf-ink">
-              {formatMoney(product.price)}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Badge tone={purchasable ? "primary" : "danger"} className="w-fit">
-                {purchasable ? "Disponible" : "No disponible"}
-              </Badge>
-              {stockLabel ? (
-                <Badge
-                  tone={isProductAvailable(product) ? "primary" : "danger"}
-                  className="w-fit"
-                >
-                  {stockLabel}
-                </Badge>
+              {product.brand ? (
+                <p className="mt-0.5 truncate text-sm text-sf-muted">
+                  {product.brand}
+                </p>
               ) : null}
-            </div>
-            {!purchasable ? (
-              <p className="text-sm text-sf-muted">
-                Este producto no está a la venta ahora. Puedes mantenerlo o
+              <p className="mt-1 text-base font-bold text-sf-ink">
+                {formatMoney(product.price)}
+              </p>
+              <div className="mt-1.5">
+                {!purchasable ? (
+                  <Badge tone="danger" className="w-fit">
+                    No disponible
+                  </Badge>
+                ) : outOfStock ? (
+                  <Badge tone="danger" className="w-fit">
+                    Agotado
+                  </Badge>
+                ) : (
+                  <Badge tone="primary" className="w-fit">
+                    Disponible
+                  </Badge>
+                )}
+              </div>
+              {showStockDetail ? (
+                <p className="mt-1 text-xs text-sf-muted">{stockLabel}</p>
+              ) : null}
+              {!purchasable ? (
+                <p className="mt-1 text-xs text-sf-muted md:text-sm">
+                  Este producto no está a la venta ahora. Puedes mantenerlo o
+                  quitarlo de la lista.
+                </p>
+              ) : null}
+              {purchasable && outOfStock ? (
+                <p className="mt-1 text-xs text-sf-muted md:text-sm">
+                  Este producto está agotado por ahora. Puedes mantenerlo en la
+                  lista.
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <p className="line-clamp-2 text-base font-semibold text-sf-ink">
+                {name}
+              </p>
+              <p className="mt-1 text-xs text-sf-muted md:text-sm">
+                Ya no está en el catálogo o no se puede comprar ahora. Puedes
                 quitarlo de la lista.
               </p>
-            ) : null}
-            {purchasable && outOfStock ? (
-              <p className="text-sm text-sf-muted">
-                Este producto está agotado por ahora. Puedes mantenerlo en la
-                lista.
-              </p>
-            ) : null}
-          </>
-        ) : (
-          <>
-            <h2 className="text-lg font-semibold text-sf-ink">
-              Producto no disponible
-            </h2>
-            <p className="text-sm text-sf-muted">
-              Ya no está en el catálogo o no se puede comprar ahora. Puedes
-              quitarlo de la lista.
+              <Badge tone="danger" className="mt-1.5 w-fit">
+                No disponible
+              </Badge>
+            </>
+          )}
+
+          {removeError ? (
+            <p className="mt-1.5 text-xs text-sf-error">{removeError}</p>
+          ) : null}
+          {cartError ? (
+            <p className="mt-1.5 text-xs text-sf-error">{cartError}</p>
+          ) : null}
+          {addedFeedback ? (
+            <p
+              className="mt-1.5 text-sm font-semibold text-sf-success"
+              aria-live="polite"
+            >
+              Añadido al carrito.{" "}
+              <Link
+                href="/cart"
+                className="font-semibold text-sf-primary hover:underline"
+              >
+                Ver carrito
+              </Link>
             </p>
-            <Badge tone="danger" className="w-fit">
-              No disponible
-            </Badge>
-          </>
-        )}
+          ) : null}
 
-        {removeError ? (
-          <p className="text-sm text-sf-error">{removeError}</p>
-        ) : null}
-        {cartError ? (
-          <p className="text-sm text-sf-error">{cartError}</p>
-        ) : null}
-        {addedFeedback ? (
-          <p className="text-sm font-semibold text-sf-success" aria-live="polite">
-            Añadido al carrito.
-          </p>
-        ) : null}
-
-        <div className="mt-auto flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
-          <ListQuantityStepper
-            shoppingListId={shoppingListId}
-            productId={item.productId}
-            quantity={item.quantity}
-            disabled={busy || removeMutation.isPending}
-          />
-          {offerAddToCart ? (
+          <div className="mt-2.5 flex items-center gap-2 overflow-x-auto sm:gap-3">
+            <ListQuantityStepper
+              shoppingListId={shoppingListId}
+              productId={item.productId}
+              quantity={item.quantity}
+              disabled={busy || removeMutation.isPending}
+            />
+            {offerAddToCart ? (
+              <Button
+                type="button"
+                variant="secondary"
+                className="min-h-11 shrink-0 px-3 text-sm sm:px-4"
+                disabled={
+                  busy || addCartMutation.isPending || removeMutation.isPending
+                }
+                onClick={() => void onAddToCart()}
+              >
+                {addCartMutation.isPending
+                  ? "Añadiendo…"
+                  : "Agregar al carrito"}
+              </Button>
+            ) : null}
             <Button
               type="button"
-              variant="secondary"
-              disabled={
-                busy || addCartMutation.isPending || removeMutation.isPending
-              }
-              onClick={() => void onAddToCart()}
+              variant="ghost"
+              className="min-h-11 shrink-0 px-2 text-sm font-semibold text-sf-error hover:bg-sf-error/5 hover:text-sf-error sm:px-3"
+              disabled={busy || removeMutation.isPending}
+              onClick={() => void removeMutation.mutateAsync(item.productId)}
             >
-              {addCartMutation.isPending
-                ? "Añadiendo…"
-                : "Agregar al carrito"}
+              {removeMutation.isPending ? "Eliminando…" : "Eliminar"}
             </Button>
-          ) : null}
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={busy || removeMutation.isPending}
-            onClick={() => void removeMutation.mutateAsync(item.productId)}
-          >
-            {removeMutation.isPending ? "Eliminando…" : "Eliminar"}
-          </Button>
+          </div>
         </div>
       </div>
-    </Card>
+    </li>
   );
 }
 
