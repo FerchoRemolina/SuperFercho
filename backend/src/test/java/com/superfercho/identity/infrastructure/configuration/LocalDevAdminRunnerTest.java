@@ -267,6 +267,11 @@ class LocalDevAdminRunnerTest {
 
         @Override
         public IssuedAccessToken issue(UUID userId, Role role) {
+            return issue(userId, role, null);
+        }
+
+        @Override
+        public IssuedAccessToken issue(UUID userId, Role role, UUID previewId) {
             return new IssuedAccessToken("token-" + userId + "-" + role.name(), NOW.plusSeconds(900));
         }
     }

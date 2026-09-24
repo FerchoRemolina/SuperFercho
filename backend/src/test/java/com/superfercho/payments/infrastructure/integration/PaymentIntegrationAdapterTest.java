@@ -13,11 +13,13 @@ import com.superfercho.orders.application.dto.PaymentMethod;
 import com.superfercho.orders.application.dto.PaymentRequest;
 import com.superfercho.orders.application.dto.PaymentResult;
 import com.superfercho.orders.application.dto.PaymentStatus;
+import com.superfercho.payments.application.dto.DeletePaymentCommand;
 import com.superfercho.payments.application.dto.GetPaymentCommand;
 import com.superfercho.payments.application.dto.PaymentResponse;
 import com.superfercho.payments.application.dto.ProcessPaymentCommand;
 import com.superfercho.payments.application.dto.RefundPaymentCommand;
 import com.superfercho.payments.application.exception.PaymentNotFoundException;
+import com.superfercho.payments.application.usecase.DeletePaymentUseCase;
 import com.superfercho.payments.application.usecase.GetPaymentUseCase;
 import com.superfercho.payments.application.usecase.ProcessPaymentUseCase;
 import com.superfercho.payments.application.usecase.RefundPaymentUseCase;
@@ -50,11 +52,15 @@ class PaymentIntegrationAdapterTest {
     @Mock
     private RefundPaymentUseCase refundPaymentUseCase;
 
+    @Mock
+    private DeletePaymentUseCase deletePaymentUseCase;
+
     private PaymentIntegrationAdapter adapter;
 
     @BeforeEach
     void setUp() {
-        adapter = new PaymentIntegrationAdapter(processPaymentUseCase, getPaymentUseCase, refundPaymentUseCase);
+        adapter = new PaymentIntegrationAdapter(
+                processPaymentUseCase, getPaymentUseCase, refundPaymentUseCase, deletePaymentUseCase);
     }
 
     @Test
@@ -74,7 +80,7 @@ class PaymentIntegrationAdapterTest {
         assertEquals(PAYMENT_ID, result.paymentId());
         assertEquals(PaymentStatus.APPROVED, result.status());
         assertEquals("sim-approved", result.providerReference());
-        verifyNoInteractions(getPaymentUseCase, refundPaymentUseCase);
+        verifyNoInteractions(getPaymentUseCase, refundPaymentUseCase, deletePaymentUseCase);
     }
 
     @Test
@@ -94,7 +100,7 @@ class PaymentIntegrationAdapterTest {
         assertEquals(PAYMENT_ID, result.paymentId());
         assertEquals(PaymentStatus.PENDING, result.status());
         assertEquals("cod-pending", result.providerReference());
-        verifyNoInteractions(getPaymentUseCase, refundPaymentUseCase);
+        verifyNoInteractions(getPaymentUseCase, refundPaymentUseCase, deletePaymentUseCase);
     }
 
     @Test
@@ -110,7 +116,7 @@ class PaymentIntegrationAdapterTest {
         assertEquals(AMOUNT, result.amount());
         assertEquals(PaymentStatus.APPROVED, result.status());
         assertEquals("sim-approved", result.providerReference());
-        verifyNoInteractions(processPaymentUseCase, refundPaymentUseCase);
+        verifyNoInteractions(processPaymentUseCase, refundPaymentUseCase, deletePaymentUseCase);
     }
 
     @Test
@@ -135,6 +141,17 @@ class PaymentIntegrationAdapterTest {
         assertEquals(PAYMENT_ID, command.getValue().paymentId());
         verify(processPaymentUseCase, never()).execute(any());
         verify(getPaymentUseCase, never()).execute(any());
+        verifyNoInteractions(deletePaymentUseCase);
+    }
+
+    @Test
+    void shouldDeletePayment() {
+        adapter.deletePayment(PAYMENT_ID);
+
+        ArgumentCaptor<DeletePaymentCommand> command = ArgumentCaptor.forClass(DeletePaymentCommand.class);
+        verify(deletePaymentUseCase).execute(command.capture());
+        assertEquals(PAYMENT_ID, command.getValue().paymentId());
+        verifyNoInteractions(processPaymentUseCase, getPaymentUseCase, refundPaymentUseCase);
     }
 
     @Test

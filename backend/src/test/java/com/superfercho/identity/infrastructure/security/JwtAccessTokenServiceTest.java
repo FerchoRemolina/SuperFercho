@@ -71,6 +71,22 @@ class JwtAccessTokenServiceTest {
         assertTrue(otherSecret.parse(issued.token()).isEmpty());
     }
 
+    @Test
+    void shouldIssueAndParsePreviewIdClaimWithoutBreakingNormalTokens() {
+        JwtAccessTokenService service = service(Clock.fixed(ISSUED_AT, ZoneOffset.UTC));
+        UUID previewId = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+
+        IssuedAccessToken previewToken = service.issue(USER_ID, Role.CUSTOMER, previewId);
+        AuthenticatedUserPrincipal previewPrincipal = service.parse(previewToken.token()).orElseThrow();
+        assertEquals(previewId, previewPrincipal.previewId());
+        assertTrue(previewPrincipal.isStorefrontPreview());
+
+        IssuedAccessToken normalToken = service.issue(USER_ID, Role.CUSTOMER);
+        AuthenticatedUserPrincipal normalPrincipal = service.parse(normalToken.token()).orElseThrow();
+        assertEquals(null, normalPrincipal.previewId());
+        assertTrue(!normalPrincipal.isStorefrontPreview());
+    }
+
     private static JwtAccessTokenService service(Clock clock) {
         return new JwtAccessTokenService(new JwtProperties(SECRET, Duration.ofMinutes(15)), clock);
     }

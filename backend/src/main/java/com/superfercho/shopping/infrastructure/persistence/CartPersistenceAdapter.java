@@ -37,4 +37,9 @@ public class CartPersistenceAdapter implements CartRepositoryPort {
     public Optional<Cart> findByCustomerId(UUID customerId) {
         return cartJpaRepository.findByCustomerId(customerId).map(cartPersistenceMapper::toDomain);
     }
+
+    @Override
+    public void deleteByCustomerId(UUID customerId) {
+        cartJpaRepository.deleteByCustomerId(customerId);
+    }
 }

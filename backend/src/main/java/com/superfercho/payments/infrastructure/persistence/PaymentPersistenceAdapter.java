@@ -32,4 +32,10 @@ public class PaymentPersistenceAdapter implements PaymentRepository {
     public Optional<Payment> findById(UUID paymentId) {
         return paymentJpaRepository.findById(paymentId).map(paymentPersistenceMapper::toDomain);
     }
+
+    @Override
+    public void delete(UUID paymentId) {
+        paymentJpaRepository.deleteById(paymentId);
+        paymentJpaRepository.flush();
+    }
 }

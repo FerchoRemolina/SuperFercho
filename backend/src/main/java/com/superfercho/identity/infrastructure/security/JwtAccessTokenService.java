@@ -21,6 +21,7 @@ import java.util.UUID;
 public final class JwtAccessTokenService implements AccessTokenIssuer {
 
     static final String ROLE_CLAIM = "role";
+    static final String PREVIEW_ID_CLAIM = "previewId";
 
     private final JwtProperties properties;
     private final Clock clock;
@@ -34,16 +35,23 @@ public final class JwtAccessTokenService implements AccessTokenIssuer {
 
     @Override
     public IssuedAccessToken issue(UUID userId, Role role) {
+        return issue(userId, role, null);
+    }
+
+    @Override
+    public IssuedAccessToken issue(UUID userId, Role role, UUID previewId) {
         Instant issuedAt = clock.instant();
         Instant expiresAt = issuedAt.plus(properties.expiration());
         try {
-            JWTClaimsSet claims = new JWTClaimsSet.Builder()
+            JWTClaimsSet.Builder claims = new JWTClaimsSet.Builder()
                     .subject(userId.toString())
                     .claim(ROLE_CLAIM, role.name())
                     .issueTime(Date.from(issuedAt))
-                    .expirationTime(Date.from(expiresAt))
-                    .build();
-            SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claims);
+                    .expirationTime(Date.from(expiresAt));
+            if (previewId != null) {
+                claims.claim(PREVIEW_ID_CLAIM, previewId.toString());
+            }
+            SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claims.build());
             jwt.sign(new MACSigner(secret));
             return new IssuedAccessToken(jwt.serialize(), expiresAt);
         } catch (JOSEException ex) {
@@ -69,7 +77,11 @@ public final class JwtAccessTokenService implements AccessTokenIssuer {
             }
             UUID userId = UUID.fromString(claims.getSubject());
             Role role = Role.valueOf(claims.getStringClaim(ROLE_CLAIM));
-            return Optional.of(new AuthenticatedUserPrincipal(userId, role));
+            String previewClaim = claims.getStringClaim(PREVIEW_ID_CLAIM);
+            UUID previewId = previewClaim == null || previewClaim.isBlank()
+                    ? null
+                    : UUID.fromString(previewClaim);
+            return Optional.of(new AuthenticatedUserPrincipal(userId, role, previewId));
         } catch (ParseException | JOSEException | IllegalArgumentException | NullPointerException ex) {
             return Optional.empty();
         }

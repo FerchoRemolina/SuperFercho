@@ -2,8 +2,10 @@ package com.superfercho.identity.infrastructure.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.superfercho.identity.application.port.CurrentUserProvider;
+import com.superfercho.identity.application.port.CustomerPreviewRepository;
 import com.superfercho.identity.application.port.PasswordHasher;
 import java.time.Clock;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -44,7 +46,9 @@ public class IdentitySecurityConfiguration {
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             JwtAccessTokenService jwtAccessTokenService,
-            ObjectMapper objectMapper)
+            ObjectMapper objectMapper,
+            ObjectProvider<CustomerPreviewRepository> customerPreviewRepository,
+            Clock clock)
             throws Exception {
         SecurityProblemDetailResponses problemResponses = new SecurityProblemDetailResponses(objectMapper);
         JwtAuthenticationFilter jwtAuthenticationFilter =
@@ -100,6 +104,8 @@ public class IdentitySecurityConfiguration {
                         .hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/admin/orders/**")
                         .hasRole("ADMIN")
+                        .requestMatchers("/api/v1/admin/storefront-preview", "/api/v1/admin/storefront-preview/**")
+                        .hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/payments/{paymentId}")
                         .hasRole("ADMIN")
                         .requestMatchers(
@@ -138,6 +144,12 @@ public class IdentitySecurityConfiguration {
                         .anyRequest()
                         .denyAll())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        CustomerPreviewRepository previewRepository = customerPreviewRepository.getIfAvailable();
+        if (previewRepository != null) {
+            http.addFilterAfter(
+                    new StorefrontPreviewGateFilter(previewRepository, clock, problemResponses),
+                    JwtAuthenticationFilter.class);
+        }
         return http.build();
     }
 }

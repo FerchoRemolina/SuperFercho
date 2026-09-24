@@ -52,4 +52,9 @@ public class FavoritePersistenceAdapter implements FavoriteRepositoryPort {
     public void deleteByCustomerIdAndProductId(UUID customerId, UUID productId) {
         favoriteJpaRepository.deleteByCustomerIdAndProductId(customerId, productId);
     }
+
+    @Override
+    public void deleteAllByCustomerId(UUID customerId) {
+        favoriteJpaRepository.deleteAllByCustomerId(customerId);
+    }
 }

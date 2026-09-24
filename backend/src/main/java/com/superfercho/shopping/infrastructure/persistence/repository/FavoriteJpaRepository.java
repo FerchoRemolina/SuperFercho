@@ -17,4 +17,8 @@ public interface FavoriteJpaRepository extends JpaRepository<FavoriteJpaEntity, 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional
     void deleteByCustomerIdAndProductId(UUID customerId, UUID productId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    void deleteAllByCustomerId(UUID customerId);
 }

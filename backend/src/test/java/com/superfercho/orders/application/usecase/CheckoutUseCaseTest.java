@@ -467,5 +467,10 @@ class CheckoutUseCaseTest {
         public void save(IdempotencyRecord record) {
             records.put(record.key() + "|" + record.customerId(), record);
         }
+
+        @Override
+        public void deleteAllByCustomerId(UUID customerId) {
+            records.entrySet().removeIf(entry -> entry.getKey().endsWith("|" + customerId));
+        }
     }
 }

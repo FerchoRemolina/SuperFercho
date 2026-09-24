@@ -21,4 +21,9 @@ public final class InMemoryConversationStore implements ConversationStore {
     public Optional<Conversation> findById(UUID conversationId) {
         return Optional.ofNullable(conversations.get(conversationId));
     }
+
+    @Override
+    public void deleteByUserId(UUID userId) {
+        conversations.values().removeIf(conversation -> conversation.userId().equals(userId));
+    }
 }

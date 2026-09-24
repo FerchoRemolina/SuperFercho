@@ -11,4 +11,6 @@ public interface PaymentPort {
     PaymentResult getPayment(UUID paymentId);
 
     void refundPayment(UUID paymentId);
+
+    void deletePayment(UUID paymentId);
 }

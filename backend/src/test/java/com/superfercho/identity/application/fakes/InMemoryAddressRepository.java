@@ -46,4 +46,9 @@ public final class InMemoryAddressRepository implements AddressRepository {
                 .map(OwnedAddress::address)
                 .toList();
     }
+
+    @Override
+    public void deleteAllByUserId(UUID userId) {
+        addresses.entrySet().removeIf(entry -> entry.getValue().userId().equals(userId));
+    }
 }

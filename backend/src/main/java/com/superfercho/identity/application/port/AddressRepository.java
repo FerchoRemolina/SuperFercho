@@ -16,4 +16,6 @@ public interface AddressRepository {
     Optional<Address> findActiveDefaultByUserId(UUID userId);
 
     List<Address> findByUserId(UUID userId);
+
+    void deleteAllByUserId(UUID userId);
 }

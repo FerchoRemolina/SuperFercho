@@ -83,6 +83,11 @@ public class OrderPersistenceAdapter implements OrderRepository {
                 .toList();
     }
 
+    @Override
+    public void deleteAllByCustomerId(UUID customerId) {
+        orderJpaRepository.deleteAllByCustomerId(customerId);
+    }
+
     private PagedResult<Order> toPagedResult(Page<OrderJpaEntity> page, PageRequest pageRequest) {
         return new PagedResult<>(
                 page.getContent().stream().map(orderPersistenceMapper::toDomain).toList(),

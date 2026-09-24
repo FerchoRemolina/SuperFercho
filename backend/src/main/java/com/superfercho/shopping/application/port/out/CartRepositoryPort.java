@@ -9,4 +9,6 @@ public interface CartRepositoryPort {
     Cart save(Cart cart);
 
     Optional<Cart> findByCustomerId(UUID customerId);
+
+    void deleteByCustomerId(UUID customerId);
 }

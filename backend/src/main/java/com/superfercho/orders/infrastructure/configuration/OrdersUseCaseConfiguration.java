@@ -7,9 +7,11 @@ import com.superfercho.orders.application.port.CustomerAddressPort;
 import com.superfercho.orders.application.port.IdempotencyPort;
 import com.superfercho.orders.application.port.OrderRepository;
 import com.superfercho.orders.application.port.PaymentPort;
+import com.superfercho.orders.application.port.PreviewCustomerExclusionPort;
 import com.superfercho.orders.application.port.ProductCatalogPort;
 import com.superfercho.orders.application.port.ShoppingCartPort;
 import com.superfercho.orders.application.usecase.AutoConfirmPendingOrdersUseCase;
+import com.superfercho.orders.application.usecase.CancelAndDeletePreviewOrdersUseCase;
 import com.superfercho.orders.application.usecase.CancelOrderUseCase;
 import com.superfercho.orders.application.usecase.CheckoutUseCase;
 import com.superfercho.orders.application.usecase.GetAdminOrderUseCase;
@@ -97,13 +99,29 @@ public class OrdersUseCaseConfiguration {
 
     @Bean
     UpdateOrderStatusUseCase updateOrderStatusUseCase(
-            OrderRepository orderRepository, ClockProvider ordersClockProvider) {
-        return new UpdateOrderStatusUseCase(orderRepository, ordersClockProvider);
+            OrderRepository orderRepository,
+            ClockProvider ordersClockProvider,
+            PreviewCustomerExclusionPort previewCustomerExclusionPort) {
+        return new UpdateOrderStatusUseCase(orderRepository, ordersClockProvider, previewCustomerExclusionPort);
     }
 
     @Bean
     AutoConfirmPendingOrdersUseCase autoConfirmPendingOrdersUseCase(
-            OrderRepository orderRepository, ClockProvider ordersClockProvider) {
-        return new AutoConfirmPendingOrdersUseCase(orderRepository, ordersClockProvider);
+            OrderRepository orderRepository,
+            ClockProvider ordersClockProvider,
+            PreviewCustomerExclusionPort previewCustomerExclusionPort) {
+        return new AutoConfirmPendingOrdersUseCase(
+                orderRepository, ordersClockProvider, previewCustomerExclusionPort);
+    }
+
+    @Bean
+    CancelAndDeletePreviewOrdersUseCase cancelAndDeletePreviewOrdersUseCase(
+            OrderRepository orderRepository,
+            InventoryPort inventoryPort,
+            PaymentPort paymentPort,
+            IdempotencyPort idempotencyPort,
+            ClockProvider ordersClockProvider) {
+        return new CancelAndDeletePreviewOrdersUseCase(
+                orderRepository, inventoryPort, paymentPort, idempotencyPort, ordersClockProvider);
     }
 }

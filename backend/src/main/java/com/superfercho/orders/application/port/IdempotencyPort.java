@@ -29,4 +29,6 @@ public interface IdempotencyPort {
         }
         return Optional.of(record.result());
     }
+
+    void deleteAllByCustomerId(UUID customerId);
 }

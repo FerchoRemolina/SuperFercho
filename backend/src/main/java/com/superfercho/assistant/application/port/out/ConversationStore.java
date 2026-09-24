@@ -9,4 +9,6 @@ public interface ConversationStore {
     Conversation save(Conversation conversation);
 
     Optional<Conversation> findById(UUID conversationId);
+
+    void deleteByUserId(UUID userId);
 }

@@ -70,6 +70,11 @@ public class IdempotencyPersistenceAdapter implements IdempotencyPort {
                 checkoutIdempotencyPersistenceMapper.toEntity(id, record));
     }
 
+    @Override
+    public void deleteAllByCustomerId(UUID customerId) {
+        checkoutIdempotencyJpaRepository.deleteAllByCustomerId(customerId);
+    }
+
     private void acquireTransactionLock(UUID customerId, String key) {
         jdbcTemplate.query(ADVISORY_LOCK_SQL, rs -> null, customerId.toString(), key);
     }

@@ -198,7 +198,8 @@ class PendingOrderTransitionConcurrencyIntegrationTest {
         PreparedOrder prepared = checkout();
         int stockAfterCheckout = productStock(prepared.productId());
         AutoConfirmPendingOrdersUseCase futureConfirm =
-                new AutoConfirmPendingOrdersUseCase(orderRepository, futureClock());
+                new AutoConfirmPendingOrdersUseCase(
+                        orderRepository, futureClock(), customerId -> false);
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {

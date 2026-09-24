@@ -47,4 +47,9 @@ public class ShoppingListPersistenceAdapter implements ShoppingListRepositoryPor
         shoppingListJpaRepository.deleteById(shoppingListId);
         shoppingListJpaRepository.flush();
     }
+
+    @Override
+    public void deleteAllByCustomerId(UUID customerId) {
+        shoppingListJpaRepository.deleteAllByCustomerId(customerId);
+    }
 }

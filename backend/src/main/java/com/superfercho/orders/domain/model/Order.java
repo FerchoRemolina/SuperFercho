@@ -182,6 +182,20 @@ public final class Order {
         if (at.isAfter(deadline)) {
             throw new OrderCancellationNotAllowedException("customer cancellation window has expired");
         }
+        return cancelledAt(at);
+    }
+
+    /**
+     * System cancellation for storefront-preview cleanup. Requires PENDING, ignores the
+     * customer cancellation window, and reuses the same CANCELLED state as {@link #cancel}.
+     */
+    public Order cancelForCleanup(Instant currentTime) {
+        Instant at = requireCurrentTime(currentTime);
+        requireTransition(OrderStatus.CANCELLED);
+        return cancelledAt(at);
+    }
+
+    private Order cancelledAt(Instant at) {
         return of(
                 id,
                 orderNumber,

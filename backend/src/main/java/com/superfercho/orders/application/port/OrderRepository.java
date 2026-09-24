@@ -29,4 +29,6 @@ public interface OrderRepository {
     PagedResult<Order> findByStatuses(List<OrderStatus> statuses, PageRequest pageRequest);
 
     List<Order> findPendingOrdersEligibleForAutomaticConfirmation(Instant currentTime);
+
+    void deleteAllByCustomerId(UUID customerId);
 }

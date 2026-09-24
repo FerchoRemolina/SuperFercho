@@ -2,6 +2,7 @@ package com.superfercho.orders.application.usecase;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -10,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.superfercho.orders.application.dto.OrderResult;
 import com.superfercho.orders.application.port.ClockProvider;
 import com.superfercho.orders.application.port.OrderRepository;
+import com.superfercho.orders.application.port.PreviewCustomerExclusionPort;
 import com.superfercho.orders.domain.model.Order;
 import com.superfercho.orders.domain.model.OrderItem;
 import com.superfercho.orders.domain.model.OrderNumber;
@@ -42,12 +44,17 @@ class AutoConfirmPendingOrdersUseCaseTest {
     @Mock
     private ClockProvider clockProvider;
 
+    @Mock
+    private PreviewCustomerExclusionPort previewCustomerExclusionPort;
+
     private AutoConfirmPendingOrdersUseCase autoConfirm;
 
     @BeforeEach
     void setUp() {
-        autoConfirm = new AutoConfirmPendingOrdersUseCase(orderRepository, clockProvider);
+        autoConfirm = new AutoConfirmPendingOrdersUseCase(
+                orderRepository, clockProvider, previewCustomerExclusionPort);
         when(clockProvider.currentTime()).thenReturn(NOW);
+        lenient().when(previewCustomerExclusionPort.isPreviewTemporaryCustomer(any())).thenReturn(false);
     }
 
     @Test

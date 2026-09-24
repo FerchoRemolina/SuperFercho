@@ -4,8 +4,10 @@ import com.superfercho.orders.application.dto.OrderResult;
 import com.superfercho.orders.application.dto.UpdateOrderStatusCommand;
 import com.superfercho.orders.application.exception.InvalidOrderStatusUpdateException;
 import com.superfercho.orders.application.exception.OrderNotFoundException;
+import com.superfercho.orders.application.exception.PreviewCustomerOrderUpdateNotAllowedException;
 import com.superfercho.orders.application.port.ClockProvider;
 import com.superfercho.orders.application.port.OrderRepository;
+import com.superfercho.orders.application.port.PreviewCustomerExclusionPort;
 import com.superfercho.orders.domain.exception.InvalidOrderStateTransitionException;
 import com.superfercho.orders.domain.model.Order;
 import com.superfercho.orders.domain.model.OrderStatus;
@@ -15,16 +17,24 @@ public final class UpdateOrderStatusUseCase {
 
     private final OrderRepository orderRepository;
     private final ClockProvider clockProvider;
+    private final PreviewCustomerExclusionPort previewCustomerExclusionPort;
 
-    public UpdateOrderStatusUseCase(OrderRepository orderRepository, ClockProvider clockProvider) {
+    public UpdateOrderStatusUseCase(
+            OrderRepository orderRepository,
+            ClockProvider clockProvider,
+            PreviewCustomerExclusionPort previewCustomerExclusionPort) {
         this.orderRepository = orderRepository;
         this.clockProvider = clockProvider;
+        this.previewCustomerExclusionPort = previewCustomerExclusionPort;
     }
 
     public OrderResult execute(UpdateOrderStatusCommand command) {
         Order order = orderRepository
                 .findById(command.orderId())
                 .orElseThrow(() -> new OrderNotFoundException(command.orderId()));
+        if (previewCustomerExclusionPort.isPreviewTemporaryCustomer(order.customerId())) {
+            throw new PreviewCustomerOrderUpdateNotAllowedException(order.customerId());
+        }
         Instant now = clockProvider.currentTime();
         Order updated = apply(order, command.status(), now);
         if (updated.status() == OrderStatus.CONFIRMED) {

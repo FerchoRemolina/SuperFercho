@@ -8,6 +8,9 @@ import com.superfercho.identity.application.exception.InactiveAddressException;
 import com.superfercho.identity.application.exception.InactiveUserException;
 import com.superfercho.identity.application.exception.InvalidCredentialsException;
 import com.superfercho.identity.application.exception.InvalidRegistrationException;
+import com.superfercho.identity.application.exception.StorefrontPreviewExpiredException;
+import com.superfercho.identity.application.exception.StorefrontPreviewForbiddenException;
+import com.superfercho.identity.application.exception.StorefrontPreviewNotFoundException;
 import com.superfercho.identity.application.exception.UnauthenticatedUserException;
 import com.superfercho.identity.application.exception.UserAlreadyExistsException;
 import com.superfercho.identity.application.exception.UserNotFoundException;
@@ -84,6 +87,21 @@ public class IdentityExceptionHandler {
     @ExceptionHandler({AddressNotFoundException.class, AddressOwnershipException.class})
     ProblemDetail handleAddressNotFound(RuntimeException exception) {
         return problem(HttpStatus.NOT_FOUND, "ADDRESS_NOT_FOUND", exception.getMessage());
+    }
+
+    @ExceptionHandler(StorefrontPreviewNotFoundException.class)
+    ProblemDetail handleStorefrontPreviewNotFound(StorefrontPreviewNotFoundException exception) {
+        return problem(HttpStatus.NOT_FOUND, "STOREFRONT_PREVIEW_NOT_FOUND", exception.getMessage());
+    }
+
+    @ExceptionHandler(StorefrontPreviewForbiddenException.class)
+    ProblemDetail handleStorefrontPreviewForbidden(StorefrontPreviewForbiddenException exception) {
+        return problem(HttpStatus.FORBIDDEN, "STOREFRONT_PREVIEW_FORBIDDEN", exception.getMessage());
+    }
+
+    @ExceptionHandler(StorefrontPreviewExpiredException.class)
+    ProblemDetail handleStorefrontPreviewExpired(StorefrontPreviewExpiredException exception) {
+        return problem(HttpStatus.UNAUTHORIZED, "STOREFRONT_PREVIEW_EXPIRED", exception.getMessage());
     }
 
     private static ProblemDetail problem(HttpStatus status, String code, String detail) {

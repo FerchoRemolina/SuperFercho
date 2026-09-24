@@ -6,4 +6,6 @@ import java.util.UUID;
 public interface AccessTokenIssuer {
 
     IssuedAccessToken issue(UUID userId, Role role);
+
+    IssuedAccessToken issue(UUID userId, Role role, UUID previewId);
 }

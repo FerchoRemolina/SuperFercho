@@ -43,4 +43,8 @@ public interface OrderJpaRepository extends JpaRepository<OrderJpaEntity, UUID> 
             @Param("cancelledAt") Instant cancelledAt,
             @Param("updatedAt") Instant updatedAt,
             @Param("pendingStatus") OrderStatus pendingStatus);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    void deleteAllByCustomerId(UUID customerId);
 }

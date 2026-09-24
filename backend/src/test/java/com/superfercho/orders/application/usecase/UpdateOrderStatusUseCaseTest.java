@@ -14,6 +14,7 @@ import com.superfercho.orders.application.dto.UpdateOrderStatusCommand;
 import com.superfercho.orders.application.exception.InvalidOrderStatusUpdateException;
 import com.superfercho.orders.application.port.ClockProvider;
 import com.superfercho.orders.application.port.OrderRepository;
+import com.superfercho.orders.application.port.PreviewCustomerExclusionPort;
 import com.superfercho.orders.domain.exception.InvalidOrderStateTransitionException;
 import com.superfercho.orders.domain.model.Order;
 import com.superfercho.orders.domain.model.OrderItem;
@@ -47,12 +48,17 @@ class UpdateOrderStatusUseCaseTest {
     @Mock
     private ClockProvider clockProvider;
 
+    @Mock
+    private PreviewCustomerExclusionPort previewCustomerExclusionPort;
+
     private UpdateOrderStatusUseCase updateOrderStatus;
 
     @BeforeEach
     void setUp() {
-        updateOrderStatus = new UpdateOrderStatusUseCase(orderRepository, clockProvider);
+        updateOrderStatus =
+                new UpdateOrderStatusUseCase(orderRepository, clockProvider, previewCustomerExclusionPort);
         when(clockProvider.currentTime()).thenReturn(NOW);
+        lenient().when(previewCustomerExclusionPort.isPreviewTemporaryCustomer(any())).thenReturn(false);
         lenient().when(orderRepository.saveIfPending(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         lenient().when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }

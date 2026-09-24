@@ -9,6 +9,7 @@ import com.superfercho.orders.application.port.CustomerAddressPort;
 import com.superfercho.orders.application.port.IdempotencyPort;
 import com.superfercho.orders.application.port.OrderRepository;
 import com.superfercho.orders.application.port.PaymentPort;
+import com.superfercho.orders.application.port.PreviewCustomerExclusionPort;
 import com.superfercho.orders.application.port.ProductCatalogPort;
 import com.superfercho.orders.application.port.ShoppingCartPort;
 import com.superfercho.orders.application.port.in.CancelOrderUseCase;
@@ -80,6 +81,11 @@ class OrdersUseCaseConfigurationTest {
         @Bean
         IdempotencyPort idempotencyPort() {
             return Mockito.mock(IdempotencyPort.class);
+        }
+
+        @Bean
+        PreviewCustomerExclusionPort previewCustomerExclusionPort() {
+            return customerId -> false;
         }
 
         @Bean

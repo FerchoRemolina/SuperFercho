@@ -62,4 +62,9 @@ public class AddressPersistenceAdapter implements AddressRepository {
                 .map(addressPersistenceMapper::toDomain)
                 .toList();
     }
+
+    @Override
+    public void deleteAllByUserId(UUID userId) {
+        addressJpaRepository.deleteByUserId(userId);
+    }
 }

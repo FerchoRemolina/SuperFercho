@@ -14,4 +14,6 @@ public interface FavoriteRepositoryPort {
     List<Favorite> findAllByCustomerId(UUID customerId);
 
     void deleteByCustomerIdAndProductId(UUID customerId, UUID productId);
+
+    void deleteAllByCustomerId(UUID customerId);
 }

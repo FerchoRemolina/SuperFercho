@@ -2,6 +2,7 @@ package com.superfercho.payments.infrastructure.configuration;
 
 import com.superfercho.payments.application.port.ClockPort;
 import com.superfercho.payments.application.port.PaymentRepository;
+import com.superfercho.payments.application.usecase.DeletePaymentUseCase;
 import com.superfercho.payments.application.usecase.GetPaymentUseCase;
 import com.superfercho.payments.application.usecase.ProcessPaymentUseCase;
 import com.superfercho.payments.application.usecase.RefundPaymentUseCase;
@@ -33,5 +34,10 @@ public class PaymentsUseCaseConfiguration {
     @Bean
     RefundPaymentUseCase refundPaymentUseCase(PaymentRepository paymentRepository, ClockPort paymentsClockPort) {
         return new RefundPaymentUseCase(paymentRepository, paymentsClockPort);
+    }
+
+    @Bean
+    DeletePaymentUseCase deletePaymentUseCase(PaymentRepository paymentRepository) {
+        return new DeletePaymentUseCase(paymentRepository);
     }
 }

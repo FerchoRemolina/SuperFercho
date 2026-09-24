@@ -9,6 +9,7 @@ import com.superfercho.orders.application.exception.InvalidOrderStatusUpdateExce
 import com.superfercho.orders.application.exception.OrderNotFoundException;
 import com.superfercho.orders.application.exception.OrderOwnershipException;
 import com.superfercho.orders.application.exception.PaymentDeclinedException;
+import com.superfercho.orders.application.exception.PreviewCustomerOrderUpdateNotAllowedException;
 import com.superfercho.orders.application.exception.ProductNotAvailableException;
 import com.superfercho.orders.application.exception.ProductPriceChangedException;
 import com.superfercho.orders.application.exception.StockUnavailableException;
@@ -93,6 +94,11 @@ public class OrdersExceptionHandler {
     @ExceptionHandler(InvalidOrderStatusUpdateException.class)
     ProblemDetail handleInvalidOrderStatusUpdate(InvalidOrderStatusUpdateException exception) {
         return problem(HttpStatus.BAD_REQUEST, "INVALID_ORDER_STATUS_UPDATE", exception.getMessage());
+    }
+
+    @ExceptionHandler(PreviewCustomerOrderUpdateNotAllowedException.class)
+    ProblemDetail handlePreviewCustomerOrderUpdate(PreviewCustomerOrderUpdateNotAllowedException exception) {
+        return problem(HttpStatus.CONFLICT, "PREVIEW_CUSTOMER_ORDER_UPDATE_NOT_ALLOWED", exception.getMessage());
     }
 
     @ExceptionHandler(PaymentNotFoundException.class)
