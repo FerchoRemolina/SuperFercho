@@ -2,7 +2,7 @@ import { request } from "@/shared/api/client";
 import type { Money } from "@/shared/money/money";
 
 export type CategoryStatus = "ACTIVE" | "INACTIVE";
-export type ProductStatus = "ACTIVE" | "INACTIVE";
+export type ProductStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
 
 /** Mirrors CategoryRestResponse for GET /api/v1/categories. */
 export type Category = {
