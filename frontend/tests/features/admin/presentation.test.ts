@@ -170,7 +170,8 @@ describe("admin presentation", () => {
 
     expect(lowStock.map((product) => product.id)).toEqual(["a", "b"]);
     expect(outOfStock.map((product) => product.id)).toEqual(["d"]);
-    expect(ADMIN_STOCK_LOW_EMPTY_MESSAGE).toMatch(/1 a 5/);
+    expect(ADMIN_STOCK_LOW_EMPTY_MESSAGE).toMatch(/reposición/i);
+    expect(ADMIN_STOCK_LOW_EMPTY_MESSAGE).not.toMatch(/1 a 5/);
     expect(ADMIN_STOCK_OUT_EMPTY_MESSAGE).toMatch(/agotados/i);
   });
 

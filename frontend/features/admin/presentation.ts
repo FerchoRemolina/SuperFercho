@@ -71,14 +71,14 @@ export function canRestoreProduct(status: ProductStatus): boolean {
   return status === "ARCHIVED";
 }
 
-/** Inclusive upper bound for Admin Hub “Próximos a agotarse” (ACTIVE only). */
+/** Inclusive upper bound for Admin Hub “Quedan pocas unidades” (ACTIVE only). */
 export const ADMIN_STOCK_LOW_MAX = 5;
 
 export const ADMIN_STOCK_LOW_EMPTY_MESSAGE =
-  "No hay productos activos con stock bajo (1 a 5 unidades).";
+  "No hay productos que necesiten reposición en este momento.";
 
 export const ADMIN_STOCK_OUT_EMPTY_MESSAGE =
-  "No hay productos activos agotados.";
+  "No hay productos agotados en este momento.";
 
 export type AdminStockAttentionBuckets = {
   lowStock: AdminProduct[];

@@ -102,3 +102,79 @@ export function PackageIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function FolderIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l1.5 2H19.5A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-10z" />
+    </Icon>
+  );
+}
+
+export function ClipboardListIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M9 4h6" />
+      <path d="M8 4.5h8A1.5 1.5 0 0 1 17.5 6v14A1.5 1.5 0 0 1 16 21.5H8A1.5 1.5 0 0 1 6.5 20V6A1.5 1.5 0 0 1 8 4.5z" />
+      <path d="M9 11h6M9 15h4" />
+    </Icon>
+  );
+}
+
+export function BookIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v16.5H6.5A1.5 1.5 0 0 0 5 21" />
+      <path d="M5 4.5v16.5" />
+      <path d="M9 8h6M9 12h5" />
+    </Icon>
+  );
+}
+
+export function CheckCircleIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="8.25" />
+      <path d="M8.5 12.25l2.25 2.25L15.5 9.5" />
+    </Icon>
+  );
+}
+
+export function SparklesIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3.5l1.1 3.4L16.5 8l-3.4 1.1L12 12.5l-1.1-3.4L7.5 8l3.4-1.1L12 3.5z" />
+      <path d="M18.5 13.5l.6 1.8 1.8.6-1.8.6-.6 1.8-.6-1.8-1.8-.6 1.8-.6.6-1.8z" />
+      <path d="M5.5 14.5l.55 1.65L7.7 16.7l-1.65.55L5.5 18.9l-.55-1.65L3.3 16.7l1.65-.55.55-1.65z" />
+    </Icon>
+  );
+}
+
+export function TagIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3.5 12.5V5.5A2 2 0 0 1 5.5 3.5h7l8 8-7 7-8-8z" />
+      <circle cx="8" cy="8" r="1.25" />
+    </Icon>
+  );
+}
+
+export function EyeIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" />
+      <circle cx="12" cy="12" r="2.75" />
+    </Icon>
+  );
+}
+
+export function RefreshIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4.5 12a7.5 7.5 0 0 1 12.7-5.4" />
+      <path d="M17.5 4.5v4h-4" />
+      <path d="M19.5 12a7.5 7.5 0 0 1-12.7 5.4" />
+      <path d="M6.5 19.5v-4h4" />
+    </Icon>
+  );
+}

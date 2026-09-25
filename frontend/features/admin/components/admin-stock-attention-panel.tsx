@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import type { AdminProduct } from "@/features/admin/api";
+import { HubStockEmptyArt } from "@/features/admin/components/admin-hub-art";
 import {
   useAdminCategoriesQuery,
   useAdminProductsQuery,
@@ -20,7 +21,11 @@ import { messageForApiProblem } from "@/shared/errors/messages";
 import { Alert } from "@/shared/ui/alert";
 import { buttonClassName } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
-import { PackageIcon, WarningIcon } from "@/shared/ui/icons";
+import {
+  CheckCircleIcon,
+  PackageIcon,
+  WarningIcon,
+} from "@/shared/ui/icons";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { cx } from "@/shared/utils/cx";
 
@@ -47,50 +52,62 @@ export function AdminStockAttentionPanel() {
   const failed = productsQuery.isError;
 
   return (
-    <section className="mt-10 grid gap-6" aria-labelledby="admin-stock-heading">
-      <div>
-        <h2
-          id="admin-stock-heading"
-          className="text-xl font-bold tracking-tight text-sf-ink md:text-2xl"
-        >
-          Stock
-        </h2>
-        <p className="mt-1 max-w-2xl text-sm text-sf-muted md:text-base">
-          Productos activos que necesitan reposición. Los inactivos y archivados
-          no aparecen aquí.
-        </p>
-      </div>
-
-      {loading ? <StockPanelSkeleton /> : null}
-
-      {failed ? (
-        <Alert tone="error" title="No se pudieron cargar los productos.">
-          {isApiError(productsQuery.error)
-            ? messageForApiProblem(productsQuery.error.problem)
-            : "No se pudo completar la solicitud."}
-        </Alert>
-      ) : null}
-
-      {!loading && !failed ? (
-        <div className="grid gap-5">
-          <StockAttentionSection
-            kind="low"
-            title="Próximos a agotarse"
-            description="Activos con stock entre 1 y 5 unidades."
-            emptyMessage={ADMIN_STOCK_LOW_EMPTY_MESSAGE}
-            products={buckets.lowStock}
-            categoriesById={categoriesById}
-          />
-          <StockAttentionSection
-            kind="out"
-            title="Agotados"
-            description="Activos con stock en cero."
-            emptyMessage={ADMIN_STOCK_OUT_EMPTY_MESSAGE}
-            products={buckets.outOfStock}
-            categoriesById={categoriesById}
-          />
+    <section
+      className="mt-10 md:mt-12"
+      aria-labelledby="admin-stock-heading"
+    >
+      <div
+        className={cx(
+          "rounded-3xl border border-sf-border/90 bg-sf-bg/90 p-4",
+          "shadow-[0_2px_10px_rgba(23,33,27,0.04)] md:p-6",
+        )}
+      >
+        <div className="mb-5 flex items-center gap-3 px-1">
+          <span
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-800 ring-1 ring-amber-200/80"
+            aria-hidden="true"
+          >
+            <PackageIcon className="h-6 w-6" />
+          </span>
+          <h2
+            id="admin-stock-heading"
+            className="text-xl font-bold tracking-tight text-sf-ink md:text-2xl"
+          >
+            Control de inventario
+          </h2>
         </div>
-      ) : null}
+
+        {loading ? <StockPanelSkeleton /> : null}
+
+        {failed ? (
+          <Alert tone="error" title="No se pudieron cargar los productos.">
+            {isApiError(productsQuery.error)
+              ? messageForApiProblem(productsQuery.error.problem)
+              : "No se pudo completar la solicitud."}
+          </Alert>
+        ) : null}
+
+        {!loading && !failed ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            <StockAttentionSection
+              kind="low"
+              title="Quedan pocas unidades"
+              emptyTitle="¡Todo bajo control!"
+              emptyMessage={ADMIN_STOCK_LOW_EMPTY_MESSAGE}
+              products={buckets.lowStock}
+              categoriesById={categoriesById}
+            />
+            <StockAttentionSection
+              kind="out"
+              title="Agotados"
+              emptyTitle="Sin productos agotados"
+              emptyMessage={ADMIN_STOCK_OUT_EMPTY_MESSAGE}
+              products={buckets.outOfStock}
+              categoriesById={categoriesById}
+            />
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -98,14 +115,14 @@ export function AdminStockAttentionPanel() {
 function StockAttentionSection({
   kind,
   title,
-  description,
+  emptyTitle,
   emptyMessage,
   products,
   categoriesById,
 }: {
   kind: StockSectionKind;
   title: string;
-  description: string;
+  emptyTitle: string;
   emptyMessage: string;
   products: AdminProduct[];
   categoriesById: Map<string, string>;
@@ -117,55 +134,60 @@ function StockAttentionSection({
   return (
     <Card
       className={cx(
-        "overflow-hidden p-0 transition-shadow duration-200",
+        "overflow-hidden p-0 transition-shadow duration-200 hover:shadow-[0_8px_20px_rgba(23,33,27,0.06)]",
         isLow
-          ? "border-sf-warning/25 shadow-[0_1px_2px_rgba(181,71,8,0.06)]"
-          : "border-sf-error/25 shadow-[0_1px_2px_rgba(217,45,32,0.06)]",
+          ? "border-amber-200/90 bg-amber-50/40 shadow-[0_1px_2px_rgba(181,71,8,0.05)]"
+          : "border-red-200/90 bg-red-50/35 shadow-[0_1px_2px_rgba(217,45,32,0.05)]",
       )}
     >
       <div
         className={cx(
-          "flex items-start gap-3 border-b px-4 py-4 md:px-5",
+          "flex items-center justify-between gap-3 border-b px-4 py-4 md:px-5",
           isLow
-            ? "border-sf-warning/15 bg-amber-50/70"
-            : "border-sf-error/15 bg-red-50/60",
+            ? "border-amber-100/90 bg-amber-50/80"
+            : "border-red-100/90 bg-red-50/70",
         )}
       >
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className={cx(
+              "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+              isLow
+                ? "bg-amber-100 text-amber-700"
+                : "bg-red-100 text-red-700",
+            )}
+            aria-hidden="true"
+          >
+            {isLow ? (
+              <WarningIcon className="h-5 w-5" />
+            ) : (
+              <PackageIcon className="h-5 w-5" />
+            )}
+          </span>
+          <h3 className="truncate text-base font-semibold text-sf-ink md:text-lg">
+            {title}
+          </h3>
+        </div>
         <span
           className={cx(
-            "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+            "inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums",
             isLow
-              ? "bg-sf-warning/10 text-sf-warning"
-              : "bg-sf-error/10 text-sf-error",
+              ? "bg-amber-100 text-amber-800"
+              : "bg-red-100 text-red-800",
           )}
-          aria-hidden="true"
         >
-          {isLow ? <WarningIcon /> : <PackageIcon />}
+          {countLabel}
         </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-semibold text-sf-ink md:text-lg">
-              {title}
-            </h3>
-            <span
-              className={cx(
-                "inline-flex rounded-lg px-2 py-0.5 text-xs font-semibold tabular-nums",
-                isLow
-                  ? "bg-sf-warning/10 text-sf-warning"
-                  : "bg-sf-error/10 text-sf-error",
-              )}
-            >
-              {countLabel}
-            </span>
-          </div>
-          <p className="mt-0.5 text-sm text-sf-muted">{description}</p>
-        </div>
       </div>
 
       {products.length === 0 ? (
-        <p className="px-4 py-6 text-sm text-sf-muted md:px-5">{emptyMessage}</p>
+        <StockEmptyState
+          kind={kind}
+          title={emptyTitle}
+          message={emptyMessage}
+        />
       ) : (
-        <ul className="divide-y divide-sf-border/80">
+        <ul className="divide-y divide-sf-border/70 bg-sf-surface/90">
           {products.map((product) => (
             <StockAttentionRow
               key={product.id}
@@ -177,6 +199,49 @@ function StockAttentionSection({
         </ul>
       )}
     </Card>
+  );
+}
+
+function StockEmptyState({
+  kind,
+  title,
+  message,
+}: {
+  kind: StockSectionKind;
+  title: string;
+  message: string;
+}) {
+  const isLow = kind === "low";
+  return (
+    <div
+      className={cx(
+        "flex min-h-[16rem] flex-col items-center justify-center px-5 py-10 text-center md:min-h-[17rem] md:px-8",
+        isLow ? "bg-amber-50/30" : "bg-red-50/20",
+      )}
+    >
+      {isLow ? (
+        <span
+          className="mb-1 h-[5.5rem] w-[6.5rem] text-amber-700/80 md:h-24 md:w-[7.25rem]"
+          aria-hidden="true"
+        >
+          <HubStockEmptyArt />
+        </span>
+      ) : (
+        <span
+          className="relative mb-1 flex h-16 w-16 items-center justify-center rounded-2xl bg-sf-surface text-sf-primary shadow-sm ring-1 ring-sf-border"
+          aria-hidden="true"
+        >
+          <PackageIcon className="h-8 w-8 opacity-80" />
+          <span className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 ring-2 ring-sf-surface">
+            <CheckCircleIcon className="h-3.5 w-3.5" />
+          </span>
+        </span>
+      )}
+      <p className="mt-4 text-lg font-bold tracking-tight text-sf-ink">{title}</p>
+      <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-sf-muted">
+        {message}
+      </p>
+    </div>
   );
 }
 
@@ -200,14 +265,16 @@ function StockAttentionRow({
     <li>
       <div
         className={cx(
-          "grid gap-3 px-4 py-3.5 transition-colors duration-150 hover:bg-sf-bg/80 md:px-5",
-          "md:grid-cols-[3.5rem_minmax(0,1fr)_auto_auto] md:items-center md:gap-4",
+          "grid gap-3 px-4 py-3.5 transition-colors duration-150 hover:bg-sf-bg/90 md:px-5 md:items-center md:gap-4",
+          isLow
+            ? "md:grid-cols-[3.25rem_minmax(0,1fr)_auto_auto]"
+            : "md:grid-cols-[3.25rem_minmax(0,1fr)_auto]",
         )}
       >
         <div className="flex min-w-0 items-start gap-3 md:contents">
           <Link
             href={href}
-            className="block w-14 shrink-0 overflow-hidden rounded-xl ring-1 ring-sf-border/80 transition-transform duration-150 hover:scale-[1.02] md:w-14"
+            className="block w-14 shrink-0 overflow-hidden rounded-xl ring-1 ring-sf-border/80 transition-transform duration-150 hover:scale-[1.02] md:w-[3.25rem]"
             aria-label={product.name}
           >
             <ProductImage
@@ -235,32 +302,23 @@ function StockAttentionRow({
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 md:contents">
-          <div
-            className={cx(
-              "flex items-baseline gap-1.5 md:justify-self-end",
-              "rounded-xl px-3 py-2",
-              isLow ? "bg-amber-50/90" : "bg-red-50/80",
-            )}
-          >
-            <span className="text-xs font-semibold uppercase tracking-wide text-sf-muted">
-              Stock
-            </span>
-            <span
-              className={cx(
-                "text-xl font-bold tabular-nums leading-none",
-                isLow ? "text-sf-warning" : "text-sf-error",
-              )}
-            >
-              {product.stock}
-            </span>
-          </div>
+          {isLow ? (
+            <div className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-amber-800 md:justify-self-end">
+              Stock {product.stock}
+            </div>
+          ) : null}
 
           <div className="md:justify-self-end">
             <Link
               href={href}
               className={buttonClassName(
                 "secondary",
-                "w-full min-w-[8.5rem] transition-transform duration-150 hover:-translate-y-px sm:w-auto",
+                cx(
+                  "min-h-9 w-full min-w-[7.25rem] px-3 py-1.5 text-xs font-semibold",
+                  "border-sf-border bg-sf-bg text-sf-ink",
+                  "hover:border-sf-border hover:bg-sf-surface",
+                  "transition-colors duration-150 sm:w-auto",
+                ),
               )}
             >
               Ver producto
@@ -274,18 +332,17 @@ function StockAttentionRow({
 
 function StockPanelSkeleton() {
   return (
-    <div className="grid gap-5" aria-hidden="true">
+    <div className="grid gap-4 md:grid-cols-2" aria-hidden="true">
       {[0, 1].map((section) => (
         <Card key={section} className="grid gap-3 p-4 md:p-5">
           <div className="flex items-center gap-3">
             <Skeleton className="h-10 w-10 rounded-xl" />
             <div className="grid flex-1 gap-2">
               <Skeleton className="h-5 w-48" />
-              <Skeleton className="h-4 w-64 max-w-full" />
+              <Skeleton className="h-4 w-24 max-w-full" />
             </div>
           </div>
-          <Skeleton className="h-16 w-full rounded-xl" />
-          <Skeleton className="h-16 w-full rounded-xl" />
+          <Skeleton className="h-28 w-full rounded-xl" />
         </Card>
       ))}
     </div>
