@@ -80,7 +80,7 @@ import org.springframework.test.web.servlet.ResultMatcher;
 @TestPropertySource(
         properties = {
             "superfercho.security.jwt.secret=test-only-superfercho-jwt-secret-key-32b",
-            "superfercho.security.jwt.expiration=15m"
+            "superfercho.security.jwt.expiration=20m"
         })
 class HttpAuthorizationSecurityTest {
 

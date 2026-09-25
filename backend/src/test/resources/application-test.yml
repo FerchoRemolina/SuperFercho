@@ -12,4 +12,4 @@ superfercho:
   security:
     jwt:
       secret: test-only-superfercho-jwt-secret-key-32b
-      expiration: 15m
+      expiration: 20m

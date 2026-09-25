@@ -27,7 +27,7 @@ class JwtAccessTokenServiceTest {
         AuthenticatedUserPrincipal principal = service.parse(issued.token()).orElseThrow();
         assertEquals(USER_ID, principal.userId());
         assertEquals(Role.CUSTOMER, principal.role());
-        assertEquals(ISSUED_AT.plus(Duration.ofMinutes(15)), issued.expiresAt());
+        assertEquals(ISSUED_AT.plus(Duration.ofMinutes(20)), issued.expiresAt());
     }
 
     @Test
@@ -45,7 +45,7 @@ class JwtAccessTokenServiceTest {
         IssuedAccessToken issued = issuer.issue(USER_ID, Role.CUSTOMER);
 
         JwtAccessTokenService parser =
-                service(Clock.fixed(ISSUED_AT.plus(Duration.ofMinutes(16)), ZoneOffset.UTC));
+                service(Clock.fixed(ISSUED_AT.plus(Duration.ofMinutes(21)), ZoneOffset.UTC));
 
         assertTrue(parser.parse(issued.token()).isEmpty());
     }
@@ -65,7 +65,7 @@ class JwtAccessTokenServiceTest {
         IssuedAccessToken issued = issuer.issue(USER_ID, Role.CUSTOMER);
 
         JwtAccessTokenService otherSecret = new JwtAccessTokenService(
-                new JwtProperties("other-only-superfercho-jwt-secret-key-32b", Duration.ofMinutes(15)),
+                new JwtProperties("other-only-superfercho-jwt-secret-key-32b", Duration.ofMinutes(20)),
                 Clock.fixed(ISSUED_AT, ZoneOffset.UTC));
 
         assertTrue(otherSecret.parse(issued.token()).isEmpty());
@@ -88,6 +88,6 @@ class JwtAccessTokenServiceTest {
     }
 
     private static JwtAccessTokenService service(Clock clock) {
-        return new JwtAccessTokenService(new JwtProperties(SECRET, Duration.ofMinutes(15)), clock);
+        return new JwtAccessTokenService(new JwtProperties(SECRET, Duration.ofMinutes(20)), clock);
     }
 }

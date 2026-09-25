@@ -101,8 +101,11 @@ public final class StartStorefrontPreviewUseCase {
     }
 
     private StorefrontPreviewSessionResult toSession(CustomerPreview preview, Instant now) {
-        IssuedAccessToken token =
+        IssuedAccessToken customerToken =
                 accessTokenIssuer.issue(preview.temporaryCustomerId(), Role.CUSTOMER, preview.id());
+        // Fresh Admin access token (same issuer as login) so stash survives the full preview window.
+        // Not a refresh token: Admin is already authenticated on this request.
+        IssuedAccessToken adminToken = accessTokenIssuer.issue(preview.adminUserId(), Role.ADMIN);
         long remaining = Math.max(0, Duration.between(now, preview.expiresAt()).getSeconds());
         return new StorefrontPreviewSessionResult(
                 preview.id(),
@@ -113,7 +116,9 @@ public final class StartStorefrontPreviewUseCase {
                 preview.createdAt(),
                 preview.expiresAt(),
                 remaining,
-                token.token(),
-                token.expiresAt());
+                customerToken.token(),
+                customerToken.expiresAt(),
+                adminToken.token(),
+                adminToken.expiresAt());
     }
 }

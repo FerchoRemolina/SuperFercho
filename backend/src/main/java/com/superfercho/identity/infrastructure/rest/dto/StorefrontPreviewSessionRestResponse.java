@@ -16,7 +16,9 @@ public record StorefrontPreviewSessionRestResponse(
         Instant previewExpiresAt,
         long remainingSeconds,
         String accessToken,
-        Instant accessTokenExpiresAt) {
+        Instant accessTokenExpiresAt,
+        String adminAccessToken,
+        Instant adminAccessTokenExpiresAt) {
 
     public static StorefrontPreviewSessionRestResponse from(StorefrontPreviewSessionResult result) {
         return new StorefrontPreviewSessionRestResponse(
@@ -29,6 +31,8 @@ public record StorefrontPreviewSessionRestResponse(
                 result.previewExpiresAt(),
                 result.remainingSeconds(),
                 result.accessToken(),
-                result.accessTokenExpiresAt());
+                result.accessTokenExpiresAt(),
+                result.adminAccessToken(),
+                result.adminAccessTokenExpiresAt());
     }
 }

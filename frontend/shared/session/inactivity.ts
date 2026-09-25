@@ -12,11 +12,10 @@ export type InactivityThresholds = {
   logoutMs: number;
 };
 
-export const INACTIVITY_THRESHOLDS: Record<Role, InactivityThresholds> = {
-  CUSTOMER: {
-    warningMs: 4 * 60_000,
-    logoutMs: 5 * 60_000,
-  },
+/** Only ADMIN uses inactivity timeouts. CUSTOMER uses JWT countdown instead. */
+export const INACTIVITY_THRESHOLDS: Partial<Record<Role, InactivityThresholds>> & {
+  ADMIN: InactivityThresholds;
+} = {
   ADMIN: {
     warningMs: 9 * 60_000,
     logoutMs: 10 * 60_000,

@@ -69,7 +69,7 @@ class StorefrontPreviewUseCasesTest {
                 users,
                 clock);
         CurrentUserProvider currentUser = () -> adminId;
-        AccessTokenIssuer tokens = new StubAccessTokenIssuer();
+        AccessTokenIssuer tokens = new StubAccessTokenIssuer(clock);
         PasswordHasher hasher = new StubPasswordHasher();
         start = new StartStorefrontPreviewUseCase(
                 currentUser, users, previews, hasher, tokens, finalize, clock);
@@ -89,6 +89,10 @@ class StorefrontPreviewUseCasesTest {
         assertThat(session.previewExpiresAt()).isEqualTo(NOW.plusSeconds(20 * 60));
         assertThat(session.remainingSeconds()).isEqualTo(20 * 60);
         assertThat(session.accessToken()).contains(session.temporaryCustomerId().toString());
+        assertThat(session.adminAccessToken()).contains(adminId.toString());
+        assertThat(session.adminAccessToken()).contains("ADMIN");
+        assertThat(session.accessTokenExpiresAt()).isEqualTo(NOW.plusSeconds(20 * 60));
+        assertThat(session.adminAccessTokenExpiresAt()).isEqualTo(NOW.plusSeconds(20 * 60));
         assertThat(users.findById(adminId).orElseThrow().role()).isEqualTo(Role.ADMIN);
         assertThat(users.findById(session.temporaryCustomerId()).orElseThrow().role())
                 .isEqualTo(Role.CUSTOMER);
@@ -101,7 +105,18 @@ class StorefrontPreviewUseCasesTest {
 
         assertThat(second.previewId()).isEqualTo(first.previewId());
         assertThat(second.temporaryCustomerId()).isEqualTo(first.temporaryCustomerId());
+        assertThat(second.adminAccessToken()).isNotEqualTo(first.adminAccessToken());
         assertThat(previews.findActiveByAdminUserId(adminId)).isPresent();
+    }
+
+    @Test
+    void startIssuesFreshAdminTokenAlignedWithCustomerTokenLifetime() {
+        clock.set(NOW.plusSeconds(12 * 60));
+        StorefrontPreviewSessionResult session = start.execute();
+
+        assertThat(session.adminAccessTokenExpiresAt()).isEqualTo(NOW.plusSeconds(12 * 60 + 20 * 60));
+        assertThat(session.accessTokenExpiresAt()).isEqualTo(NOW.plusSeconds(12 * 60 + 20 * 60));
+        assertThat(session.previewExpiresAt()).isEqualTo(NOW.plusSeconds(12 * 60 + 20 * 60));
     }
 
     @Test
@@ -113,7 +128,7 @@ class StorefrontPreviewUseCasesTest {
                 users,
                 previews,
                 new StubPasswordHasher(),
-                new StubAccessTokenIssuer(),
+                new StubAccessTokenIssuer(clock),
                 finalize,
                 clock);
 
@@ -239,6 +254,13 @@ class StorefrontPreviewUseCasesTest {
 
     private static final class StubAccessTokenIssuer implements AccessTokenIssuer {
 
+        private final MutableClock clock;
+        private final AtomicInteger sequence = new AtomicInteger();
+
+        private StubAccessTokenIssuer(MutableClock clock) {
+            this.clock = clock;
+        }
+
         @Override
         public IssuedAccessToken issue(UUID userId, Role role) {
             return issue(userId, role, null);
@@ -246,8 +268,8 @@ class StorefrontPreviewUseCasesTest {
 
         @Override
         public IssuedAccessToken issue(UUID userId, Role role, UUID previewId) {
-            String token = userId + ":" + role + ":" + previewId;
-            return new IssuedAccessToken(token, NOW.plusSeconds(900));
+            String token = userId + ":" + role + ":" + previewId + ":" + sequence.incrementAndGet();
+            return new IssuedAccessToken(token, clock.instant().plusSeconds(20 * 60));
         }
     }
 

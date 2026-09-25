@@ -7,7 +7,7 @@ import {
   createInactivityTracker,
   type InactivityTracker,
 } from "@/shared/session/inactivity";
-import type { Role, Session } from "@/shared/session/session";
+import type { Session } from "@/shared/session/session";
 
 const ACTIVITY_EVENTS = [
   "pointerdown",
@@ -20,7 +20,8 @@ const ACTIVITY_EVENTS = [
 
 type UseInactivitySessionArgs = {
   session: Session;
-  logout: () => void;
+  /** Admin idle logout. Customer sessions do not use inactivity. */
+  onIdleEnd: () => void;
   pathname: string;
 };
 
@@ -31,37 +32,37 @@ export type UseInactivitySessionResult = {
 
 export function useInactivitySession({
   session,
-  logout,
+  onIdleEnd,
   pathname,
 }: UseInactivitySessionArgs): UseInactivitySessionResult {
   const [warningVisible, setWarningVisible] = useState(false);
   const trackerRef = useRef<InactivityTracker | null>(null);
-  const logoutOnceRef = useRef(false);
-  const logoutRef = useRef(logout);
-  logoutRef.current = logout;
+  const idleOnceRef = useRef(false);
+  const onIdleEndRef = useRef(onIdleEnd);
+  onIdleEndRef.current = onIdleEnd;
 
-  const role: Role | null = session?.role ?? null;
+  const isAdmin = session?.role === "ADMIN";
 
   useEffect(() => {
-    if (!role) {
+    if (!isAdmin) {
       trackerRef.current?.stop();
       trackerRef.current = null;
-      logoutOnceRef.current = false;
+      idleOnceRef.current = false;
       setWarningVisible(false);
       return;
     }
 
-    logoutOnceRef.current = false;
+    idleOnceRef.current = false;
     const tracker = createInactivityTracker({
-      thresholds: INACTIVITY_THRESHOLDS[role],
+      thresholds: INACTIVITY_THRESHOLDS.ADMIN,
       onWarning: () => setWarningVisible(true),
       onWarningCleared: () => setWarningVisible(false),
       onLogout: () => {
-        if (logoutOnceRef.current) {
+        if (idleOnceRef.current) {
           return;
         }
-        logoutOnceRef.current = true;
-        logoutRef.current();
+        idleOnceRef.current = true;
+        onIdleEndRef.current();
       },
     });
     trackerRef.current = tracker;
@@ -94,14 +95,14 @@ export function useInactivitySession({
       }
       setWarningVisible(false);
     };
-  }, [role]);
+  }, [isAdmin]);
 
   useEffect(() => {
-    if (!role) {
+    if (!isAdmin) {
       return;
     }
     trackerRef.current?.recordActivity();
-  }, [pathname, role]);
+  }, [pathname, isAdmin]);
 
   const continueSession = useCallback(() => {
     trackerRef.current?.continueSession();

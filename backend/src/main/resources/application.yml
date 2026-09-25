@@ -27,7 +27,7 @@ superfercho:
   security:
     jwt:
       secret: ${SUPERFERCHO_JWT_SECRET}
-      expiration: 15m
+      expiration: 20m
   knowledge:
     openai:
       api-key: ${OPENAI_API_KEY:}

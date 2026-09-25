@@ -15,4 +15,6 @@ public record StorefrontPreviewSessionResult(
         Instant previewExpiresAt,
         long remainingSeconds,
         String accessToken,
-        Instant accessTokenExpiresAt) {}
+        Instant accessTokenExpiresAt,
+        String adminAccessToken,
+        Instant adminAccessTokenExpiresAt) {}

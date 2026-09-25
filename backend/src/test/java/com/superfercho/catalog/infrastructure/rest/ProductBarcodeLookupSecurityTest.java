@@ -27,7 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @TestPropertySource(
         properties = {
             "superfercho.security.jwt.secret=test-only-superfercho-jwt-secret-key-32b",
-            "superfercho.security.jwt.expiration=15m"
+            "superfercho.security.jwt.expiration=20m"
         })
 class ProductBarcodeLookupSecurityTest {
 

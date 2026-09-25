@@ -101,6 +101,11 @@ function storage(): SessionPersistence | null {
   return window.sessionStorage;
 }
 
+/** Shared storage accessor for session-adjacent keys (admin stash, preview meta). */
+export function getSessionPersistence(): SessionPersistence | null {
+  return storage();
+}
+
 function readPersistence(): Session {
   const store = storage();
   if (!store) {

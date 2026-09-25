@@ -4,6 +4,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "@/shared/session/session-provider";
+import { CustomerSessionCountdown } from "@/shared/session/customer-session-countdown";
+import { StorefrontPreviewBanner } from "@/shared/session/storefront-preview-banner";
 import { CartHeaderLink } from "@/features/cart/components/cart-header-link";
 import { SearchBar } from "@/features/catalog/components/search-bar";
 import { BrandLogo } from "@/shared/ui/brand-logo";
@@ -32,7 +34,14 @@ function isActivePath(pathname: string, href: string): boolean {
 }
 
 export function SiteHeader() {
-  const { session, logout } = useSession();
+  const {
+    session,
+    logout,
+    isPreview,
+    previewMeta,
+    returnToAdmin,
+    exitStorefrontPreviewMode,
+  } = useSession();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -73,7 +82,17 @@ export function SiteHeader() {
   }, [accountOpen]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-sf-border bg-sf-surface">
+    <header className="sticky top-0 z-40 bg-sf-surface">
+      {isPreview && previewMeta ? (
+        <StorefrontPreviewBanner
+          previewExpiresAt={previewMeta.previewExpiresAt}
+          onReturnToAdmin={returnToAdmin}
+          onExitPreview={() => {
+            void exitStorefrontPreviewMode();
+          }}
+        />
+      ) : null}
+      <div className="border-b border-sf-border">
       <Container className="flex h-16 items-center justify-between gap-4">
         <BrandLogo />
 
@@ -106,6 +125,7 @@ export function SiteHeader() {
         )}
 
         <div className="hidden items-center gap-2 md:flex">
+          <CustomerSessionCountdown />
           {session ? (
             <>
               {isCustomer ? (
@@ -152,8 +172,18 @@ export function SiteHeader() {
                   <div
                     role="menu"
                     aria-label="Cuenta"
-                    className="absolute right-0 mt-2 w-48 rounded-xl border border-sf-border bg-sf-surface p-2 shadow-[0_8px_24px_rgba(23,33,27,0.08)]"
+                    className="absolute right-0 mt-2 w-56 rounded-xl border border-sf-border bg-sf-surface p-2 shadow-[0_8px_24px_rgba(23,33,27,0.08)]"
                   >
+                    {isPreview ? (
+                      <div className="border-b border-sf-border px-3 py-2">
+                        <p className="text-sm font-semibold text-sf-ink">
+                          Cliente de prueba
+                        </p>
+                        <p className="text-xs text-sf-muted">
+                          Customer temporal · Modo de prueba
+                        </p>
+                      </div>
+                    ) : null}
                     {isCustomer ? (
                       <>
                         <Link
@@ -202,13 +232,33 @@ export function SiteHeader() {
                         Administración
                       </Link>
                     ) : null}
+                    {isPreview ? (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="flex min-h-11 w-full items-center rounded-lg px-3 text-left text-sm font-semibold text-sf-ink hover:bg-sf-bg"
+                        onClick={() => {
+                          setAccountOpen(false);
+                          returnToAdmin();
+                        }}
+                      >
+                        Volver a administración
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       role="menuitem"
                       className="flex min-h-11 w-full items-center rounded-lg px-3 text-left text-sm font-semibold text-sf-ink hover:bg-sf-bg"
-                      onClick={logout}
+                      onClick={() => {
+                        setAccountOpen(false);
+                        if (isPreview) {
+                          void exitStorefrontPreviewMode();
+                          return;
+                        }
+                        logout();
+                      }}
                     >
-                      Cerrar sesión
+                      {isPreview ? "Salir de preview" : "Cerrar sesión"}
                     </button>
                   </div>
                 ) : null}
@@ -343,7 +393,34 @@ export function SiteHeader() {
               ) : null}
             </nav>
             <div className="mt-3 flex flex-col gap-2 border-t border-sf-border pt-3">
-              {session ? (
+              {isPreview ? (
+                <>
+                  <p className="px-3 text-sm font-semibold text-sf-ink">
+                    Cliente de prueba
+                  </p>
+                  <p className="-mt-1 px-3 text-xs text-sf-muted">
+                    Customer temporal · Modo de prueba
+                  </p>
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      returnToAdmin();
+                    }}
+                  >
+                    Volver a administración
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void exitStorefrontPreviewMode();
+                    }}
+                  >
+                    Salir de preview
+                  </Button>
+                </>
+              ) : session ? (
                 <Button variant="secondary" onClick={logout}>
                   Cerrar sesión
                 </Button>
@@ -361,6 +438,7 @@ export function SiteHeader() {
           </Container>
         </div>
       ) : null}
+      </div>
     </header>
   );
 }
