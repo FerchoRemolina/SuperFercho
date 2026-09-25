@@ -83,6 +83,7 @@ export function AddressForm({
       <TextField
         id={`${formId}-label`}
         label="Nombre de la dirección"
+        placeholder="Ej. Casa, Oficina, Casa de mamá"
         value={values.label}
         error={fieldErrors.label}
         autoComplete="off"
@@ -90,7 +91,8 @@ export function AddressForm({
       />
       <TextField
         id={`${formId}-recipient`}
-        label="Destinatario"
+        label="Quién recibe"
+        placeholder="Nombre de quien recibe el pedido"
         value={values.recipientName}
         error={fieldErrors.recipientName}
         autoComplete="name"
@@ -98,7 +100,8 @@ export function AddressForm({
       />
       <TextField
         id={`${formId}-line`}
-        label="Dirección"
+        label="Dirección de entrega"
+        placeholder="Ej. Calle 45 # 12-34"
         value={values.addressLine}
         error={fieldErrors.addressLine}
         autoComplete="street-address"
@@ -106,7 +109,8 @@ export function AddressForm({
       />
       <TextField
         id={`${formId}-extra`}
-        label="Información adicional (opcional)"
+        label="Detalle del lugar (opcional)"
+        placeholder="Apto, torre, conjunto o cómo llegar"
         value={values.additionalInfo}
         autoComplete="off"
         onChange={(event) => update("additionalInfo", event.target.value)}
@@ -115,6 +119,7 @@ export function AddressForm({
         <TextField
           id={`${formId}-city`}
           label="Ciudad"
+          placeholder="Ej. Cúcuta"
           value={values.city}
           error={fieldErrors.city}
           autoComplete="address-level2"
@@ -123,6 +128,7 @@ export function AddressForm({
         <TextField
           id={`${formId}-department`}
           label="Departamento"
+          placeholder="Ej. Norte de Santander"
           value={values.department}
           error={fieldErrors.department}
           autoComplete="address-level1"
@@ -131,7 +137,8 @@ export function AddressForm({
       </div>
       <TextField
         id={`${formId}-phone`}
-        label="Teléfono"
+        label="Celular de contacto"
+        placeholder="10 dígitos, ej. 3001234567"
         value={values.phone}
         error={fieldErrors.phone}
         type="tel"
@@ -189,22 +196,22 @@ function validate(
 ): Partial<AddressFormValues> {
   const errors: Partial<AddressFormValues> = {};
   if (values.label.trim().length === 0) {
-    errors.label = "Escribe un nombre para identificar la dirección.";
+    errors.label = "Indica un nombre para reconocer esta dirección.";
   }
   if (values.recipientName.trim().length === 0) {
-    errors.recipientName = "Escribe el nombre del destinatario.";
+    errors.recipientName = "Indica quién recibe el pedido.";
   }
   if (values.addressLine.trim().length === 0) {
-    errors.addressLine = "Escribe la dirección.";
+    errors.addressLine = "Indica la dirección de entrega.";
   }
   if (values.city.trim().length === 0) {
-    errors.city = "Escribe la ciudad.";
+    errors.city = "Indica la ciudad.";
   }
   if (values.department.trim().length === 0) {
-    errors.department = "Escribe el departamento.";
+    errors.department = "Indica el departamento.";
   }
   if (values.phone.trim().length === 0) {
-    errors.phone = "Escribe el teléfono.";
+    errors.phone = "Indica un celular de contacto.";
   }
   return errors;
 }

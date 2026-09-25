@@ -129,7 +129,7 @@ export function AddressesPageContent() {
         <div className="mt-6 md:mt-8">
           <EmptyState
             title="No tienes direcciones"
-            description="Agrega una dirección para usarla al realizar un pedido."
+            description="Agrega tu primera dirección de entrega para pedir a domicilio."
             action={
               <button
                 type="button"
@@ -177,11 +177,10 @@ function Header() {
         ← Catálogo
       </Link>
       <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
-        Direcciones
+        Direcciones de entrega
       </h1>
       <p className="mt-2 max-w-2xl text-sm text-sf-muted md:text-base">
-        Usa estas direcciones al realizar un pedido. Solo las direcciones
-        activas están disponibles para tus pedidos.
+        Guarda dónde quieres recibir tus pedidos.
       </p>
     </div>
   );
@@ -260,7 +259,8 @@ function AddressCard({
               ¿Desactivar esta dirección?
             </p>
             <p className="text-xs leading-relaxed text-sf-muted md:text-sm">
-              Una dirección inactiva no se puede usar para realizar un pedido.
+              La dirección no se eliminará. Solo dejará de estar disponible para
+              nuevos pedidos.
             </p>
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               <Button
