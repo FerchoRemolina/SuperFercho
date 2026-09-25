@@ -81,3 +81,24 @@ export function HeartIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function WarningIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3.5L21 19.5H3L12 3.5z" />
+      <path d="M12 10v4.5" />
+      <path d="M12 17.25h.01" />
+    </Icon>
+  );
+}
+
+export function PackageIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" />
+      <path d="M12 12l8-4.5" />
+      <path d="M12 12v9" />
+      <path d="M12 12L4 7.5" />
+    </Icon>
+  );
+}

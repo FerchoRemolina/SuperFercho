@@ -31,6 +31,7 @@ import {
   documentStatusLabel,
   documentStatusTone,
   formatAdminInstant,
+  formatAdminPresentation,
   isAdminOrderStatusSubmitLocked,
   isAdminRole,
   knowledgeDocumentDeactivateConfirmation,
@@ -43,14 +44,19 @@ import {
   parseAdminOrderStatus,
   parseAdminOrdersPage,
   parseAdminOrdersStatusFilter,
+  partitionAdminStockAttention,
   paymentStatusTone,
   productStatusLabel,
   productStatusTone,
   shouldSearchAdminKnowledge,
   shouldSearchAdminProducts,
   ADMIN_NAV_LINKS,
+  ADMIN_STOCK_LOW_EMPTY_MESSAGE,
+  ADMIN_STOCK_OUT_EMPTY_MESSAGE,
+  adminProductDetailHref,
 } from "@/features/admin/presentation";
 import { productAvailabilityLabel } from "@/features/catalog/quantity";
+import type { AdminProduct } from "@/features/admin/api";
 import {
   ADMIN_DOCUMENT_STATUSES,
   ADMIN_SALES_ORDER_STATUSES,
@@ -58,6 +64,26 @@ import {
 import { ApiError } from "@/shared/errors/api-problem";
 import { formatMoney } from "@/shared/money/money";
 import { messageForApiProblem } from "@/shared/errors/messages";
+
+function adminProduct(
+  overrides: Partial<AdminProduct> & Pick<AdminProduct, "id" | "name" | "stock">,
+): AdminProduct {
+  return {
+    categoryId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    productTypeId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+    productVariantId: null,
+    presentation: { quantity: 1, unit: "UNIT" },
+    barcode: null,
+    brand: null,
+    description: null,
+    price: { amount: 1000, currency: "COP" },
+    imageUrl: null,
+    status: "ACTIVE",
+    createdAt: "2026-03-01T10:00:00Z",
+    updatedAt: "2026-03-01T10:30:00Z",
+    ...overrides,
+  };
+}
 
 describe("admin presentation", () => {
   it("detects admin role", () => {
@@ -118,6 +144,46 @@ describe("admin presentation", () => {
     expect(productAvailabilityLabel("INACTIVE", 0)).toBe("No disponible");
     expect(productAvailabilityLabel("INACTIVE", 8)).toBe("No disponible");
     expect(productAvailabilityLabel("ARCHIVED", 0)).toBe("Archivado");
+  });
+
+  it("partitions ACTIVE products for Hub stock attention", () => {
+    const products: AdminProduct[] = [
+      adminProduct({ id: "a", name: "Agua", stock: 1 }),
+      adminProduct({ id: "b", name: "Leche", stock: 5 }),
+      adminProduct({ id: "c", name: "Pan", stock: 6 }),
+      adminProduct({ id: "d", name: "Huevos", stock: 0 }),
+      adminProduct({
+        id: "e",
+        name: "Inactivo",
+        stock: 2,
+        status: "INACTIVE",
+      }),
+      adminProduct({
+        id: "f",
+        name: "Archivado",
+        stock: 0,
+        status: "ARCHIVED",
+      }),
+    ];
+
+    const { lowStock, outOfStock } = partitionAdminStockAttention(products);
+
+    expect(lowStock.map((product) => product.id)).toEqual(["a", "b"]);
+    expect(outOfStock.map((product) => product.id)).toEqual(["d"]);
+    expect(ADMIN_STOCK_LOW_EMPTY_MESSAGE).toMatch(/1 a 5/);
+    expect(ADMIN_STOCK_OUT_EMPTY_MESSAGE).toMatch(/agotados/i);
+  });
+
+  it("formats presentation and product detail href", () => {
+    expect(formatAdminPresentation({ quantity: 1, unit: "UNIT" })).toBe(
+      "1 UNIT",
+    );
+    expect(formatAdminPresentation({ quantity: 0.5, unit: "KG" })).toBe(
+      "0.5 KG",
+    );
+    expect(
+      adminProductDetailHref("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+    ).toBe("/admin/products/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
   });
 
   it("gates product status transitions", () => {

@@ -2,8 +2,10 @@ import type {
   DocumentStatus,
   ListAdminOrdersQuery,
   ListAdminProductsQuery,
+  Presentation,
   ProductTypeStatus,
   ProductVariantStatus,
+  AdminProduct,
 } from "@/features/admin/api";
 import {
   ADMIN_DOCUMENT_STATUSES,
@@ -67,6 +69,57 @@ export function canArchiveProduct(status: ProductStatus): boolean {
 
 export function canRestoreProduct(status: ProductStatus): boolean {
   return status === "ARCHIVED";
+}
+
+/** Inclusive upper bound for Admin Hub “Próximos a agotarse” (ACTIVE only). */
+export const ADMIN_STOCK_LOW_MAX = 5;
+
+export const ADMIN_STOCK_LOW_EMPTY_MESSAGE =
+  "No hay productos activos con stock bajo (1 a 5 unidades).";
+
+export const ADMIN_STOCK_OUT_EMPTY_MESSAGE =
+  "No hay productos activos agotados.";
+
+export type AdminStockAttentionBuckets = {
+  lowStock: AdminProduct[];
+  outOfStock: AdminProduct[];
+};
+
+/**
+ * Partitions Admin products for Hub stock attention.
+ * Preserves input order (catalog ordering). Only ACTIVE products are considered.
+ */
+export function partitionAdminStockAttention(
+  products: readonly AdminProduct[],
+): AdminStockAttentionBuckets {
+  const lowStock: AdminProduct[] = [];
+  const outOfStock: AdminProduct[] = [];
+  for (const product of products) {
+    if (product.status !== "ACTIVE") {
+      continue;
+    }
+    if (product.stock === 0) {
+      outOfStock.push(product);
+    } else if (product.stock >= 1 && product.stock <= ADMIN_STOCK_LOW_MAX) {
+      lowStock.push(product);
+    }
+  }
+  return { lowStock, outOfStock };
+}
+
+export function formatAdminPresentation(presentation: Presentation): string {
+  return `${formatPresentationQuantityDisplay(presentation.quantity)} ${presentation.unit}`;
+}
+
+function formatPresentationQuantityDisplay(quantity: number): string {
+  if (Number.isInteger(quantity)) {
+    return String(quantity);
+  }
+  return String(quantity);
+}
+
+export function adminProductDetailHref(productId: string): string {
+  return `/admin/products/${encodeURIComponent(productId)}`;
 }
 
 export function categoryStatusLabel(status: CategoryStatus): string {

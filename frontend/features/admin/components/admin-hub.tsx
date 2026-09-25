@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AdminStockAttentionPanel } from "@/features/admin/components/admin-stock-attention-panel";
 import { Card } from "@/shared/ui/card";
 import { Container } from "@/shared/ui/container";
 
@@ -29,7 +30,6 @@ const sections = [
   },
 ];
 
-
 export function AdminHub() {
   return (
     <Container as="main" className="py-10 md:py-16">
@@ -56,6 +56,7 @@ export function AdminHub() {
           </li>
         ))}
       </ul>
+      <AdminStockAttentionPanel />
     </Container>
   );
 }
