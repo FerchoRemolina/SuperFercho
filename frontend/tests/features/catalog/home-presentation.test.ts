@@ -44,12 +44,21 @@ describe("home customer presentation", () => {
     expect(productCard).toContain("FavoriteToggle");
     expect(productCard).toContain('session?.role === "CUSTOMER"');
     expect(productCard).toContain("line-clamp-2");
-    expect(productCard).toContain("Disponible");
-    expect(productCard).toContain("Agotado");
+    expect(productCard).toContain("productAvailabilityLabel");
     expect(productCard).not.toContain("productStockLabel");
     expect(productCard).not.toContain("product.description");
   });
+});
 
+describe("home availability labels", () => {
+  it("uses the shared availability helper on HomeProductCard", () => {
+    const card = source("features/catalog/components/home-product-card.tsx");
+    expect(card).toContain("productAvailabilityLabel");
+    expect(card).not.toContain("productStockLabel");
+  });
+});
+
+describe("home branding assets", () => {
   it("renders branding SVG assets reserved by the design system", () => {
     expect(
       existsSync(

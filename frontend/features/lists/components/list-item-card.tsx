@@ -10,6 +10,7 @@ import {
 import { ProductImage } from "@/features/catalog/components/product-image";
 import {
   canOfferAddToCart,
+  productAvailabilityLabel,
   productStockLabel,
 } from "@/features/catalog/quantity";
 import type { ShoppingListItem } from "@/features/lists/api";
@@ -41,6 +42,9 @@ export function ListItemCard({
   const stock = product?.stock;
   const offerAddToCart = canOfferAddToCart(purchasable, stock);
   const outOfStock = stock !== undefined && stock <= 0;
+  const availability = product
+    ? productAvailabilityLabel(product.status, product.stock)
+    : null;
   const stockLabel = product ? productStockLabel(product.stock) : null;
   const showStockDetail =
     purchasable &&
@@ -119,19 +123,12 @@ export function ListItemCard({
                 {formatMoney(product.price)}
               </p>
               <div className="mt-1.5">
-                {!purchasable ? (
-                  <Badge tone="danger" className="w-fit">
-                    No disponible
-                  </Badge>
-                ) : outOfStock ? (
-                  <Badge tone="danger" className="w-fit">
-                    Agotado
-                  </Badge>
-                ) : (
-                  <Badge tone="primary" className="w-fit">
-                    Disponible
-                  </Badge>
-                )}
+                <Badge
+                  tone={availability === "Disponible" ? "primary" : "danger"}
+                  className="w-fit"
+                >
+                  {availability}
+                </Badge>
               </div>
               {showStockDetail ? (
                 <p className="mt-1 text-xs text-sf-muted">{stockLabel}</p>

@@ -7,6 +7,7 @@ import { FavoriteToggle } from "@/features/favorites/components/favorite-toggle"
 import { CatalogQueryError } from "@/features/catalog/components/catalog-query-error";
 import { ProductImage } from "@/features/catalog/components/product-image";
 import { useCategoryQuery, useProductQuery } from "@/features/catalog/hooks";
+import { productAvailabilityLabel } from "@/features/catalog/quantity";
 import { AddToListControl } from "@/features/lists/components/add-to-list-control";
 import { isApiError } from "@/shared/errors/api-problem";
 import { formatMoney } from "@/shared/money/money";
@@ -17,10 +18,6 @@ import { Container } from "@/shared/ui/container";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { cx } from "@/shared/utils/cx";
-
-function detailAvailabilityLabel(available: boolean): string {
-  return available ? "Disponible" : "Agotado";
-}
 
 function brandsMatchName(brand: string, name: string): boolean {
   return brand.trim().toLocaleLowerCase("es") === name.trim().toLocaleLowerCase("es");
@@ -80,6 +77,7 @@ export function ProductDetailContent({ productId }: { productId: string }) {
   }
 
   const available = isProductAvailable(product);
+  const availability = productAvailabilityLabel(product.status, product.stock);
   const category = categoryQuery.data;
   const showFavorite = session?.role === "CUSTOMER";
   const showBrand =
@@ -123,8 +121,11 @@ export function ProductDetailContent({ productId }: { productId: string }) {
           <p className="mt-3 text-xl font-bold text-sf-ink md:mt-4 md:text-2xl">
             {formatMoney(product.price)}
           </p>
-          <Badge tone={available ? "primary" : "danger"} className="mt-3 w-fit md:mt-4">
-            {detailAvailabilityLabel(available)}
+          <Badge
+            tone={availability === "Disponible" ? "primary" : "danger"}
+            className="mt-3 w-fit md:mt-4"
+          >
+            {availability}
           </Badge>
 
           <div className="mt-5 grid gap-2 md:mt-6 md:gap-2.5">

@@ -357,7 +357,7 @@ class ProductUseCasesTest {
 
     @Test
     void shouldRejectActivateWhenProductIsArchived() {
-        Product existing = product(PRODUCT_ID, CATEGORY_ID, ProductStatus.ARCHIVED, 10, PRICE);
+        Product existing = product(PRODUCT_ID, CATEGORY_ID, ProductStatus.ARCHIVED, 0, PRICE);
         when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(existing));
 
         assertThrows(
@@ -380,7 +380,7 @@ class ProductUseCasesTest {
     }
 
     @Test
-    void shouldArchiveProduct() {
+    void shouldArchiveProductAndZeroStock() {
         Product existing = product(PRODUCT_ID, CATEGORY_ID, ProductStatus.ACTIVE, 10, PRICE);
         when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(existing));
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -388,18 +388,20 @@ class ProductUseCasesTest {
         ProductResult result = archiveProduct.execute(new ArchiveProductCommand(PRODUCT_ID));
 
         assertEquals(ProductStatus.ARCHIVED, result.status());
+        assertEquals(0, result.stock());
         assertEquals(NOW, result.updatedAt());
     }
 
     @Test
-    void shouldRestoreArchivedProductToInactive() {
-        Product existing = product(PRODUCT_ID, CATEGORY_ID, ProductStatus.ARCHIVED, 10, PRICE);
+    void shouldRestoreArchivedProductToInactiveWithZeroStock() {
+        Product existing = product(PRODUCT_ID, CATEGORY_ID, ProductStatus.ARCHIVED, 0, PRICE);
         when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(existing));
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductResult result = restoreProduct.execute(new RestoreProductCommand(PRODUCT_ID));
 
         assertEquals(ProductStatus.INACTIVE, result.status());
+        assertEquals(0, result.stock());
         assertEquals(NOW, result.updatedAt());
     }
 

@@ -50,6 +50,7 @@ import {
   shouldSearchAdminProducts,
   ADMIN_NAV_LINKS,
 } from "@/features/admin/presentation";
+import { productAvailabilityLabel } from "@/features/catalog/quantity";
 import {
   ADMIN_DOCUMENT_STATUSES,
   ADMIN_SALES_ORDER_STATUSES,
@@ -109,6 +110,14 @@ describe("admin presentation", () => {
     expect(productStatusTone("ACTIVE")).toBe("primary");
     expect(productStatusTone("INACTIVE")).toBe("neutral");
     expect(productStatusTone("ARCHIVED")).toBe("danger");
+  });
+
+  it("does not label inactive or archived stock as Agotado", () => {
+    expect(productAvailabilityLabel("ACTIVE", 0)).toBe("Agotado");
+    expect(productAvailabilityLabel("ACTIVE", 3)).toBe("Disponible");
+    expect(productAvailabilityLabel("INACTIVE", 0)).toBe("No disponible");
+    expect(productAvailabilityLabel("INACTIVE", 8)).toBe("No disponible");
+    expect(productAvailabilityLabel("ARCHIVED", 0)).toBe("Archivado");
   });
 
   it("gates product status transitions", () => {

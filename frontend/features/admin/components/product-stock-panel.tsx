@@ -7,7 +7,7 @@ import {
 } from "@/features/admin/payloads";
 import { useAdjustAdminProductStockMutation } from "@/features/admin/hooks";
 import type { Product } from "@/features/catalog/api";
-import { productStockLabel } from "@/features/catalog/quantity";
+import { productAvailabilityLabel } from "@/features/catalog/quantity";
 import { isApiError } from "@/shared/errors/api-problem";
 import { messageForApiProblem } from "@/shared/errors/messages";
 import { Button } from "@/shared/ui/button";
@@ -22,7 +22,8 @@ export function ProductStockPanel({ product }: { product: Product }) {
         <p className="mt-1 text-sm text-sf-muted">
           Stock actual:{" "}
           <span className="font-semibold text-sf-ink">
-            {product.stock} · {productStockLabel(product.stock)}
+            {product.stock} ·{" "}
+            {productAvailabilityLabel(product.status, product.stock)}
           </span>
         </p>
       </div>

@@ -313,6 +313,7 @@ class PublicCatalogVisibilityTest {
 
     private static Product product(
             UUID id, UUID categoryId, UUID typeId, UUID variantId, ProductStatus status) {
+        int stock = status == ProductStatus.ARCHIVED ? 0 : 5;
         return Product.create(
                 id,
                 categoryId,
@@ -324,7 +325,7 @@ class PublicCatalogVisibilityTest {
                 "Alpina",
                 "1L",
                 PRICE,
-                5,
+                stock,
                 null,
                 status,
                 CREATED_AT,

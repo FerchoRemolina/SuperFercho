@@ -14,7 +14,7 @@ import {
   listQueryFromSearchParams,
   shouldSearchAdminProducts,
 } from "@/features/admin/presentation";
-import { productStockLabel } from "@/features/catalog/quantity";
+import { productAvailabilityLabel } from "@/features/catalog/quantity";
 import type { ProductStatus } from "@/features/catalog/api";
 import { isApiError } from "@/shared/errors/api-problem";
 import { messageForApiProblem } from "@/shared/errors/messages";
@@ -224,7 +224,8 @@ export function AdminProductsPageContent() {
                     {formatMoney(product.price)}
                   </p>
                   <p className="text-sm text-sf-muted">
-                    Stock: {product.stock} · {productStockLabel(product.stock)}
+                    Stock: {product.stock} ·{" "}
+                    {productAvailabilityLabel(product.status, product.stock)}
                   </p>
                   <div className="grid gap-2">
                     <Link
@@ -275,7 +276,7 @@ export function AdminProductsPageContent() {
                       <span className="block font-semibold text-sf-ink">
                         {product.stock}
                       </span>
-                      {productStockLabel(product.stock)}
+                      {productAvailabilityLabel(product.status, product.stock)}
                     </td>
                     <td className="px-3 py-4">
                       <ProductStatusBadge status={product.status} />

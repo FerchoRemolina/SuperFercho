@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AddToCartButton } from "@/features/cart/components/add-to-cart-button";
 import { isProductAvailable, type Product } from "@/features/catalog/api";
 import { ProductImage } from "@/features/catalog/components/product-image";
+import { productAvailabilityLabel } from "@/features/catalog/quantity";
 import { FavoriteToggle } from "@/features/favorites/components/favorite-toggle";
 import { AddToListControl } from "@/features/lists/components/add-to-list-control";
 import { formatMoney } from "@/shared/money/money";
@@ -11,13 +12,10 @@ import { useSession } from "@/shared/session/session-provider";
 import { Badge } from "@/shared/ui/badge";
 import { cx } from "@/shared/utils/cx";
 
-function catalogAvailabilityLabel(available: boolean): string {
-  return available ? "Disponible" : "Agotado";
-}
-
 export function ProductCard({ product }: { product: Product }) {
   const { session } = useSession();
   const available = isProductAvailable(product);
+  const availability = productAvailabilityLabel(product.status, product.stock);
   const showFavorite = session?.role === "CUSTOMER";
 
   return (
@@ -53,8 +51,11 @@ export function ProductCard({ product }: { product: Product }) {
         <p className="mt-auto pt-2 text-base font-bold text-sf-ink">
           {formatMoney(product.price)}
         </p>
-        <Badge tone={available ? "primary" : "danger"} className="mt-2 w-fit">
-          {catalogAvailabilityLabel(available)}
+        <Badge
+          tone={availability === "Disponible" ? "primary" : "danger"}
+          className="mt-2 w-fit"
+        >
+          {availability}
         </Badge>
       </div>
 

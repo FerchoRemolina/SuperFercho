@@ -28,8 +28,7 @@ describe("product detail presentation", () => {
     );
     expect(detail).toContain("← Catálogo");
     expect(detail).toContain('href="/catalog"');
-    expect(detail).toContain("Disponible");
-    expect(detail).toContain("Agotado");
+    expect(detail).toContain("productAvailabilityLabel");
     expect(detail).not.toContain("productStockLabel");
     expect(detail).toContain("AddToCartButton");
     expect(detail).toContain("AddToListControl");

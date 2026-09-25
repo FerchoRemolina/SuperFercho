@@ -40,13 +40,13 @@ const actionCopy: Record<
   archive: {
     label: "Archivar",
     title: "¿Archivar este producto?",
-    body: "Se retira del catálogo comercial. No se elimina: podrás restaurarlo después a Inactivo.",
+    body: "El producto pasará a Archivado, su stock se establecerá en 0 y dejará de estar disponible en el catálogo. No se elimina: podrás restaurarlo después a Inactivo.",
     confirm: "Sí, archivar",
   },
   restore: {
     label: "Restaurar",
     title: "¿Restaurar este producto?",
-    body: `Pasará a ${productStatusLabel("INACTIVE")}. Luego podrás activarlo para volver a venderlo.`,
+    body: `Pasará a ${productStatusLabel("INACTIVE")} con stock 0. Luego podrás ajustar el stock y activarlo para volver a venderlo.`,
     confirm: "Sí, restaurar",
   },
 };

@@ -7,6 +7,7 @@ import {
   clampSelectedQuantity,
   initialSelectedQuantity,
   nextSelectedQuantity,
+  productAvailabilityLabel,
   productStockLabel,
   quantityToAddToCart,
 } from "@/features/catalog/quantity";
@@ -64,6 +65,14 @@ describe("catalog stock UX", () => {
     expect(productStockLabel(1)).toBe("1 unidad disponible");
     expect(productStockLabel(8)).toBe("8 unidades disponibles");
     expect(isProductAvailable(product)).toBe(true);
+  });
+
+  it("maps availability from status and stock", () => {
+    expect(productAvailabilityLabel("ACTIVE", 5)).toBe("Disponible");
+    expect(productAvailabilityLabel("ACTIVE", 0)).toBe("Agotado");
+    expect(productAvailabilityLabel("INACTIVE", 5)).toBe("No disponible");
+    expect(productAvailabilityLabel("INACTIVE", 0)).toBe("No disponible");
+    expect(productAvailabilityLabel("ARCHIVED", 0)).toBe("Archivado");
   });
 
   it("keeps sellability and stock independent for the cart CTA", () => {

@@ -20,7 +20,7 @@ import {
   validateUpdateAdminProduct,
 } from "@/features/admin/payloads";
 import { formatAdminInstant } from "@/features/admin/presentation";
-import { productStockLabel } from "@/features/catalog/quantity";
+import { productAvailabilityLabel } from "@/features/catalog/quantity";
 import { ProductImage } from "@/features/catalog/components/product-image";
 import { isApiError } from "@/shared/errors/api-problem";
 import { messageForApiProblem } from "@/shared/errors/messages";
@@ -167,7 +167,8 @@ export function AdminProductDetailPageContent({
               <div>
                 <dt className="text-sf-muted">Stock</dt>
                 <dd className="font-semibold text-sf-ink">
-                  {product.stock} · {productStockLabel(product.stock)}
+                  {product.stock} ·{" "}
+                  {productAvailabilityLabel(product.status, product.stock)}
                 </dd>
               </div>
               <div>

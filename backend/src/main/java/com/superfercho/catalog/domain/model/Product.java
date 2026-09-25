@@ -91,6 +91,9 @@ public final class Product {
         if (stock < 0) {
             throw new InvalidProductException("stock cannot be negative");
         }
+        if (status == ProductStatus.ARCHIVED && stock > 0) {
+            throw new InvalidProductException("ARCHIVED product must have stock 0");
+        }
         if (createdAt.isAfter(updatedAt)) {
             throw new InvalidProductException("createdAt must not be after updatedAt");
         }
@@ -160,14 +163,44 @@ public final class Product {
         if (status == ProductStatus.ARCHIVED) {
             throw new InvalidProductException("product is already ARCHIVED");
         }
-        return withStatus(ProductStatus.ARCHIVED, updatedAt);
+        return create(
+                id,
+                categoryId,
+                productTypeId,
+                productVariantId,
+                presentation,
+                barcode,
+                name,
+                brand,
+                description,
+                price,
+                0,
+                imageUrl,
+                ProductStatus.ARCHIVED,
+                createdAt,
+                updatedAt);
     }
 
     public Product restore(Instant updatedAt) {
         if (status != ProductStatus.ARCHIVED) {
             throw new InvalidProductException("product can only be restored when ARCHIVED");
         }
-        return withStatus(ProductStatus.INACTIVE, updatedAt);
+        return create(
+                id,
+                categoryId,
+                productTypeId,
+                productVariantId,
+                presentation,
+                barcode,
+                name,
+                brand,
+                description,
+                price,
+                0,
+                imageUrl,
+                ProductStatus.INACTIVE,
+                createdAt,
+                updatedAt);
     }
 
     public Product changePrice(Money price, Instant updatedAt) {

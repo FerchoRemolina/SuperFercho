@@ -1,5 +1,24 @@
 /** UX helpers over catalog stock. Checkout remains the inventory authority. */
 
+import type { ProductStatus } from "@/features/catalog/api";
+
+/**
+ * Availability label from status + stock (approved matrix).
+ * ACTIVE+stock>0 → Disponible; ACTIVE+0 → Agotado; INACTIVE → No disponible; ARCHIVED → Archivado.
+ */
+export function productAvailabilityLabel(
+  status: ProductStatus,
+  stock: number,
+): string {
+  if (status === "ARCHIVED") {
+    return "Archivado";
+  }
+  if (status === "INACTIVE") {
+    return "No disponible";
+  }
+  return stock > 0 ? "Disponible" : "Agotado";
+}
+
 export function productStockLabel(stock: number): string {
   if (stock <= 0) {
     return "Agotado";

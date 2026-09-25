@@ -200,7 +200,7 @@ class ProductTest {
 
     @Test
     void shouldRejectActivateWhenProductIsArchived() {
-        Product archived = validProduct().status(ProductStatus.ARCHIVED).build();
+        Product archived = validProduct().status(ProductStatus.ARCHIVED).stock(0).build();
 
         assertThrows(InvalidProductException.class, () -> archived.activate(LATER));
     }
@@ -227,52 +227,84 @@ class ProductTest {
 
     @Test
     void shouldRejectDeactivateWhenProductIsArchived() {
-        Product archived = validProduct().status(ProductStatus.ARCHIVED).build();
+        Product archived = validProduct().status(ProductStatus.ARCHIVED).stock(0).build();
 
         assertThrows(InvalidProductException.class, () -> archived.deactivate(LATER));
     }
 
     @Test
-    void shouldArchiveActiveProduct() {
-        Product active = validProduct().build();
+    void shouldArchiveActiveProductAndZeroStock() {
+        Product active = validProduct().stock(10).build();
 
         Product archived = active.archive(LATER);
 
         assertEquals(ProductStatus.ARCHIVED, archived.status());
+        assertEquals(0, archived.stock());
         assertEquals(active.id(), archived.id());
-        assertEquals(active.stock(), archived.stock());
         assertEquals(active.price(), archived.price());
         assertEquals(active.createdAt(), archived.createdAt());
         assertEquals(LATER, archived.updatedAt());
     }
 
     @Test
-    void shouldArchiveInactiveProduct() {
-        Product inactive = validProduct().status(ProductStatus.INACTIVE).build();
+    void shouldArchiveInactiveProductAndZeroStock() {
+        Product inactive = validProduct().status(ProductStatus.INACTIVE).stock(7).build();
 
         Product archived = inactive.archive(LATER);
 
         assertEquals(ProductStatus.ARCHIVED, archived.status());
+        assertEquals(0, archived.stock());
         assertEquals(LATER, archived.updatedAt());
     }
 
     @Test
     void shouldRejectArchiveWhenProductIsAlreadyArchived() {
-        Product archived = validProduct().status(ProductStatus.ARCHIVED).build();
+        Product archived = validProduct().status(ProductStatus.ARCHIVED).stock(0).build();
 
         assertThrows(InvalidProductException.class, () -> archived.archive(LATER));
     }
 
     @Test
-    void shouldRestoreArchivedProductToInactive() {
-        Product archived = validProduct().status(ProductStatus.ARCHIVED).build();
+    void shouldRestoreArchivedProductToInactiveWithZeroStock() {
+        Product archived = validProduct().status(ProductStatus.ARCHIVED).stock(0).build();
 
         Product restored = archived.restore(LATER);
 
         assertEquals(ProductStatus.INACTIVE, restored.status());
+        assertEquals(0, restored.stock());
         assertEquals(archived.id(), restored.id());
         assertEquals(archived.createdAt(), restored.createdAt());
         assertEquals(LATER, restored.updatedAt());
+    }
+
+    @Test
+    void shouldRejectCreateWhenArchivedWithPositiveStock() {
+        assertThrows(
+                InvalidProductException.class,
+                () -> validProduct().status(ProductStatus.ARCHIVED).stock(1).build());
+    }
+
+    @Test
+    void shouldRejectStockChangeWhenArchivedWouldHavePositiveStock() {
+        Product archived = validProduct().status(ProductStatus.ARCHIVED).stock(0).build();
+
+        assertThrows(InvalidProductException.class, () -> archived.changeStock(5, LATER));
+    }
+
+    @Test
+    void shouldAllowActiveProductWithZeroStock() {
+        Product product = validProduct().stock(0).build();
+
+        assertEquals(ProductStatus.ACTIVE, product.status());
+        assertEquals(0, product.stock());
+    }
+
+    @Test
+    void shouldAllowInactiveProductToKeepStock() {
+        Product inactive = validProduct().status(ProductStatus.INACTIVE).stock(10).build();
+
+        assertEquals(ProductStatus.INACTIVE, inactive.status());
+        assertEquals(10, inactive.stock());
     }
 
     @Test
