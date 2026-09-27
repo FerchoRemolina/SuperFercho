@@ -76,4 +76,9 @@ public final class InMemoryCustomerPreviewRepository implements CustomerPreviewR
         }
         return List.copyOf(expired);
     }
+
+    @Override
+    public void deleteById(UUID previewId) {
+        byId.remove(previewId);
+    }
 }

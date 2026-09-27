@@ -52,4 +52,17 @@ public class UserPersistenceAdapter implements UserRepository {
     public Optional<User> findByEmail(String email) {
         return userJpaRepository.findByEmail(email).map(userPersistenceMapper::toDomain);
     }
+
+    @Override
+    public Optional<User> findByDocument(String documentType, String documentNumber) {
+        return userJpaRepository
+                .findByDocumentTypeAndDocumentNumber(documentType, documentNumber)
+                .map(userPersistenceMapper::toDomain);
+    }
+
+    @Override
+    public void deleteById(UUID id) {
+        userJpaRepository.deleteById(id);
+        userJpaRepository.flush();
+    }
 }

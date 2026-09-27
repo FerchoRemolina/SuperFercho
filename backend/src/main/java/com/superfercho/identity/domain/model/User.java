@@ -10,7 +10,8 @@ public final class User {
     private final UUID id;
     private final String documentType;
     private final String documentNumber;
-    private final String fullName;
+    private final String firstName;
+    private final String lastName;
     private final String email;
     private final String phone;
     private final String passwordHash;
@@ -23,7 +24,8 @@ public final class User {
             UUID id,
             String documentType,
             String documentNumber,
-            String fullName,
+            String firstName,
+            String lastName,
             String email,
             String phone,
             String passwordHash,
@@ -34,7 +36,8 @@ public final class User {
         this.id = id;
         this.documentType = documentType;
         this.documentNumber = documentNumber;
-        this.fullName = fullName;
+        this.firstName = firstName;
+        this.lastName = lastName;
         this.email = email;
         this.phone = phone;
         this.passwordHash = passwordHash;
@@ -48,7 +51,8 @@ public final class User {
             UUID id,
             String documentType,
             String documentNumber,
-            String fullName,
+            String firstName,
+            String lastName,
             String email,
             String phone,
             String passwordHash,
@@ -59,7 +63,8 @@ public final class User {
         requireNonNull(id, "id");
         requireText(documentType, "documentType");
         requireText(documentNumber, "documentNumber");
-        requireText(fullName, "fullName");
+        requireText(firstName, "firstName");
+        requireNonNull(lastName, "lastName");
         requireText(email, "email");
         requireText(phone, "phone");
         requireText(passwordHash, "passwordHash");
@@ -75,7 +80,8 @@ public final class User {
                 id,
                 documentType,
                 documentNumber,
-                fullName,
+                firstName,
+                lastName,
                 normalizeEmail(email),
                 phone,
                 passwordHash,
@@ -87,6 +93,19 @@ public final class User {
 
     public static String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    /** Visible Customer name (first name). */
+    public String displayFirstName() {
+        return firstName;
+    }
+
+    /** Full display when both parts exist: "Luis Remolina". */
+    public String displayFullName() {
+        if (lastName == null || lastName.isBlank()) {
+            return firstName;
+        }
+        return firstName + " " + lastName;
     }
 
     public UUID id() {
@@ -101,8 +120,12 @@ public final class User {
         return documentNumber;
     }
 
-    public String fullName() {
-        return fullName;
+    public String firstName() {
+        return firstName;
+    }
+
+    public String lastName() {
+        return lastName;
     }
 
     public String email() {

@@ -24,4 +24,6 @@ public interface CustomerPreviewRepository {
     Optional<CustomerPreview> claimClose(UUID previewId, Instant closedAt);
 
     List<CustomerPreview> findExpiredActive(Instant now);
+
+    void deleteById(UUID previewId);
 }

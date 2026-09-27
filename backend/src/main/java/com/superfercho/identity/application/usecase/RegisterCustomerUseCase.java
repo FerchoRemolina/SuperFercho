@@ -3,11 +3,11 @@ package com.superfercho.identity.application.usecase;
 import com.superfercho.identity.application.dto.RegisteredCustomer;
 import com.superfercho.identity.application.dto.RegisterCustomerCommand;
 import com.superfercho.identity.application.exception.DocumentAlreadyExistsException;
-import com.superfercho.identity.application.exception.InvalidRegistrationException;
 import com.superfercho.identity.application.exception.UserAlreadyExistsException;
 import com.superfercho.identity.application.port.PasswordHasher;
 import com.superfercho.identity.application.port.UserRepository;
-import com.superfercho.identity.domain.exception.InvalidUserException;
+import com.superfercho.identity.application.validation.CustomerRegistrationRules;
+import com.superfercho.identity.application.validation.CustomerRegistrationRules.ValidatedRegistration;
 import com.superfercho.identity.domain.model.Role;
 import com.superfercho.identity.domain.model.User;
 import com.superfercho.identity.domain.model.UserStatus;
@@ -29,30 +29,26 @@ public final class RegisterCustomerUseCase {
     }
 
     public RegisteredCustomer execute(RegisterCustomerCommand command) {
-        if (command.password() == null || command.password().isBlank()) {
-            throw new InvalidRegistrationException("password cannot be null or blank");
+        ValidatedRegistration validated = CustomerRegistrationRules.validate(command);
+
+        if (userRepository.existsByEmail(validated.email())) {
+            throw new UserAlreadyExistsException(validated.email());
         }
-        if (command.email() == null || command.email().isBlank()) {
-            throw new InvalidUserException("email cannot be null or blank");
+        if (userRepository.existsByDocument(validated.documentType(), validated.documentNumber())) {
+            throw new DocumentAlreadyExistsException(
+                    validated.documentType(), validated.documentNumber());
         }
 
-        String email = User.normalizeEmail(command.email());
-        if (userRepository.existsByEmail(email)) {
-            throw new UserAlreadyExistsException(email);
-        }
-        if (userRepository.existsByDocument(command.documentType(), command.documentNumber())) {
-            throw new DocumentAlreadyExistsException(command.documentType(), command.documentNumber());
-        }
-
-        String passwordHash = passwordHasher.hash(command.password());
+        String passwordHash = passwordHasher.hash(validated.password());
         Instant now = clock.instant();
         User user = User.create(
                 UUID.randomUUID(),
-                command.documentType(),
-                command.documentNumber(),
-                command.fullName(),
-                email,
-                command.phone(),
+                validated.documentType(),
+                validated.documentNumber(),
+                validated.firstName(),
+                validated.lastName(),
+                validated.email(),
+                validated.phone(),
                 passwordHash,
                 Role.CUSTOMER,
                 UserStatus.ACTIVE,

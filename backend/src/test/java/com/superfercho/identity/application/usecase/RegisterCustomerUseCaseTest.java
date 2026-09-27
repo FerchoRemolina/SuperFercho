@@ -12,7 +12,6 @@ import com.superfercho.identity.application.exception.InvalidRegistrationExcepti
 import com.superfercho.identity.application.exception.UserAlreadyExistsException;
 import com.superfercho.identity.application.fakes.FakePasswordHasher;
 import com.superfercho.identity.application.fakes.InMemoryUserRepository;
-import com.superfercho.identity.domain.exception.InvalidUserException;
 import com.superfercho.identity.domain.model.Role;
 import com.superfercho.identity.domain.model.User;
 import com.superfercho.identity.domain.model.UserStatus;
@@ -50,7 +49,8 @@ class RegisterCustomerUseCaseTest {
         assertNotNull(result.id());
         assertEquals("CC", result.documentType());
         assertEquals("12345678", result.documentNumber());
-        assertEquals("Ada Lovelace", result.fullName());
+        assertEquals("Ada", result.firstName());
+        assertEquals("Lovelace", result.lastName());
         assertEquals("ada@example.com", result.email());
         assertEquals("3001234567", result.phone());
         assertEquals(Role.CUSTOMER, result.role());
@@ -60,7 +60,8 @@ class RegisterCustomerUseCaseTest {
 
     @Test
     void shouldNormalizeEmailDuringRegistration() {
-        RegisteredCustomer result = useCase.execute(validCommand().email("  Ada.Lovelace@Example.COM  ").build());
+        RegisteredCustomer result =
+                useCase.execute(validCommand().email("  Ada.Lovelace@Example.COM  ").build());
 
         assertEquals("ada.lovelace@example.com", result.email());
         assertTrue(users.existsByEmail("ada.lovelace@example.com"));
@@ -68,11 +69,11 @@ class RegisterCustomerUseCaseTest {
 
     @Test
     void shouldHashPasswordThroughThePort() {
-        RegisteredCustomer result = useCase.execute(validCommand().password("secret-pass").build());
+        RegisteredCustomer result = useCase.execute(validCommand().password("Luis123!").build());
 
-        assertEquals("secret-pass", passwordHasher.lastRawPassword());
+        assertEquals("Luis123!", passwordHasher.lastRawPassword());
         User saved = users.findById(result.id()).orElseThrow();
-        assertEquals("hashed:secret-pass", saved.passwordHash());
+        assertEquals("hashed:Luis123!", saved.passwordHash());
     }
 
     @Test
@@ -91,7 +92,7 @@ class RegisterCustomerUseCaseTest {
         assertTrue(Arrays.stream(RegisteredCustomer.class.getRecordComponents())
                 .map(RecordComponent::getName)
                 .noneMatch(name -> name.equals("password") || name.equals("passwordHash")));
-        assertTrue(!result.toString().contains("secret"));
+        assertTrue(!result.toString().contains("Luis123!"));
         assertTrue(!result.toString().contains("hashed:"));
     }
 
@@ -101,7 +102,8 @@ class RegisterCustomerUseCaseTest {
 
         assertThrows(
                 UserAlreadyExistsException.class,
-                () -> useCase.execute(validCommand().email("ada@example.com").documentNumber("999").build()));
+                () -> useCase.execute(
+                        validCommand().email("ada@example.com").documentNumber("999").build()));
     }
 
     @Test
@@ -115,20 +117,30 @@ class RegisterCustomerUseCaseTest {
 
     @ParameterizedTest
     @NullAndEmptySource
-    @ValueSource(strings = {" ", "   "})
-    void shouldRejectRegistrationWhenPasswordIsMissing(String password) {
+    @ValueSource(strings = {" ", "   ", "secret", "luis123!"})
+    void shouldRejectRegistrationWhenPasswordIsInvalid(String password) {
         assertThrows(
                 InvalidRegistrationException.class,
                 () -> useCase.execute(validCommand().password(password).build()));
     }
 
     @Test
-    void shouldRejectRegistrationWhenRequiredUserFieldIsMissing() {
+    void shouldRejectRegistrationWhenRequiredFieldsAreInvalid() {
         assertThrows(
-                InvalidUserException.class, () -> useCase.execute(validCommand().fullName("  ").build()));
-        assertThrows(InvalidUserException.class, () -> useCase.execute(validCommand().email(null).build()));
+                InvalidRegistrationException.class,
+                () -> useCase.execute(validCommand().firstName("  ").build()));
         assertThrows(
-                InvalidUserException.class, () -> useCase.execute(validCommand().email("   ").build()));
+                InvalidRegistrationException.class,
+                () -> useCase.execute(validCommand().lastName("  ").build()));
+        assertThrows(
+                InvalidRegistrationException.class,
+                () -> useCase.execute(validCommand().email(null).build()));
+        assertThrows(
+                InvalidRegistrationException.class,
+                () -> useCase.execute(validCommand().email("   ").build()));
+        assertThrows(
+                InvalidRegistrationException.class,
+                () -> useCase.execute(validCommand().phone("2001234567").build()));
     }
 
     private static CommandBuilder validCommand() {
@@ -138,10 +150,11 @@ class RegisterCustomerUseCaseTest {
     private static final class CommandBuilder {
         private String documentType = "CC";
         private String documentNumber = "12345678";
-        private String fullName = "Ada Lovelace";
+        private String firstName = "Ada";
+        private String lastName = "Lovelace";
         private String email = "ada@example.com";
         private String phone = "3001234567";
-        private String password = "secret";
+        private String password = "Luis123!";
 
         private CommandBuilder email(String email) {
             this.email = email;
@@ -153,8 +166,18 @@ class RegisterCustomerUseCaseTest {
             return this;
         }
 
-        private CommandBuilder fullName(String fullName) {
-            this.fullName = fullName;
+        private CommandBuilder firstName(String firstName) {
+            this.firstName = firstName;
+            return this;
+        }
+
+        private CommandBuilder lastName(String lastName) {
+            this.lastName = lastName;
+            return this;
+        }
+
+        private CommandBuilder phone(String phone) {
+            this.phone = phone;
             return this;
         }
 
@@ -165,7 +188,7 @@ class RegisterCustomerUseCaseTest {
 
         private RegisterCustomerCommand build() {
             return new RegisterCustomerCommand(
-                    documentType, documentNumber, fullName, email, phone, password);
+                    documentType, documentNumber, firstName, lastName, email, phone, password);
         }
     }
 }

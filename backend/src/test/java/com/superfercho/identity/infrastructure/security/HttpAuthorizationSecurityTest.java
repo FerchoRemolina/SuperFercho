@@ -20,12 +20,15 @@ import com.superfercho.catalog.application.usecase.UpdateCategoryUseCase;
 import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.infrastructure.rest.CategoryController;
 import com.superfercho.identity.application.dto.AuthenticationResult;
+import com.superfercho.identity.application.dto.PasswordRecoveryRequestResult;
 import com.superfercho.identity.application.dto.RegisteredCustomer;
 import com.superfercho.identity.application.usecase.AddAddressUseCase;
 import com.superfercho.identity.application.usecase.AuthenticateUserUseCase;
 import com.superfercho.identity.application.usecase.DeactivateAddressUseCase;
 import com.superfercho.identity.application.usecase.ListAddressesUseCase;
 import com.superfercho.identity.application.usecase.RegisterCustomerUseCase;
+import com.superfercho.identity.application.usecase.RequestPasswordRecoveryUseCase;
+import com.superfercho.identity.application.usecase.ResetPasswordUseCase;
 import com.superfercho.identity.application.usecase.SetDefaultAddressUseCase;
 import com.superfercho.identity.application.usecase.UpdateAddressUseCase;
 import com.superfercho.identity.domain.model.Role;
@@ -33,6 +36,7 @@ import com.superfercho.identity.domain.model.UserStatus;
 import com.superfercho.identity.infrastructure.rest.AddressController;
 import com.superfercho.identity.infrastructure.rest.AuthController;
 import com.superfercho.identity.infrastructure.rest.CustomerController;
+import com.superfercho.identity.infrastructure.rest.PasswordRecoveryController;
 import com.superfercho.orders.application.dto.CheckoutResult;
 import com.superfercho.orders.application.dto.OrderItemResult;
 import com.superfercho.orders.application.dto.OrderResult;
@@ -43,7 +47,6 @@ import com.superfercho.orders.application.usecase.GetAdminOrderUseCase;
 import com.superfercho.orders.application.usecase.GetOrderUseCase;
 import com.superfercho.orders.application.usecase.ListAdminOrdersUseCase;
 import com.superfercho.orders.application.usecase.ListOrdersUseCase;
-import com.superfercho.orders.application.usecase.UpdateOrderStatusUseCase;
 import com.superfercho.orders.domain.model.OrderStatus;
 import com.superfercho.orders.infrastructure.configuration.TransactionalCancelOrderUseCase;
 import com.superfercho.orders.infrastructure.configuration.TransactionalCheckoutUseCase;
@@ -70,6 +73,7 @@ import org.springframework.test.web.servlet.ResultMatcher;
 @WebMvcTest(
         controllers = {
             AuthController.class,
+            PasswordRecoveryController.class,
             CustomerController.class,
             AddressController.class,
             CategoryController.class,
@@ -99,6 +103,12 @@ class HttpAuthorizationSecurityTest {
 
     @MockitoBean
     private AuthenticateUserUseCase authenticateUserUseCase;
+
+    @MockitoBean
+    private RequestPasswordRecoveryUseCase requestPasswordRecoveryUseCase;
+
+    @MockitoBean
+    private ResetPasswordUseCase resetPasswordUseCase;
 
     @MockitoBean
     private RegisterCustomerUseCase registerCustomerUseCase;
@@ -154,18 +164,16 @@ class HttpAuthorizationSecurityTest {
     @MockitoBean
     private ListAdminOrdersUseCase listAdminOrdersUseCase;
 
-    @MockitoBean
-    private UpdateOrderStatusUseCase updateOrderStatusUseCase;
-
     @BeforeEach
     void stubUseCases() {
         when(authenticateUserUseCase.execute(any()))
-                .thenReturn(new AuthenticationResult(USER_ID, Role.CUSTOMER, "token", NOW));
+                .thenReturn(new AuthenticationResult(USER_ID, Role.CUSTOMER, "Ada", "Lovelace", "token", NOW));
+        when(requestPasswordRecoveryUseCase.execute(any()))
+                .thenReturn(PasswordRecoveryRequestResult.generic());
         when(registerCustomerUseCase.execute(any())).thenReturn(registeredCustomer());
         when(listAddressesUseCase.execute()).thenReturn(List.of());
         when(listCategoriesUseCase.execute(any())).thenReturn(List.of());
         when(createCategoryUseCase.execute(any())).thenReturn(categoryResult());
-        when(updateOrderStatusUseCase.execute(any())).thenReturn(orderResult());
         when(listOrdersUseCase.execute(any())).thenReturn(new PagedResult<>(List.of(), 0, 20, 0));
         when(getOrderUseCase.execute(any())).thenReturn(orderResult());
         when(listAdminOrdersUseCase.execute(any())).thenReturn(new PagedResult<>(List.of(), 0, 20, 0));
@@ -185,6 +193,26 @@ class HttpAuthorizationSecurityTest {
     }
 
     @Test
+    void shouldAllowPasswordRecoveryWithoutJwt() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/password-recovery")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "ada@identity.test"}
+                                """))
+                .andExpect(notBlockedBySecurity());
+        mockMvc.perform(post("/api/v1/auth/password-recovery/reset")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "token": "raw-token",
+                                  "newPassword": "Luis123!",
+                                  "confirmPassword": "Luis123!"
+                                }
+                                """))
+                .andExpect(notBlockedBySecurity());
+    }
+
+    @Test
     void shouldAllowCustomerRegistrationWithoutJwt() throws Exception {
         mockMvc.perform(post("/api/v1/customers")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -192,7 +220,8 @@ class HttpAuthorizationSecurityTest {
                                 {
                                   "documentType": "CC",
                                   "documentNumber": "1234567890",
-                                  "fullName": "Ada Lovelace",
+                                  "firstName": "Ada",
+                                  "lastName": "Lovelace",
                                   "email": "ada@identity.test",
                                   "phone": "3001234567",
                                   "password": "secret-password"
@@ -299,27 +328,6 @@ class HttpAuthorizationSecurityTest {
                 .andExpect(notBlockedBySecurity());
     }
 
-    @Test
-    void shouldRejectOrderStatusUpdateWithCustomerJwt() throws Exception {
-        mockMvc.perform(post("/api/v1/orders/{orderId}/status", ORDER_ID)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"status": "PREPARING"}
-                                """))
-                .andExpect(accessDenied());
-    }
-
-    @Test
-    void shouldAllowOrderStatusUpdateWithAdminJwt() throws Exception {
-        mockMvc.perform(post("/api/v1/orders/{orderId}/status", ORDER_ID)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"status": "PREPARING"}
-                                """))
-                .andExpect(notBlockedBySecurity());
-    }
 
     @Test
     void shouldRejectCustomerOrdersWithoutJwt() throws Exception {
@@ -665,7 +673,8 @@ class HttpAuthorizationSecurityTest {
                 USER_ID,
                 "CC",
                 "1234567890",
-                "Ada Lovelace",
+                "Ada",
+                "Lovelace",
                 "ada@identity.test",
                 "3001234567",
                 Role.CUSTOMER,
@@ -708,7 +717,7 @@ class HttpAuthorizationSecurityTest {
         return new CheckoutResult(
                 ORDER_ID,
                 "ORD-P-1001",
-                OrderStatus.PENDING,
+                OrderStatus.CONFIRMED,
                 PaymentStatus.APPROVED,
                 Money.cop(new BigDecimal("21.00")));
     }

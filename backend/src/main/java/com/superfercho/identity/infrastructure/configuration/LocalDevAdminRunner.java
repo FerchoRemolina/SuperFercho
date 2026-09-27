@@ -24,7 +24,8 @@ public class LocalDevAdminRunner implements ApplicationRunner {
     private static final Logger LOGGER = LoggerFactory.getLogger(LocalDevAdminRunner.class);
 
     static final String DOCUMENT_TYPE = "CC";
-    static final String FULL_NAME = "Administrador local";
+    static final String FIRST_NAME = "Administrador";
+    static final String LAST_NAME = "local";
     static final String PHONE = "3000000000";
 
     private final UserRepository userRepository;
@@ -83,7 +84,8 @@ public class LocalDevAdminRunner implements ApplicationRunner {
                 existing.id(),
                 existing.documentType(),
                 existing.documentNumber(),
-                existing.fullName(),
+                existing.firstName(),
+                existing.lastName(),
                 existing.email(),
                 existing.phone(),
                 passwordHash,
@@ -102,7 +104,8 @@ public class LocalDevAdminRunner implements ApplicationRunner {
                 id,
                 DOCUMENT_TYPE,
                 documentNumberFor(id),
-                FULL_NAME,
+                FIRST_NAME,
+                LAST_NAME,
                 email,
                 PHONE,
                 passwordHasher.hash(rawPassword),

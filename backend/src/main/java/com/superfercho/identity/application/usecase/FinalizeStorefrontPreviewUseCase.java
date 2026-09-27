@@ -7,8 +7,6 @@ import com.superfercho.identity.application.port.PreviewOrdersCleanupPort;
 import com.superfercho.identity.application.port.PreviewShoppingCleanupPort;
 import com.superfercho.identity.application.port.UserRepository;
 import com.superfercho.identity.domain.model.CustomerPreview;
-import com.superfercho.identity.domain.model.User;
-import com.superfercho.identity.domain.model.UserStatus;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
@@ -16,6 +14,7 @@ import java.util.UUID;
 
 /**
  * Idempotent finalization: only the writer that successfully claims ACTIVE→CLOSED runs cleanup.
+ * After business-data cleanup, removes the preview row and the temporary customer user by id.
  */
 public final class FinalizeStorefrontPreviewUseCase {
 
@@ -59,30 +58,8 @@ public final class FinalizeStorefrontPreviewUseCase {
         previewShoppingCleanupPort.deleteAllForCustomer(temporaryCustomerId);
         addressRepository.deleteAllByUserId(temporaryCustomerId);
         previewAssistantCleanupPort.deleteAllForUser(temporaryCustomerId);
-        deactivateTemporaryUser(temporaryCustomerId, now);
+        customerPreviewRepository.deleteById(preview.id());
+        userRepository.deleteById(temporaryCustomerId);
         return true;
-    }
-
-    private void deactivateTemporaryUser(UUID temporaryCustomerId, Instant now) {
-        userRepository
-                .findById(temporaryCustomerId)
-                .ifPresent(user -> {
-                    if (user.status() == UserStatus.INACTIVE) {
-                        return;
-                    }
-                    User deactivated = User.create(
-                            user.id(),
-                            user.documentType(),
-                            user.documentNumber(),
-                            user.fullName(),
-                            user.email(),
-                            user.phone(),
-                            user.passwordHash(),
-                            user.role(),
-                            UserStatus.INACTIVE,
-                            user.createdAt(),
-                            now);
-                    userRepository.save(deactivated);
-                });
     }
 }

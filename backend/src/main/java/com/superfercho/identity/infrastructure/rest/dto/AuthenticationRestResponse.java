@@ -5,9 +5,16 @@ import com.superfercho.identity.domain.model.Role;
 import java.time.Instant;
 import java.util.UUID;
 
-public record AuthenticationRestResponse(UUID userId, Role role, String accessToken, Instant expiresAt) {
+public record AuthenticationRestResponse(
+        UUID userId, Role role, String firstName, String lastName, String accessToken, Instant expiresAt) {
 
     public static AuthenticationRestResponse from(AuthenticationResult result) {
-        return new AuthenticationRestResponse(result.userId(), result.role(), result.accessToken(), result.expiresAt());
+        return new AuthenticationRestResponse(
+                result.userId(),
+                result.role(),
+                result.firstName(),
+                result.lastName(),
+                result.accessToken(),
+                result.expiresAt());
     }
 }

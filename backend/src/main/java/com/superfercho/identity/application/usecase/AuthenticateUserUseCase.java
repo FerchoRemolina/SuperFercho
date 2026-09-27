@@ -43,6 +43,12 @@ public final class AuthenticateUserUseCase {
         }
 
         IssuedAccessToken token = accessTokenIssuer.issue(user.id(), user.role());
-        return new AuthenticationResult(user.id(), user.role(), token.token(), token.expiresAt());
+        return new AuthenticationResult(
+                user.id(),
+                user.role(),
+                user.firstName(),
+                user.lastName(),
+                token.token(),
+                token.expiresAt());
     }
 }

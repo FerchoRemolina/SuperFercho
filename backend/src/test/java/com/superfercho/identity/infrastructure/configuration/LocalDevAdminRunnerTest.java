@@ -102,7 +102,8 @@ class LocalDevAdminRunnerTest {
         assertEquals(PASSWORD, passwordHasher.lastRawPassword());
         assertEquals(LocalDevAdminRunner.DOCUMENT_TYPE, saved.documentType());
         assertEquals(saved.id().toString().replace("-", ""), saved.documentNumber());
-        assertEquals(LocalDevAdminRunner.FULL_NAME, saved.fullName());
+        assertEquals(LocalDevAdminRunner.FIRST_NAME, saved.firstName());
+        assertEquals(LocalDevAdminRunner.LAST_NAME, saved.lastName());
         assertEquals(LocalDevAdminRunner.PHONE, saved.phone());
         assertEquals(NOW, saved.createdAt());
         assertEquals(NOW, saved.updatedAt());
@@ -161,7 +162,8 @@ class LocalDevAdminRunnerTest {
         assertEquals(Role.ADMIN, updated.role());
         assertEquals(UserStatus.ACTIVE, updated.status());
         assertEquals("hashed:" + PASSWORD, updated.passwordHash());
-        assertEquals("Ada Lovelace", updated.fullName());
+        assertEquals("Ada", updated.firstName());
+        assertEquals("Lovelace", updated.lastName());
         assertEquals("12345678", updated.documentNumber());
         assertEquals(CREATED_AT, updated.createdAt());
         assertEquals(NOW, updated.updatedAt());
@@ -211,7 +213,8 @@ class LocalDevAdminRunnerTest {
                 id,
                 "CC",
                 "12345678",
-                "Ada Lovelace",
+                "Ada",
+                "Lovelace",
                 email,
                 "3001234567",
                 passwordHash,
@@ -252,6 +255,17 @@ class LocalDevAdminRunnerTest {
         @Override
         public Optional<User> findByEmail(String email) {
             return delegate.findByEmail(email);
+        }
+
+        @Override
+        public Optional<User> findByDocument(String documentType, String documentNumber) {
+            return delegate.findByDocument(documentType, documentNumber);
+        }
+
+        @Override
+        public void deleteById(UUID id) {
+            delegate.deleteById(id);
+            ids.remove(id);
         }
 
         int saveCount() {

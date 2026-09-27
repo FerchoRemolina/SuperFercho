@@ -7,7 +7,9 @@ import com.superfercho.identity.application.exception.DuplicateDefaultAddressExc
 import com.superfercho.identity.application.exception.InactiveAddressException;
 import com.superfercho.identity.application.exception.InactiveUserException;
 import com.superfercho.identity.application.exception.InvalidCredentialsException;
+import com.superfercho.identity.application.exception.InvalidPasswordRecoveryException;
 import com.superfercho.identity.application.exception.InvalidRegistrationException;
+import com.superfercho.identity.application.exception.PasswordRecoveryRateLimitedException;
 import com.superfercho.identity.application.exception.StorefrontPreviewExpiredException;
 import com.superfercho.identity.application.exception.StorefrontPreviewForbiddenException;
 import com.superfercho.identity.application.exception.StorefrontPreviewNotFoundException;
@@ -47,6 +49,16 @@ public class IdentityExceptionHandler {
     @ExceptionHandler(InvalidRegistrationException.class)
     ProblemDetail handleInvalidRegistration(InvalidRegistrationException exception) {
         return problem(HttpStatus.BAD_REQUEST, "INVALID_REGISTRATION", exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidPasswordRecoveryException.class)
+    ProblemDetail handleInvalidPasswordRecovery(InvalidPasswordRecoveryException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "INVALID_PASSWORD_RECOVERY", exception.getMessage());
+    }
+
+    @ExceptionHandler(PasswordRecoveryRateLimitedException.class)
+    ProblemDetail handlePasswordRecoveryRateLimited(PasswordRecoveryRateLimitedException exception) {
+        return problem(HttpStatus.TOO_MANY_REQUESTS, "PASSWORD_RECOVERY_RATE_LIMITED", exception.getMessage());
     }
 
     @ExceptionHandler(InvalidUserException.class)

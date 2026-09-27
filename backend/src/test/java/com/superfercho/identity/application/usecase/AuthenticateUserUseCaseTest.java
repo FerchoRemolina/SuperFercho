@@ -45,6 +45,8 @@ class AuthenticateUserUseCaseTest {
 
         assertEquals(USER_ID, result.userId());
         assertEquals(Role.CUSTOMER, result.role());
+        assertEquals("Ada", result.firstName());
+        assertEquals("Lovelace", result.lastName());
         assertEquals("token-" + USER_ID + "-CUSTOMER", result.accessToken());
         assertEquals(EXPIRES_AT, result.expiresAt());
         assertTrue(!result.toString().contains("hashed:"));
@@ -92,7 +94,8 @@ class AuthenticateUserUseCaseTest {
                 id,
                 "CC",
                 id.toString().substring(0, 8),
-                "Ada Lovelace",
+                "Ada",
+                "Lovelace",
                 email,
                 "3001234567",
                 "hashed:secret",

@@ -137,18 +137,20 @@ class StorefrontPreviewUseCasesTest {
     }
 
     @Test
-    void exitClosesPreviewAndRunsCleanupOnce() {
+    void exitClosesPreviewDeletesTemporaryUserAndPreviewRow() {
         StorefrontPreviewSessionResult session = start.execute();
+        UUID temporaryCustomerId = session.temporaryCustomerId();
+        UUID previewId = session.previewId();
 
         exit.execute();
 
-        assertThat(previews.findById(session.previewId()).orElseThrow().status())
-                .isEqualTo(CustomerPreviewStatus.CLOSED);
-        assertThat(ordersCleanup.calls).containsExactly(session.temporaryCustomerId());
-        assertThat(shoppingCleanup.calls).containsExactly(session.temporaryCustomerId());
-        assertThat(assistantCleanup.calls).containsExactly(session.temporaryCustomerId());
-        assertThat(users.findById(session.temporaryCustomerId()).orElseThrow().status())
-                .isEqualTo(UserStatus.INACTIVE);
+        assertThat(previews.findById(previewId)).isEmpty();
+        assertThat(users.findById(temporaryCustomerId)).isEmpty();
+        assertThat(users.findById(adminId)).isPresent();
+        assertThat(users.findById(adminId).orElseThrow().status()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(ordersCleanup.calls).containsExactly(temporaryCustomerId);
+        assertThat(shoppingCleanup.calls).containsExactly(temporaryCustomerId);
+        assertThat(assistantCleanup.calls).containsExactly(temporaryCustomerId);
         assertThatThrownBy(exit::execute).isInstanceOf(StorefrontPreviewNotFoundException.class);
         assertThat(ordersCleanup.calls).hasSize(1);
     }
@@ -156,26 +158,74 @@ class StorefrontPreviewUseCasesTest {
     @Test
     void getExpiresAndCleansWhenPastExpiresAt() {
         StorefrontPreviewSessionResult session = start.execute();
+        UUID temporaryCustomerId = session.temporaryCustomerId();
+        UUID previewId = session.previewId();
         clock.set(NOW.plusSeconds(20 * 60));
 
         assertThatThrownBy(get::execute).isInstanceOf(StorefrontPreviewNotFoundException.class);
-        assertThat(previews.findById(session.previewId()).orElseThrow().status())
-                .isEqualTo(CustomerPreviewStatus.CLOSED);
-        assertThat(ordersCleanup.calls).containsExactly(session.temporaryCustomerId());
+        assertThat(previews.findById(previewId)).isEmpty();
+        assertThat(users.findById(temporaryCustomerId)).isEmpty();
+        assertThat(users.findById(adminId)).isPresent();
+        assertThat(ordersCleanup.calls).containsExactly(temporaryCustomerId);
     }
 
     @Test
     void sweeperExpiresAbandonedPreviewsIdempotently() {
         StorefrontPreviewSessionResult session = start.execute();
+        UUID temporaryCustomerId = session.temporaryCustomerId();
+        UUID previewId = session.previewId();
         clock.set(NOW.plusSeconds(20 * 60 + 1));
 
         assertThat(expire.execute()).isEqualTo(1);
         assertThat(expire.execute()).isEqualTo(0);
-        assertThat(ordersCleanup.calls).containsExactly(session.temporaryCustomerId());
+        assertThat(previews.findById(previewId)).isEmpty();
+        assertThat(users.findById(temporaryCustomerId)).isEmpty();
+        assertThat(users.findById(adminId)).isPresent();
+        assertThat(ordersCleanup.calls).containsExactly(temporaryCustomerId);
     }
 
     @Test
-    void activityDoesNotExtendLifetime() {
+    void onlyClaimingWriterRunsCleanup() {
+        StorefrontPreviewSessionResult session = start.execute();
+        UUID temporaryCustomerId = session.temporaryCustomerId();
+
+        assertThat(finalize.execute(session.previewId())).isTrue();
+        assertThat(finalize.execute(session.previewId())).isFalse();
+        assertThat(ordersCleanup.calls).containsExactly(temporaryCustomerId);
+        assertThat(previews.findById(session.previewId())).isEmpty();
+        assertThat(users.findById(temporaryCustomerId)).isEmpty();
+    }
+
+    @Test
+    void cleanupOfOnePreviewDoesNotAffectAnotherPreviewOrNormalCustomer() {
+        StorefrontPreviewSessionResult previewA = start.execute();
+        UUID otherAdminId = UUID.randomUUID();
+        users.save(adminUser(otherAdminId, "admin-b@example.com"));
+        StartStorefrontPreviewUseCase startB = new StartStorefrontPreviewUseCase(
+                () -> otherAdminId,
+                users,
+                previews,
+                new StubPasswordHasher(),
+                new StubAccessTokenIssuer(clock),
+                finalize,
+                clock);
+        StorefrontPreviewSessionResult previewB = startB.execute();
+        UUID normalCustomerId = UUID.randomUUID();
+        users.save(customerUser(normalCustomerId, "normal@example.com"));
+
+        exit.execute();
+
+        assertThat(previews.findById(previewA.previewId())).isEmpty();
+        assertThat(users.findById(previewA.temporaryCustomerId())).isEmpty();
+        assertThat(previews.findById(previewB.previewId())).isPresent();
+        assertThat(users.findById(previewB.temporaryCustomerId())).isPresent();
+        assertThat(users.findById(normalCustomerId)).isPresent();
+        assertThat(users.findById(adminId)).isPresent();
+        assertThat(users.findById(otherAdminId)).isPresent();
+    }
+
+    @Test
+    void activityDoesNotExtendDuration() {
         StorefrontPreviewSessionResult first = start.execute();
         clock.set(NOW.plusSeconds(5 * 60));
         StorefrontPreviewSessionResult reused = start.execute();
@@ -190,6 +240,7 @@ class StorefrontPreviewUseCasesTest {
                 "CC",
                 "ADMIN" + id.toString().substring(0, 8),
                 "Admin",
+                "User",
                 email,
                 "3000000000",
                 "hash",
@@ -205,6 +256,7 @@ class StorefrontPreviewUseCasesTest {
                 "CC",
                 "CUST" + id.toString().substring(0, 8),
                 "Customer",
+                "User",
                 email,
                 "3000000001",
                 "hash",

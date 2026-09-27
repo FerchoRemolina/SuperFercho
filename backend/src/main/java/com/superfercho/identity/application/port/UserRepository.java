@@ -15,4 +15,8 @@ public interface UserRepository {
     boolean existsByDocument(String documentType, String documentNumber);
 
     Optional<User> findByEmail(String email);
+
+    Optional<User> findByDocument(String documentType, String documentNumber);
+
+    void deleteById(UUID id);
 }

@@ -69,4 +69,11 @@ public class CustomerPreviewPersistenceAdapter implements CustomerPreviewReposit
                 .map(CustomerPreviewPersistenceMapper::toDomain)
                 .toList();
     }
+
+    @Override
+    @Transactional
+    public void deleteById(UUID previewId) {
+        repository.deleteById(previewId);
+        repository.flush();
+    }
 }

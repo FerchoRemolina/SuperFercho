@@ -21,7 +21,10 @@ class UserTest {
         assertEquals(ID, user.id());
         assertEquals("CC", user.documentType());
         assertEquals("12345678", user.documentNumber());
-        assertEquals("Ada Lovelace", user.fullName());
+        assertEquals("Ada", user.firstName());
+        assertEquals("Lovelace", user.lastName());
+        assertEquals("Ada", user.displayFirstName());
+        assertEquals("Ada Lovelace", user.displayFullName());
         assertEquals("ada@example.com", user.email());
         assertEquals("3001234567", user.phone());
         assertEquals("hashed-password", user.passwordHash());
@@ -29,6 +32,14 @@ class UserTest {
         assertEquals(UserStatus.ACTIVE, user.status());
         assertEquals(CREATED_AT, user.createdAt());
         assertEquals(UPDATED_AT, user.updatedAt());
+    }
+
+    @Test
+    void shouldAllowBlankLastNameAndShowFirstNameAsDisplayFullName() {
+        User user = validUser().lastName("").build();
+
+        assertEquals("", user.lastName());
+        assertEquals("Ada", user.displayFullName());
     }
 
     @Test
@@ -47,8 +58,13 @@ class UserTest {
     }
 
     @Test
-    void shouldRejectUserWhenFullNameIsBlank() {
-        assertThrows(InvalidUserException.class, () -> validUser().fullName(" ").build());
+    void shouldRejectUserWhenFirstNameIsBlank() {
+        assertThrows(InvalidUserException.class, () -> validUser().firstName(" ").build());
+    }
+
+    @Test
+    void shouldRejectUserWhenLastNameIsNull() {
+        assertThrows(InvalidUserException.class, () -> validUser().lastName(null).build());
     }
 
     @Test
@@ -102,7 +118,8 @@ class UserTest {
         private UUID id = ID;
         private String documentType = "CC";
         private String documentNumber = "12345678";
-        private String fullName = "Ada Lovelace";
+        private String firstName = "Ada";
+        private String lastName = "Lovelace";
         private String email = "ada@example.com";
         private String phone = "3001234567";
         private String passwordHash = "hashed-password";
@@ -126,8 +143,13 @@ class UserTest {
             return this;
         }
 
-        private UserBuilder fullName(String fullName) {
-            this.fullName = fullName;
+        private UserBuilder firstName(String firstName) {
+            this.firstName = firstName;
+            return this;
+        }
+
+        private UserBuilder lastName(String lastName) {
+            this.lastName = lastName;
             return this;
         }
 
@@ -171,7 +193,8 @@ class UserTest {
                     id,
                     documentType,
                     documentNumber,
-                    fullName,
+                    firstName,
+                    lastName,
                     email,
                     phone,
                     passwordHash,

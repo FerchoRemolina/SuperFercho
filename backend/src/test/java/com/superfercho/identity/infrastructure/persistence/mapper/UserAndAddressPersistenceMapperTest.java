@@ -25,7 +25,8 @@ class UserAndAddressPersistenceMapperTest {
                 UUID.fromString("11111111-1111-1111-1111-111111111111"),
                 "CC",
                 "12345678",
-                "Ada Lovelace",
+                "Ada",
+                "Lovelace",
                 "ada@example.com",
                 "3001234567",
                 "hashed-password",
@@ -40,7 +41,8 @@ class UserAndAddressPersistenceMapperTest {
         assertEquals(user.id(), mapped.id());
         assertEquals(user.documentType(), mapped.documentType());
         assertEquals(user.documentNumber(), mapped.documentNumber());
-        assertEquals(user.fullName(), mapped.fullName());
+        assertEquals(user.firstName(), mapped.firstName());
+        assertEquals(user.lastName(), mapped.lastName());
         assertEquals(user.email(), mapped.email());
         assertEquals(user.phone(), mapped.phone());
         assertEquals(user.passwordHash(), mapped.passwordHash());

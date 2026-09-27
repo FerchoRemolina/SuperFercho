@@ -42,7 +42,8 @@ class AuthControllerTest {
     @Test
     void shouldAuthenticateUser() throws Exception {
         when(authenticateUserUseCase.execute(any()))
-                .thenReturn(new AuthenticationResult(USER_ID, Role.CUSTOMER, "jwt-token", EXPIRES_AT));
+                .thenReturn(new AuthenticationResult(
+                        USER_ID, Role.CUSTOMER, "Ada", "Lovelace", "jwt-token", EXPIRES_AT));
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -52,6 +53,8 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value(USER_ID.toString()))
                 .andExpect(jsonPath("$.role").value("CUSTOMER"))
+                .andExpect(jsonPath("$.firstName").value("Ada"))
+                .andExpect(jsonPath("$.lastName").value("Lovelace"))
                 .andExpect(jsonPath("$.accessToken").value("jwt-token"))
                 .andExpect(jsonPath("$.expiresAt").value(EXPIRES_AT.toString()));
 

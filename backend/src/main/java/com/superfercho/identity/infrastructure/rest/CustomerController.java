@@ -29,7 +29,8 @@ public class CustomerController {
                 registerCustomerUseCase.execute(new RegisterCustomerCommand(
                         request.documentType(),
                         request.documentNumber(),
-                        request.fullName(),
+                        request.firstName(),
+                        request.lastName(),
                         request.email(),
                         request.phone(),
                         request.password())));

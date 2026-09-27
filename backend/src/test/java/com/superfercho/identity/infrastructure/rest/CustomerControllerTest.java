@@ -55,7 +55,8 @@ class CustomerControllerTest {
                 .andExpect(jsonPath("$.id").value(CUSTOMER_ID.toString()))
                 .andExpect(jsonPath("$.documentType").value("CC"))
                 .andExpect(jsonPath("$.documentNumber").value("1234567890"))
-                .andExpect(jsonPath("$.fullName").value("Ada Lovelace"))
+                .andExpect(jsonPath("$.firstName").value("Ada"))
+                .andExpect(jsonPath("$.lastName").value("Lovelace"))
                 .andExpect(jsonPath("$.email").value("ada@identity.test"))
                 .andExpect(jsonPath("$.phone").value("3001234567"))
                 .andExpect(jsonPath("$.role").value("CUSTOMER"))
@@ -68,7 +69,8 @@ class CustomerControllerTest {
                 .execute(new RegisterCustomerCommand(
                         "CC",
                         "1234567890",
-                        "Ada Lovelace",
+                        "Ada",
+                        "Lovelace",
                         "ada@identity.test",
                         "3001234567",
                         "secret-password"));
@@ -125,7 +127,8 @@ class CustomerControllerTest {
                 {
                   "documentType": "CC",
                   "documentNumber": "1234567890",
-                  "fullName": "Ada Lovelace",
+                  "firstName": "Ada",
+                  "lastName": "Lovelace",
                   "email": "ada@identity.test",
                   "phone": "3001234567",
                   "password": "secret-password"
@@ -138,7 +141,8 @@ class CustomerControllerTest {
                 CUSTOMER_ID,
                 "CC",
                 "1234567890",
-                "Ada Lovelace",
+                "Ada",
+                "Lovelace",
                 "ada@identity.test",
                 "3001234567",
                 Role.CUSTOMER,

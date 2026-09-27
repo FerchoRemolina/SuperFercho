@@ -25,8 +25,11 @@ public class UserJpaEntity {
     @Column(name = "document_number", nullable = false)
     private String documentNumber;
 
-    @Column(name = "full_name", nullable = false)
-    private String fullName;
+    @Column(name = "first_name", nullable = false)
+    private String firstName;
+
+    @Column(name = "last_name", nullable = false)
+    private String lastName;
 
     @Column(name = "email", nullable = false)
     private String email;
@@ -51,14 +54,14 @@ public class UserJpaEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    protected UserJpaEntity() {
-    }
+    protected UserJpaEntity() {}
 
     public UserJpaEntity(
             UUID id,
             String documentType,
             String documentNumber,
-            String fullName,
+            String firstName,
+            String lastName,
             String email,
             String phone,
             String passwordHash,
@@ -69,7 +72,8 @@ public class UserJpaEntity {
         this.id = id;
         this.documentType = documentType;
         this.documentNumber = documentNumber;
-        this.fullName = fullName;
+        this.firstName = firstName;
+        this.lastName = lastName;
         this.email = email;
         this.phone = phone;
         this.passwordHash = passwordHash;
@@ -91,8 +95,12 @@ public class UserJpaEntity {
         return documentNumber;
     }
 
-    public String getFullName() {
-        return fullName;
+    public String getFirstName() {
+        return firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
     }
 
     public String getEmail() {

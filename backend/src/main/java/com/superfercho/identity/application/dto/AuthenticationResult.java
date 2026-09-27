@@ -4,5 +4,5 @@ import com.superfercho.identity.domain.model.Role;
 import java.time.Instant;
 import java.util.UUID;
 
-public record AuthenticationResult(UUID userId, Role role, String accessToken, Instant expiresAt) {
-}
+public record AuthenticationResult(
+        UUID userId, Role role, String firstName, String lastName, String accessToken, Instant expiresAt) {}
