@@ -1,6 +1,6 @@
 "use client";
 
-import type { MouseEvent } from "react";
+import { useState, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import { isProductInFavorites } from "@/features/favorites/api";
 import {
@@ -41,6 +41,7 @@ export function FavoriteToggle({
   const favorited = isProductInFavorites(favoritesQuery.data?.items, productId);
   const mutating = addMutation.isPending || removeMutation.isPending;
   const showHeart = favoriteToggleShowsHeart(variant);
+  const [pulse, setPulse] = useState(false);
 
   if (!canShowFavoriteToggle(session?.role)) {
     return null;
@@ -63,6 +64,8 @@ export function FavoriteToggle({
       } else {
         await addMutation.mutateAsync(productId);
       }
+      setPulse(true);
+      window.setTimeout(() => setPulse(false), 220);
     } catch {
       // Error is rendered from mutation state.
     }
@@ -108,14 +111,25 @@ export function FavoriteToggle({
         aria-pressed={favorited}
         aria-label={label}
         className={cx(
-          "group relative inline-flex h-11 w-11 items-center justify-center rounded-full",
-          "border border-sf-border bg-sf-surface/90 text-sf-error shadow-[0_1px_2px_rgba(23,33,27,0.08)]",
-          "backdrop-blur-sm transition-colors hover:bg-sf-surface",
-          "disabled:cursor-not-allowed",
+          "group relative inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full",
+          "border bg-sf-surface/90 shadow-[0_1px_2px_rgba(23,33,27,0.08)] backdrop-blur-sm",
+          "transition-[background-color,border-color,box-shadow,transform] duration-200 ease-out",
+          "hover:bg-sf-surface hover:shadow-[0_2px_8px_rgba(23,33,27,0.1)]",
+          "active:scale-95",
+          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sf-primary",
+          "disabled:cursor-not-allowed disabled:opacity-70",
+          favorited
+            ? "border-sf-error/40 text-sf-error"
+            : "border-sf-border text-sf-error/75 hover:border-sf-error/35 hover:text-sf-error",
         )}
       >
         <HeartIcon
-          className="transition-[fill] duration-150"
+          className={cx(
+            "transition-[transform,fill,opacity] duration-200 ease-out",
+            "md:group-hover:scale-[1.09]",
+            pulse && "scale-[1.12]",
+            favorited ? "opacity-100" : "opacity-90",
+          )}
           fill={favoriteHeartFill(favorited)}
         />
         <span
