@@ -4,6 +4,7 @@ import {
   changeShoppingListItemQuantity,
   clearShoppingList,
   createShoppingList,
+  deleteShoppingList,
   getShoppingList,
   listShoppingLists,
   removeShoppingListItem,
@@ -190,6 +191,17 @@ describe("shopping lists api", () => {
     expect(url).toBe(
       `http://localhost:8080/api/v1/shopping-lists/${listId}/items`,
     );
+    expect(init.method).toBe("DELETE");
+  });
+
+  it("deletes a shopping list with DELETE /shopping-lists/{id}", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(deleteShoppingList(listId)).resolves.toBeUndefined();
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`http://localhost:8080/api/v1/shopping-lists/${listId}`);
     expect(init.method).toBe("DELETE");
   });
 

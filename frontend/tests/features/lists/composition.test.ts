@@ -36,10 +36,41 @@ describe("shopping lists composition", () => {
     expect(addControl).toContain("useAddShoppingListItemMutation");
     expect(addControl).not.toContain("/api/v1/shopping-lists/");
     expect(addControl).not.toContain("from-list");
+    expect(addControl).not.toContain("Gestionar listas");
+    expect(addControl).not.toContain("Crear lista y agregar");
+    expect(addControl).toContain("lists.length === 0");
     expect(listItem).toContain("useAddCartItemMutation");
     expect(listItem).toContain("quantity: item.quantity");
     expect(api).not.toContain("from-list");
     expect(api).not.toContain("/cart");
+  });
+
+  it("gates lists intro and empty-state copy for zero lists", () => {
+    const listsPage = source(
+      "features/lists/components/lists-page-content.tsx",
+    );
+    expect(listsPage).toContain("{!hasLists ? (");
+    expect(listsPage).toContain("Guarda productos y arma tu mercado a tu ritmo.");
+    expect(listsPage).toContain("cumpleaños");
+    expect(listsPage).toContain("asados");
+    expect(listsPage).toContain("ocasiones especiales");
+    expect(listsPage).toContain("mercado");
+  });
+
+  it("supports delete list with inline confirmation and redirect", () => {
+    const detail = source(
+      "features/lists/components/list-detail-page-content.tsx",
+    );
+    const hooks = source("features/lists/hooks.ts");
+    const api = source("features/lists/api.ts");
+
+    expect(api).toContain("deleteShoppingList");
+    expect(hooks).toContain("useDeleteShoppingListMutation");
+    expect(detail).toContain("Eliminar lista");
+    expect(detail).toContain("¿Eliminar esta lista?");
+    expect(detail).toContain("confirmingDelete");
+    expect(detail).toContain('router.push("/lists")');
+    expect(detail).toContain("useDeleteShoppingListMutation");
   });
 
   it("keeps list pages on customer routes without placeholders", () => {
@@ -67,11 +98,11 @@ describe("shopping lists composition", () => {
     const listItem = source("features/lists/components/list-item-card.tsx");
     expect(listItem).toContain("canOfferAddToCart");
     expect(listItem).toContain("product.status === \"ACTIVE\"");
+    expect(listItem).toContain("productAvailabilityLabel");
     expect(listItem).toContain("productStockLabel");
     expect(listItem).toContain("offerAddToCart");
     expect(listItem).toContain("Agregar al carrito");
     expect(listItem).toContain("agotado");
-    expect(listItem).toContain("Disponible");
     expect(listItem).toContain("No disponible");
   });
 });
