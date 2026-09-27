@@ -31,19 +31,18 @@ export const ADMIN_ORDERS_DEFAULT_PAGE = 0;
 export const ADMIN_ORDERS_DEFAULT_SIZE = 20;
 
 export const ADMIN_ORDER_STATUSES: readonly OrderStatus[] = [
-  "PENDING",
   "CONFIRMED",
   "PREPARING",
-  "READY",
+  "DELIVERY",
   "DELIVERED",
   "CANCELLED",
 ] as const;
 
-/** Blueprint Ventas filter: excludes PENDING and CANCELLED. */
+/** Blueprint Ventas filter: excludes CANCELLED. */
 export const ADMIN_SALES_ORDER_STATUSES: readonly OrderStatus[] = [
   "CONFIRMED",
   "PREPARING",
-  "READY",
+  "DELIVERY",
   "DELIVERED",
 ] as const;
 
@@ -586,25 +585,6 @@ export async function listAdminOrders(
 /** GET /api/v1/admin/orders/{orderId} — ADMIN; no reutilizar GET /api/v1/orders/{orderId}. */
 export async function getAdminOrder(orderId: string): Promise<Order> {
   return request<Order>(`/admin/orders/${encodeURIComponent(orderId)}`);
-}
-
-/** Mirrors UpdateOrderStatusRequest for POST /api/v1/orders/{orderId}/status (ADMIN). */
-export type UpdateAdminOrderStatusRequest = {
-  status: OrderStatus;
-};
-
-/**
- * POST /api/v1/orders/{orderId}/status — ADMIN.
- * Response may include payment=null; prefer refreshing GET /admin/orders/{id}.
- */
-export async function updateAdminOrderStatus(
-  orderId: string,
-  body: UpdateAdminOrderStatusRequest,
-): Promise<Order> {
-  return request<Order>(`/orders/${encodeURIComponent(orderId)}/status`, {
-    method: "POST",
-    body,
-  });
 }
 
 /** Mirrors DocumentStatus. */

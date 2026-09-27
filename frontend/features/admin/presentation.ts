@@ -335,83 +335,18 @@ export function adminOrderDetailHref(orderId: string): string {
   return `/admin/orders/${encodeURIComponent(orderId)}`;
 }
 
-/** Next status for ADMIN POST /orders/{id}/status. Excludes CANCELLED. */
-export function nextAdminOrderStatus(
-  status: OrderStatus,
-): OrderStatus | null {
-  switch (status) {
-    case "PENDING":
-      return "CONFIRMED";
-    case "CONFIRMED":
-      return "PREPARING";
-    case "PREPARING":
-      return "READY";
-    case "READY":
-      return "DELIVERED";
-    case "DELIVERED":
-    case "CANCELLED":
-      return null;
+/**
+ * Read-only status copy for the admin detail page: the lifecycle advances
+ * automatically, so there is no manual transition to offer.
+ */
+export function adminOrderStatusSummary(status: OrderStatus): string {
+  if (status === "CANCELLED") {
+    return `Estado actual: ${orderStatusLabel(status)}.`;
   }
-}
-
-export function adminOrderStatusAdvanceLabel(
-  status: OrderStatus,
-): string | null {
-  switch (status) {
-    case "PENDING":
-      return "Confirmar pedido";
-    case "CONFIRMED":
-      return "Pasar a preparación";
-    case "PREPARING":
-      return "Marcar como listo";
-    case "READY":
-      return "Marcar como entregado";
-    case "DELIVERED":
-    case "CANCELLED":
-      return null;
+  if (status === "DELIVERED") {
+    return `Estado actual: ${orderStatusLabel(status)}. El pedido completó su ciclo de vida.`;
   }
-}
-
-export function canAdvanceAdminOrderStatus(status: OrderStatus): boolean {
-  return nextAdminOrderStatus(status) !== null;
-}
-
-export type AdminOrderStatusPanelState =
-  | "hidden"
-  | "idle"
-  | "confirming"
-  | "pending";
-
-export function adminOrderStatusPanelState(args: {
-  status: OrderStatus;
-  confirming: boolean;
-  isPending: boolean;
-}): AdminOrderStatusPanelState {
-  if (!canAdvanceAdminOrderStatus(args.status)) {
-    return "hidden";
-  }
-  if (args.isPending) {
-    return "pending";
-  }
-  if (args.confirming) {
-    return "confirming";
-  }
-  return "idle";
-}
-
-export function isAdminOrderStatusSubmitLocked(isPending: boolean): boolean {
-  return isPending;
-}
-
-export function adminOrderStatusAdvanceConfirmation(args: {
-  orderNumber: string;
-  currentStatus: OrderStatus;
-  nextStatus: OrderStatus;
-}): { title: string; body: string } {
-  return {
-    title: "¿Cambiar el estado del pedido?",
-    body: `El pedido ${args.orderNumber} pasará de ${orderStatusLabel(args.currentStatus)} a ${orderStatusLabel(args.nextStatus)}.`,
-  };
+  return `Estado actual: ${orderStatusLabel(status)}. El pedido avanza automáticamente.`;
 }
 
 export type AdminOrderDetailErrorKind =

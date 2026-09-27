@@ -3,16 +3,21 @@ import { orderStatusLabel, type Order } from "@/features/orders/api";
 import {
   CANCEL_CONFIRMATION_BODY,
   CANCEL_CONFIRMATION_TITLE,
-  CANCEL_WINDOW_EXPIRED_COPY,
+  CANCEL_COUNTDOWN_CRITICAL_MS,
   CANCEL_WINDOW_IDLE_COPY,
   CUSTOMER_CANCELLATION_WINDOW_MS,
+  ORDER_LIFECYCLE_POLL_MS,
   formatOrderDate,
   canShowCancelAction,
   cancelErrorCopy,
   cancelOrderCacheKeys,
   cancellationRemainingLabel,
+  cancellationRemainingMs,
   cancelPanelState,
+  formatCancellationCountdown,
+  isCancellationCountdownCritical,
   isCancelSubmitLocked,
+  isOrderInProgress,
   isWithinCustomerCancellationWindow,
   listPaymentSummary,
   orderDetailErrorCopy,
@@ -27,13 +32,13 @@ import {
 } from "@/features/orders/order-views";
 import { ApiError } from "@/shared/errors/api-problem";
 
-const now = new Date("2026-03-01T15:05:00Z");
+const now = new Date("2026-03-01T15:00:30Z");
 
 const order: Order = {
   id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
   orderNumber: "ORD-P-1001",
   customerId: "11111111-1111-1111-1111-111111111111",
-  status: "PENDING",
+  status: "CONFIRMED",
   items: [
     {
       id: "99999999-9999-9999-9999-000000000001",
@@ -56,7 +61,7 @@ const order: Order = {
   },
   paymentId: "55555555-5555-5555-5555-555555555555",
   createdAt: "2026-03-01T15:00:00Z",
-  confirmedAt: null,
+  confirmedAt: "2026-03-01T15:00:00Z",
   cancelledAt: null,
   updatedAt: "2026-03-01T15:00:00Z",
   payment: {
@@ -228,21 +233,28 @@ describe("order detail view", () => {
 });
 
 describe("order status presentation", () => {
-  it("uses Spanish labels and distinct treatment for PENDING and CANCELLED", () => {
-    expect(orderStatusLabel("PENDING")).toBe("Pendiente");
+  it("uses Spanish labels and distinct treatment for the lifecycle statuses", () => {
     expect(orderStatusLabel("CONFIRMED")).toBe("Confirmado");
     expect(orderStatusLabel("PREPARING")).toBe("En preparación");
-    expect(orderStatusLabel("READY")).toBe("Listo");
+    expect(orderStatusLabel("DELIVERY")).toBe("En camino");
     expect(orderStatusLabel("DELIVERED")).toBe("Entregado");
     expect(orderStatusLabel("CANCELLED")).toBe("Cancelado");
-    expect(orderStatusTone("PENDING")).toBe("accent");
-    expect(orderStatusTone("CONFIRMED")).toBe("neutral");
+    expect(orderStatusTone("CONFIRMED")).toBe("accent");
     expect(orderStatusTone("PREPARING")).toBe("primary");
-    expect(orderStatusTone("READY")).toBe("primary");
+    expect(orderStatusTone("DELIVERY")).toBe("primary");
     expect(orderStatusTone("DELIVERED")).toBe("primary");
     expect(orderStatusTone("CANCELLED")).toBe("danger");
-    expect(orderStatusHint("PENDING")).toContain("15 minutos");
+    expect(orderStatusHint("CONFIRMED")).toContain("2 minutos");
     expect(orderStatusHint("CANCELLED")).toContain("cancelado");
+  });
+
+  it("polls only while the lifecycle job can still advance the order", () => {
+    expect(isOrderInProgress("CONFIRMED")).toBe(true);
+    expect(isOrderInProgress("PREPARING")).toBe(true);
+    expect(isOrderInProgress("DELIVERY")).toBe(true);
+    expect(isOrderInProgress("DELIVERED")).toBe(false);
+    expect(isOrderInProgress("CANCELLED")).toBe(false);
+    expect(ORDER_LIFECYCLE_POLL_MS).toBe(10_000);
   });
 
   it("formats createdAt in es-CO without inventing a different instant", () => {
@@ -251,29 +263,60 @@ describe("order status presentation", () => {
 });
 
 describe("order cancellation presentation", () => {
-  it("shows the cancel action only while PENDING and within 15 minutes", () => {
+  it("shows the cancel action only while CONFIRMED and within 2 minutes of confirmedAt", () => {
     expect(canShowCancelAction(order, now)).toBe(true);
-    expect(CUSTOMER_CANCELLATION_WINDOW_MS).toBe(15 * 60 * 1000);
+    expect(CUSTOMER_CANCELLATION_WINDOW_MS).toBe(2 * 60 * 1000);
     expect(isWithinCustomerCancellationWindow(order, now)).toBe(true);
     expect(
       isWithinCustomerCancellationWindow(
         order,
-        new Date("2026-03-01T15:16:00Z"),
+        new Date("2026-03-01T15:01:59.999Z"),
+      ),
+    ).toBe(true);
+    expect(
+      isWithinCustomerCancellationWindow(
+        order,
+        new Date("2026-03-01T15:02:00Z"),
       ),
     ).toBe(false);
-    expect(canShowCancelAction({ ...order, status: "CONFIRMED" }, now)).toBe(
-      false,
-    );
     expect(canShowCancelAction({ ...order, status: "PREPARING" }, now)).toBe(
       false,
     );
-    expect(canShowCancelAction({ ...order, status: "READY" }, now)).toBe(false);
+    expect(canShowCancelAction({ ...order, status: "DELIVERY" }, now)).toBe(
+      false,
+    );
     expect(canShowCancelAction({ ...order, status: "DELIVERED" }, now)).toBe(
       false,
     );
     expect(canShowCancelAction({ ...order, status: "CANCELLED" }, now)).toBe(
       false,
     );
+  });
+
+  it("anchors the window on confirmedAt and falls back to createdAt", () => {
+    const reconfirmed = { ...order, confirmedAt: "2026-03-01T15:02:00Z" };
+    expect(
+      isWithinCustomerCancellationWindow(
+        reconfirmed,
+        new Date("2026-03-01T15:03:00Z"),
+      ),
+    ).toBe(true);
+    expect(
+      cancellationRemainingMs({ ...order, confirmedAt: null }, now),
+    ).toBe(90_000);
+  });
+
+  it("counts down in MM:SS and turns critical in the last minute", () => {
+    expect(formatCancellationCountdown(120_000)).toBe("2:00");
+    expect(formatCancellationCountdown(90_000)).toBe("1:30");
+    expect(formatCancellationCountdown(59_000)).toBe("0:59");
+    expect(formatCancellationCountdown(1)).toBe("0:01");
+    expect(formatCancellationCountdown(0)).toBe("0:00");
+    expect(CANCEL_COUNTDOWN_CRITICAL_MS).toBe(60_000);
+    expect(isCancellationCountdownCritical(61_000)).toBe(false);
+    expect(isCancellationCountdownCritical(60_000)).toBe(true);
+    expect(isCancellationCountdownCritical(1)).toBe(true);
+    expect(isCancellationCountdownCritical(0)).toBe(false);
   });
 
   it("moves from idle to confirmation then locks submit while pending", () => {
@@ -288,15 +331,17 @@ describe("order cancellation presentation", () => {
     ).toBe("pending");
     expect(isCancelSubmitLocked(false)).toBe(false);
     expect(isCancelSubmitLocked(true)).toBe(true);
-    expect(CANCEL_WINDOW_IDLE_COPY).toContain("15 minutos");
-    expect(cancellationRemainingLabel(order.createdAt, now)).toMatch(/minutos/);
+    expect(CANCEL_WINDOW_IDLE_COPY).toContain("2 minutos");
+    expect(cancellationRemainingLabel(order, now)).toBe(
+      "Te queda 1:30 para cancelar.",
+    );
     expect(CANCEL_CONFIRMATION_TITLE).toMatch(/Cancelar/);
     expect(CANCEL_CONFIRMATION_BODY).toMatch(/no podrás deshacerlo/);
     expect(CANCEL_CONFIRMATION_BODY).not.toMatch(/reembolso/i);
   });
 
-  it("explains expiration without showing the cancel CTA", () => {
-    const expiredNow = new Date("2026-03-01T15:16:00Z");
+  it("hides the panel once the countdown reaches zero", () => {
+    const expiredNow = new Date("2026-03-01T15:02:00Z");
     expect(
       cancelPanelState({
         order,
@@ -304,9 +349,20 @@ describe("order cancellation presentation", () => {
         isPending: false,
         now: expiredNow,
       }),
-    ).toBe("expired");
-    expect(CANCEL_WINDOW_EXPIRED_COPY).toContain("15 minutos");
-    expect(cancellationRemainingLabel(order.createdAt, expiredNow)).toBeNull();
+    ).toBe("hidden");
+    expect(cancellationRemainingMs(order, expiredNow)).toBe(0);
+    expect(cancellationRemainingLabel(order, expiredNow)).toBeNull();
+  });
+
+  it("keeps the panel mounted while a cancel request is in flight", () => {
+    expect(
+      cancelPanelState({
+        order,
+        confirming: true,
+        isPending: true,
+        now: new Date("2026-03-01T15:02:00Z"),
+      }),
+    ).toBe("pending");
   });
 
   it("hides the panel for a successful cancelled order", () => {
@@ -332,7 +388,7 @@ describe("order cancellation presentation", () => {
     ).toEqual({
       title: "No se puede cancelar",
       message:
-        "Este pedido ya no puede cancelarse. El plazo de 15 minutos terminó o el pedido ya cambió de estado.",
+        "Este pedido ya no puede cancelarse. El plazo de 2 minutos terminó o el pedido ya cambió de estado.",
     });
   });
 

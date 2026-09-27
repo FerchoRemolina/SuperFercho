@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   adminKnowledgeDocumentHref,
@@ -11,14 +14,11 @@ import {
   adminOrdersListQueryFromSearchParams,
   adminOrdersPageCount,
   adminOrdersStatusFromSelectValue,
-  adminOrderStatusAdvanceConfirmation,
-  adminOrderStatusAdvanceLabel,
-  adminOrderStatusPanelState,
+  adminOrderStatusSummary,
   adminPaymentDetailErrorKind,
   adminPaymentHref,
   adminProductsHref,
   canActivateProduct,
-  canAdvanceAdminOrderStatus,
   canArchiveProduct,
   canDeactivateKnowledgeDocument,
   canDeactivateProduct,
@@ -32,14 +32,12 @@ import {
   documentStatusTone,
   formatAdminInstant,
   formatAdminPresentation,
-  isAdminOrderStatusSubmitLocked,
   isAdminRole,
   knowledgeDocumentDeactivateConfirmation,
   knowledgeDocumentProcessConfirmation,
   knowledgeDocumentReactivateConfirmation,
   knowledgeDocumentReplaceContentWarning,
   listQueryFromSearchParams,
-  nextAdminOrderStatus,
   parseAdminKnowledgeSearchLimit,
   parseAdminOrderStatus,
   parseAdminOrdersPage,
@@ -245,14 +243,14 @@ describe("admin orders presentation", () => {
 
   it("parses Ventas multi-status regardless of token order", () => {
     expect(
-      parseAdminOrdersStatusFilter("CONFIRMED,PREPARING,READY,DELIVERED"),
+      parseAdminOrdersStatusFilter("CONFIRMED,PREPARING,DELIVERY,DELIVERED"),
     ).toEqual(ADMIN_SALES_ORDER_STATUSES);
     expect(
-      parseAdminOrdersStatusFilter("DELIVERED,READY,PREPARING,CONFIRMED"),
+      parseAdminOrdersStatusFilter("DELIVERED,DELIVERY,PREPARING,CONFIRMED"),
     ).toEqual(ADMIN_SALES_ORDER_STATUSES);
     expect(
       adminOrdersListQueryFromSearchParams({
-        status: "CONFIRMED,PREPARING,READY,DELIVERED",
+        status: "CONFIRMED,PREPARING,DELIVERY,DELIVERED",
       }),
     ).toEqual({
       page: 0,
@@ -264,21 +262,21 @@ describe("admin orders presentation", () => {
   it("rejects invalid tokens and non-Ventas multi-status sets", () => {
     expect(parseAdminOrdersStatusFilter("SOLD")).toBeUndefined();
     expect(
-      parseAdminOrdersStatusFilter("CONFIRMED,PREPARING,READY,SOLD"),
+      parseAdminOrdersStatusFilter("CONFIRMED,PREPARING,DELIVERY,SOLD"),
     ).toBeUndefined();
     expect(
-      parseAdminOrdersStatusFilter("CONFIRMED,PREPARING,READY"),
+      parseAdminOrdersStatusFilter("CONFIRMED,PREPARING,DELIVERY"),
     ).toBeUndefined();
     expect(
-      parseAdminOrdersStatusFilter("PENDING,CONFIRMED,PREPARING,READY,DELIVERED"),
+      parseAdminOrdersStatusFilter("CANCELLED,CONFIRMED,PREPARING,DELIVERY,DELIVERED"),
     ).toBeUndefined();
   });
 
   it("builds orders href with page and status filters", () => {
     expect(adminOrdersHref({})).toBe("/admin/orders");
     expect(adminOrdersHref({ page: 0, status: "" })).toBe("/admin/orders");
-    expect(adminOrdersHref({ page: 2, status: "READY" })).toBe(
-      "/admin/orders?page=2&status=READY",
+    expect(adminOrdersHref({ page: 2, status: "DELIVERY" })).toBe(
+      "/admin/orders?page=2&status=DELIVERY",
     );
     expect(adminOrdersHref({ page: 0, status: "CANCELLED" })).toBe(
       "/admin/orders?status=CANCELLED",
@@ -286,7 +284,7 @@ describe("admin orders presentation", () => {
     expect(
       adminOrdersHref({ page: 0, status: ADMIN_SALES_ORDER_STATUSES }),
     ).toBe(
-      "/admin/orders?status=CONFIRMED%2CPREPARING%2CREADY%2CDELIVERED",
+      "/admin/orders?status=CONFIRMED%2CPREPARING%2CDELIVERY%2CDELIVERED",
     );
   });
 
@@ -300,7 +298,7 @@ describe("admin orders presentation", () => {
     expect(adminOrdersStatusFromSelectValue("sales")).toEqual(
       ADMIN_SALES_ORDER_STATUSES,
     );
-    expect(adminOrdersStatusFromSelectValue("READY")).toBe("READY");
+    expect(adminOrdersStatusFromSelectValue("DELIVERY")).toBe("DELIVERY");
     expect(adminOrdersStatusFromSelectValue("SOLD")).toBe("");
   });
 
@@ -349,85 +347,33 @@ describe("admin orders presentation", () => {
   });
 });
 
-describe("admin order status advance", () => {
-  it("maps only the linear ADMIN transitions", () => {
-    expect(nextAdminOrderStatus("PENDING")).toBe("CONFIRMED");
-    expect(nextAdminOrderStatus("CONFIRMED")).toBe("PREPARING");
-    expect(nextAdminOrderStatus("PREPARING")).toBe("READY");
-    expect(nextAdminOrderStatus("READY")).toBe("DELIVERED");
-    expect(nextAdminOrderStatus("DELIVERED")).toBeNull();
-    expect(nextAdminOrderStatus("CANCELLED")).toBeNull();
-  });
-
-  it("exposes advance labels only when an action exists", () => {
-    expect(adminOrderStatusAdvanceLabel("PENDING")).toBe("Confirmar pedido");
-    expect(adminOrderStatusAdvanceLabel("CONFIRMED")).toBe(
-      "Pasar a preparación",
+describe("admin order status", () => {
+  it("describes the status as read-only because the lifecycle is automatic", () => {
+    expect(adminOrderStatusSummary("CONFIRMED")).toBe(
+      "Estado actual: Confirmado. El pedido avanza automáticamente.",
     );
-    expect(adminOrderStatusAdvanceLabel("PREPARING")).toBe("Marcar como listo");
-    expect(adminOrderStatusAdvanceLabel("READY")).toBe(
-      "Marcar como entregado",
+    expect(adminOrderStatusSummary("DELIVERY")).toContain("En camino");
+    expect(adminOrderStatusSummary("DELIVERED")).toContain(
+      "completó su ciclo de vida",
     );
-    expect(adminOrderStatusAdvanceLabel("DELIVERED")).toBeNull();
-    expect(adminOrderStatusAdvanceLabel("CANCELLED")).toBeNull();
-    expect(canAdvanceAdminOrderStatus("PENDING")).toBe(true);
-    expect(canAdvanceAdminOrderStatus("DELIVERED")).toBe(false);
-    expect(canAdvanceAdminOrderStatus("CANCELLED")).toBe(false);
+    expect(adminOrderStatusSummary("CANCELLED")).toBe(
+      "Estado actual: Cancelado.",
+    );
+    expect(adminOrderStatusSummary("CONFIRMED")).not.toMatch(/cambiar/i);
   });
 
-  it("requires confirmation before submit and locks while pending", () => {
+  it("no longer ships a manual status advance component", () => {
     expect(
-      adminOrderStatusPanelState({
-        status: "PENDING",
-        confirming: false,
-        isPending: false,
-      }),
-    ).toBe("idle");
-    expect(
-      adminOrderStatusPanelState({
-        status: "PENDING",
-        confirming: true,
-        isPending: false,
-      }),
-    ).toBe("confirming");
-    expect(
-      adminOrderStatusPanelState({
-        status: "PENDING",
-        confirming: true,
-        isPending: true,
-      }),
-    ).toBe("pending");
-    expect(
-      adminOrderStatusPanelState({
-        status: "DELIVERED",
-        confirming: false,
-        isPending: false,
-      }),
-    ).toBe("hidden");
-    expect(
-      adminOrderStatusPanelState({
-        status: "CANCELLED",
-        confirming: true,
-        isPending: false,
-      }),
-    ).toBe("hidden");
-    expect(isAdminOrderStatusSubmitLocked(true)).toBe(true);
-    expect(isAdminOrderStatusSubmitLocked(false)).toBe(false);
+      existsSync(
+        join(
+          dirname(fileURLToPath(import.meta.url)),
+          "../../../features/admin/components/admin-order-status-actions.tsx",
+        ),
+      ),
+    ).toBe(false);
   });
 
-  it("builds confirmation copy with order number and statuses", () => {
-    const copy = adminOrderStatusAdvanceConfirmation({
-      orderNumber: "ORD-P-1001",
-      currentStatus: "PENDING",
-      nextStatus: "CONFIRMED",
-    });
-    expect(copy.title).toMatch(/estado/i);
-    expect(copy.body).toContain("ORD-P-1001");
-    expect(copy.body).toContain("Pendiente");
-    expect(copy.body).toContain("Confirmado");
-  });
-
-  it("maps status-update problem codes without cancel-oriented wording", () => {
+  it("maps order problem codes without cancel-oriented wording", () => {
     expect(
       messageForApiProblem({
         status: 404,
@@ -439,16 +385,9 @@ describe("admin order status advance", () => {
       messageForApiProblem({
         status: 409,
         code: "INVALID_ORDER_TRANSITION",
-        detail: "Invalid order state transition: PENDING -> PREPARING",
+        detail: "Invalid order state transition: CONFIRMED -> PREPARING",
       }),
     ).toBe("El pedido ya no está en un estado que permita esta acción.");
-    expect(
-      messageForApiProblem({
-        status: 400,
-        code: "INVALID_ORDER_STATUS_UPDATE",
-        detail: "Order status cannot be updated to: CANCELLED",
-      }),
-    ).toBe("No se puede establecer ese estado desde esta acción.");
   });
 });
 

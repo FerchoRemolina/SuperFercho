@@ -55,7 +55,7 @@ const checkoutBody: CheckoutRequest = {
 const checkoutResponse: CheckoutResponse = {
   orderId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
   orderNumber: "ORD-P-1001",
-  status: "PENDING",
+  status: "CONFIRMED",
   paymentStatus: "APPROVED",
   total: { amount: 21, currency: "COP" },
 };
@@ -64,7 +64,7 @@ const order: Order = {
   id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
   orderNumber: "ORD-P-1001",
   customerId: "11111111-1111-1111-1111-111111111111",
-  status: "PENDING",
+  status: "CONFIRMED",
   items: [
     {
       id: "99999999-9999-9999-9999-000000000001",

@@ -26,13 +26,12 @@ describe("orders presentation", () => {
     const badge = source("features/orders/components/order-status-badge.tsx");
     expect(badge).not.toContain("Estado:");
     expect(badge).toContain("orderStatusLabel(status)");
-    expect(orderStatusTone("PENDING")).toBe("accent");
-    expect(orderStatusTone("CONFIRMED")).toBe("neutral");
+    expect(orderStatusTone("CONFIRMED")).toBe("accent");
     expect(orderStatusTone("PREPARING")).toBe("primary");
-    expect(orderStatusTone("READY")).toBe("primary");
+    expect(orderStatusTone("DELIVERY")).toBe("primary");
     expect(orderStatusTone("DELIVERED")).toBe("primary");
     expect(orderStatusTone("CANCELLED")).toBe("danger");
-    expect(orderStatusBadgeClassName("READY")).toContain("ring-");
+    expect(orderStatusBadgeClassName("DELIVERY")).toContain("ring-");
     expect(orderStatusBadgeClassName("DELIVERED")).toContain("sf-primary");
   });
 
@@ -56,7 +55,9 @@ describe("orders presentation", () => {
     expect(cancel).toContain("cancelPanelState");
     expect(cancel).toContain("Cancelar pedido");
     expect(cancel).toContain("Conservar pedido");
-    expect(cancel).toContain("CANCEL_WINDOW_EXPIRED_COPY");
+    expect(cancel).toContain("CANCEL_WINDOW_IDLE_COPY");
+    expect(cancel).toContain("cancellationRemainingLabel");
+    expect(cancel).not.toContain("CANCEL_WINDOW_EXPIRED_COPY");
     expect(cancel).toContain("<Card");
     expect(cancel).not.toContain("border-dashed");
   });

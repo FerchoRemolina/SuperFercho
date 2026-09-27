@@ -6,11 +6,13 @@ import { useCancelOrderMutation } from "@/features/orders/hooks";
 import {
   CANCEL_CONFIRMATION_BODY,
   CANCEL_CONFIRMATION_TITLE,
-  CANCEL_WINDOW_EXPIRED_COPY,
+  CANCEL_COUNTDOWN_TICK_MS,
   CANCEL_WINDOW_IDLE_COPY,
   cancelErrorCopy,
   cancellationRemainingLabel,
+  cancellationRemainingMs,
   cancelPanelState,
+  isCancellationCountdownCritical,
   isCancelSubmitLocked,
 } from "@/features/orders/order-views";
 import { Alert } from "@/shared/ui/alert";
@@ -31,12 +33,15 @@ export function CancelOrderPanel({ order }: { order: Order }) {
   });
 
   useEffect(() => {
-    if (order.status !== "PENDING") {
+    if (order.status !== "CONFIRMED") {
       return;
     }
-    const id = window.setInterval(() => setNow(new Date()), 30_000);
+    const id = window.setInterval(
+      () => setNow(new Date()),
+      CANCEL_COUNTDOWN_TICK_MS,
+    );
     return () => window.clearInterval(id);
-  }, [order.status, order.createdAt]);
+  }, [order.status, order.confirmedAt, order.createdAt]);
 
   if (state === "hidden") {
     return null;
@@ -45,27 +50,16 @@ export function CancelOrderPanel({ order }: { order: Order }) {
   const error = cancelMutation.isError
     ? cancelErrorCopy(cancelMutation.error)
     : null;
-  const remaining = cancellationRemainingLabel(order.createdAt, now);
-  const actionable =
-    state === "idle" || state === "confirming" || state === "pending";
+  const remainingMs = cancellationRemainingMs(order, now);
+  const remaining = cancellationRemainingLabel(order, now);
+  const critical = isCancellationCountdownCritical(remainingMs);
 
   return (
-    <Card
-      className={cx(
-        "grid gap-2.5 !p-4 md:!p-4",
-        !actionable && "border-sf-border bg-sf-bg/60 shadow-none",
-      )}
-    >
+    <Card className="grid gap-2.5 !p-4 md:!p-4">
       {error ? (
         <Alert tone="error" title={error.title}>
           {error.message}
         </Alert>
-      ) : null}
-
-      {state === "expired" ? (
-        <p className="text-xs leading-relaxed text-sf-muted md:text-sm">
-          {CANCEL_WINDOW_EXPIRED_COPY}
-        </p>
       ) : null}
 
       {state === "idle" ? (
@@ -74,7 +68,15 @@ export function CancelOrderPanel({ order }: { order: Order }) {
             {CANCEL_WINDOW_IDLE_COPY}
           </p>
           {remaining ? (
-            <p className="text-sm font-semibold text-sf-ink">{remaining}</p>
+            <p
+              aria-live="polite"
+              className={cx(
+                "text-sm font-semibold tabular-nums",
+                critical ? "text-sf-error" : "text-sf-ink",
+              )}
+            >
+              {remaining}
+            </p>
           ) : null}
           <Button
             type="button"
@@ -99,6 +101,17 @@ export function CancelOrderPanel({ order }: { order: Order }) {
           <p className="text-xs leading-relaxed text-sf-muted md:text-sm">
             {CANCEL_CONFIRMATION_BODY}
           </p>
+          {remaining ? (
+            <p
+              aria-live="polite"
+              className={cx(
+                "text-sm font-semibold tabular-nums",
+                critical ? "text-sf-error" : "text-sf-ink",
+              )}
+            >
+              {remaining}
+            </p>
+          ) : null}
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               type="button"

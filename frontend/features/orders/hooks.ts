@@ -14,7 +14,11 @@ import {
 import { addressKeys } from "@/features/account/api";
 import { isApiError } from "@/shared/errors/api-problem";
 import { useSession } from "@/shared/session/session-provider";
-import { cancelOrderCacheKeys } from "@/features/orders/order-views";
+import {
+  cancelOrderCacheKeys,
+  isOrderInProgress,
+  ORDER_LIFECYCLE_POLL_MS,
+} from "@/features/orders/order-views";
 
 const keys = orderKeys();
 
@@ -26,6 +30,12 @@ export function useOrdersQuery() {
     queryKey: keys.all,
     queryFn: () => listOrders(),
     enabled,
+    // The lifecycle job advances orders server-side; stop polling once every
+    // order reached a terminal status.
+    refetchInterval: (query) =>
+      query.state.data?.items.some((order) => isOrderInProgress(order.status))
+        ? ORDER_LIFECYCLE_POLL_MS
+        : false,
   });
 }
 
@@ -37,6 +47,12 @@ export function useOrderQuery(orderId: string) {
     queryKey: keys.detail(orderId),
     queryFn: () => getOrder(orderId),
     enabled,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status && isOrderInProgress(status)
+        ? ORDER_LIFECYCLE_POLL_MS
+        : false;
+    },
   });
 }
 

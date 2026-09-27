@@ -40,7 +40,6 @@ import {
   searchAdminKnowledge,
   searchAdminProducts,
   updateAdminCategory,
-  updateAdminOrderStatus,
   updateAdminProduct,
   updateAdminProductType,
   updateAdminProductVariant,
@@ -56,7 +55,6 @@ import {
   type ReplaceAdminKnowledgeDocumentContentRequest,
   type SearchAdminKnowledgeQuery,
   type UpdateAdminCategoryRequest,
-  type UpdateAdminOrderStatusRequest,
   type UpdateAdminProductRequest,
   type UpdateAdminProductTypeRequest,
   type UpdateAdminProductVariantRequest,
@@ -490,25 +488,6 @@ export function useAdminOrderQuery(orderId: string) {
     queryKey: keys.order(orderId),
     queryFn: () => getAdminOrder(orderId),
     enabled: isAdminRole(session?.role) && orderId.length > 0,
-  });
-}
-
-export function useUpdateAdminOrderStatusMutation() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({
-      orderId,
-      body,
-    }: {
-      orderId: string;
-      body: UpdateAdminOrderStatusRequest;
-    }) => updateAdminOrderStatus(orderId, body),
-    onSuccess: (_order, variables) => {
-      // Do not setQueryData from POST: payment may be null without OrderPaymentComposer.
-      void queryClient.invalidateQueries({ queryKey: keys.order(variables.orderId) });
-      void queryClient.invalidateQueries({ queryKey: keys.ordersRoot() });
-    },
   });
 }
 

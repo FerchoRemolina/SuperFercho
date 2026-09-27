@@ -124,12 +124,10 @@ export function listPaymentSummary(order: Order): string | null {
 
 export function orderStatusTone(status: OrderStatus): OrderStatusTone {
   switch (status) {
-    case "PENDING":
-      return "accent";
     case "CONFIRMED":
-      return "neutral";
+      return "accent";
     case "PREPARING":
-    case "READY":
+    case "DELIVERY":
     case "DELIVERED":
       return "primary";
     case "CANCELLED":
@@ -142,7 +140,7 @@ export function orderStatusBadgeClassName(
   status: OrderStatus,
 ): string | undefined {
   switch (status) {
-    case "READY":
+    case "DELIVERY":
       return "ring-1 ring-inset ring-sf-primary/35";
     case "DELIVERED":
       return "!bg-sf-primary !text-white";
@@ -153,13 +151,24 @@ export function orderStatusBadgeClassName(
 
 export function orderStatusHint(status: OrderStatus): string | null {
   switch (status) {
-    case "PENDING":
-      return "Puedes cancelarlo durante los primeros 15 minutos después de realizarlo.";
+    case "CONFIRMED":
+      return "Puedes cancelarlo durante los primeros 2 minutos después de confirmarlo.";
+    case "PREPARING":
+      return "El supermercado ya está preparando tu pedido.";
+    case "DELIVERY":
+      return "Tu pedido va en camino.";
     case "CANCELLED":
       return "Este pedido fue cancelado.";
     default:
       return null;
   }
+}
+
+/** Statuses the lifecycle job still advances; the UI polls while in one of them. */
+export function isOrderInProgress(status: OrderStatus): boolean {
+  return (
+    status === "CONFIRMED" || status === "PREPARING" || status === "DELIVERY"
+  );
 }
 
 export function formatOrderDate(iso: string): string {
@@ -177,40 +186,68 @@ function problemFromError(error: unknown): ApiProblem | null {
   return null;
 }
 
-export type CancelPanelState =
-  | "hidden"
-  | "expired"
-  | "idle"
-  | "confirming"
-  | "pending";
+export type CancelPanelState = "hidden" | "idle" | "confirming" | "pending";
 
-/** Matches backend Order.CUSTOMER_CANCELLATION_WINDOW (15 minutes). */
-export const CUSTOMER_CANCELLATION_WINDOW_MS = 15 * 60 * 1000;
+/** Matches backend Order.CUSTOMER_CANCELLATION_WINDOW (2 minutes). */
+export const CUSTOMER_CANCELLATION_WINDOW_MS = 2 * 60 * 1000;
+
+/** Below this the countdown turns red: the window is about to close. */
+export const CANCEL_COUNTDOWN_CRITICAL_MS = 60 * 1000;
+
+/** Countdown tick while the order is still cancellable. */
+export const CANCEL_COUNTDOWN_TICK_MS = 1000;
+
+/** Poll interval while the order is still advancing through the lifecycle. */
+export const ORDER_LIFECYCLE_POLL_MS = 10_000;
 
 export const CANCEL_WINDOW_IDLE_COPY =
-  "Puedes cancelar este pedido durante los primeros 15 minutos después de realizarlo.";
-
-export const CANCEL_WINDOW_EXPIRED_COPY =
-  "El plazo de 15 minutos para cancelar este pedido ya terminó.";
+  "Puedes cancelar este pedido durante los primeros 2 minutos después de confirmarlo.";
 
 export const CANCEL_CONFIRMATION_TITLE = "¿Cancelar este pedido?";
 export const CANCEL_CONFIRMATION_BODY =
   "El pedido se cancelará y no podrás deshacerlo desde esta pantalla. El supermercado dejará de gestionarlo.";
 
-export function customerCancellationDeadline(createdAt: string): Date {
+/** Window is anchored on confirmedAt; createdAt is the fallback for older rows. */
+export function cancellationAnchor(order: Order): string {
+  return order.confirmedAt ?? order.createdAt;
+}
+
+export function customerCancellationDeadline(confirmedAt: string): Date {
   return new Date(
-    new Date(createdAt).getTime() + CUSTOMER_CANCELLATION_WINDOW_MS,
+    new Date(confirmedAt).getTime() + CUSTOMER_CANCELLATION_WINDOW_MS,
   );
+}
+
+export function cancellationRemainingMs(
+  order: Order,
+  now: Date = new Date(),
+): number {
+  const remaining =
+    customerCancellationDeadline(cancellationAnchor(order)).getTime() -
+    now.getTime();
+  return remaining > 0 ? remaining : 0;
+}
+
+/** MM:SS, rounded up so the last second is shown as 0:01 and never 0:00. */
+export function formatCancellationCountdown(remainingMs: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+export function isCancellationCountdownCritical(remainingMs: number): boolean {
+  return remainingMs > 0 && remainingMs <= CANCEL_COUNTDOWN_CRITICAL_MS;
 }
 
 export function isWithinCustomerCancellationWindow(
   order: Order,
   now: Date = new Date(),
 ): boolean {
-  if (order.status !== "PENDING") {
+  if (order.status !== "CONFIRMED") {
     return false;
   }
-  return now.getTime() <= customerCancellationDeadline(order.createdAt).getTime();
+  return cancellationRemainingMs(order, now) > 0;
 }
 
 export function canShowCancelAction(
@@ -221,19 +258,14 @@ export function canShowCancelAction(
 }
 
 export function cancellationRemainingLabel(
-  createdAt: string,
+  order: Order,
   now: Date = new Date(),
 ): string | null {
-  const remainingMs =
-    customerCancellationDeadline(createdAt).getTime() - now.getTime();
+  const remainingMs = cancellationRemainingMs(order, now);
   if (remainingMs <= 0) {
     return null;
   }
-  const minutes = Math.max(1, Math.ceil(remainingMs / 60_000));
-  if (minutes === 1) {
-    return "Te queda aproximadamente 1 minuto para cancelar.";
-  }
-  return `Te quedan aproximadamente ${minutes} minutos para cancelar.`;
+  return `Te queda ${formatCancellationCountdown(remainingMs)} para cancelar.`;
 }
 
 export function cancelPanelState({
@@ -247,14 +279,16 @@ export function cancelPanelState({
   isPending: boolean;
   now?: Date;
 }): CancelPanelState {
-  if (order.status !== "PENDING") {
+  if (order.status !== "CONFIRMED") {
     return "hidden";
   }
-  if (!isWithinCustomerCancellationWindow(order, now)) {
-    return "expired";
-  }
+  // Keep the panel mounted while the request is in flight, even if the
+  // countdown reaches zero mid-submit.
   if (isPending) {
     return "pending";
+  }
+  if (!isWithinCustomerCancellationWindow(order, now)) {
+    return "hidden";
   }
   if (confirming) {
     return "confirming";

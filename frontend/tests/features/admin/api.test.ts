@@ -6,6 +6,7 @@ import {
   activateAdminProductVariant,
   adjustAdminProductStock,
   adminKeys,
+  ADMIN_ORDER_STATUSES,
   ADMIN_SALES_ORDER_STATUSES,
   archiveAdminProduct,
   changeAdminProductPrice,
@@ -39,7 +40,6 @@ import {
   searchAdminKnowledge,
   searchAdminProducts,
   updateAdminCategory,
-  updateAdminOrderStatus,
   updateAdminProduct,
   updateAdminProductType,
   updateAdminProductVariant,
@@ -515,7 +515,7 @@ const listedAdminOrder: Order = {
   id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
   orderNumber: "ORD-P-1001",
   customerId: "11111111-1111-1111-1111-111111111111",
-  status: "PENDING",
+  status: "CONFIRMED",
   items: [
     {
       id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
@@ -612,7 +612,7 @@ describe("admin orders api", () => {
     });
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      "http://localhost:8080/api/v1/admin/orders?page=0&size=20&status=CONFIRMED%2CPREPARING%2CREADY%2CDELIVERED",
+      "http://localhost:8080/api/v1/admin/orders?page=0&size=20&status=CONFIRMED%2CPREPARING%2CDELIVERY%2CDELIVERED",
     );
   });
 
@@ -628,8 +628,8 @@ describe("admin orders api", () => {
   it("uses admin orders query keys with page size and status", () => {
     expect(adminKeys().ordersRoot()).toEqual(["admin", "orders"]);
     expect(
-      adminKeys().orders({ page: 0, size: 20, status: "READY" }),
-    ).toEqual(["admin", "orders", "list", 0, 20, "READY"]);
+      adminKeys().orders({ page: 0, size: 20, status: "DELIVERY" }),
+    ).toEqual(["admin", "orders", "list", 0, 20, "DELIVERY"]);
     expect(adminKeys().orders({ page: 2, size: 20 })).toEqual([
       "admin",
       "orders",
@@ -671,7 +671,7 @@ describe("admin orders api", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      listAdminOrders({ page: 0, size: 20, status: "PENDING" }),
+      listAdminOrders({ page: 0, size: 20, status: "DELIVERY" }),
     ).rejects.toMatchObject({
       problem: { status: 400, code: "INVALID_ORDER" },
     });
@@ -769,104 +769,20 @@ describe("admin orders api", () => {
     });
   });
 
-  it("posts admin order status update to /orders/{id}/status", async () => {
-    configureSessionPersistence(new MemoryPersistence());
-    setSession({
-      userId: "99999999-9999-9999-9999-999999999999",
-      role: "ADMIN",
-      accessToken: "admin-token",
-      expiresAt: "2099-01-01T00:00:00Z",
-    });
-    const updated: Order = {
-      ...listedAdminOrder,
-      status: "CONFIRMED",
-      confirmedAt: "2026-03-01T10:20:00Z",
-      payment: null,
-    };
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(updated));
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(
-      updateAdminOrderStatus(listedAdminOrder.id, { status: "CONFIRMED" }),
-    ).resolves.toEqual(updated);
-
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe(
-      `http://localhost:8080/api/v1/orders/${listedAdminOrder.id}/status`,
-    );
-    expect(url).not.toContain("/admin/orders/");
-    expect(init.method).toBe("POST");
-    expect(new Headers(init.headers).get("Authorization")).toBe(
-      "Bearer admin-token",
-    );
-    expect(init.body).toBe(JSON.stringify({ status: "CONFIRMED" }));
-    expect(updated.payment).toBeNull();
-  });
-
-  it("encodes order id in status update path", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(listedAdminOrder));
-    vi.stubGlobal("fetch", fetchMock);
-
-    await updateAdminOrderStatus("id with spaces", { status: "PREPARING" });
-
-    expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      "http://localhost:8080/api/v1/orders/id%20with%20spaces/status",
-    );
-  });
-
-  it("propagates status update RFC7807 errors", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        jsonResponse(
-          {
-            status: 404,
-            code: "ORDER_NOT_FOUND",
-            title: "Not Found",
-            detail: "missing",
-          },
-          404,
-        ),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse(
-          {
-            status: 409,
-            code: "INVALID_ORDER_TRANSITION",
-            title: "Conflict",
-            detail: "Invalid order state transition: PENDING -> PREPARING",
-          },
-          409,
-        ),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse(
-          {
-            status: 400,
-            code: "INVALID_ORDER_STATUS_UPDATE",
-            title: "Bad Request",
-            detail: "Order status cannot be updated to: CANCELLED",
-          },
-          400,
-        ),
-      );
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(
-      updateAdminOrderStatus(listedAdminOrder.id, { status: "CONFIRMED" }),
-    ).rejects.toMatchObject({
-      problem: { status: 404, code: "ORDER_NOT_FOUND" },
-    });
-    await expect(
-      updateAdminOrderStatus(listedAdminOrder.id, { status: "PREPARING" }),
-    ).rejects.toMatchObject({
-      problem: { status: 409, code: "INVALID_ORDER_TRANSITION" },
-    });
-    await expect(
-      updateAdminOrderStatus(listedAdminOrder.id, { status: "CANCELLED" }),
-    ).rejects.toMatchObject({
-      problem: { status: 400, code: "INVALID_ORDER_STATUS_UPDATE" },
-    });
+  it("exposes the lifecycle statuses without PENDING or READY", () => {
+    expect(ADMIN_ORDER_STATUSES).toEqual([
+      "CONFIRMED",
+      "PREPARING",
+      "DELIVERY",
+      "DELIVERED",
+      "CANCELLED",
+    ]);
+    expect(ADMIN_SALES_ORDER_STATUSES).toEqual([
+      "CONFIRMED",
+      "PREPARING",
+      "DELIVERY",
+      "DELIVERED",
+    ]);
   });
 });
 

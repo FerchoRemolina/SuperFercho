@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { AdminOrderStatusActions } from "@/features/admin/components/admin-order-status-actions";
 import { useAdminOrderQuery } from "@/features/admin/hooks";
 import {
   adminOrderDetailErrorKind,
+  adminOrderStatusSummary,
   adminPaymentHref,
   formatAdminInstant,
 } from "@/features/admin/presentation";
@@ -126,7 +126,9 @@ export function AdminOrderDetailPageContent({
       <div className="mt-8 grid gap-6">
         <Card className="grid gap-4">
           <h2 className="text-xl font-semibold text-sf-ink">Estado</h2>
-          <AdminOrderStatusActions order={order} />
+          <p className="text-sm text-sf-muted">
+            {adminOrderStatusSummary(order.status)}
+          </p>
         </Card>
 
         <Card className="grid gap-4">

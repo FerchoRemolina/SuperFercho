@@ -4,12 +4,11 @@ import type { Money } from "@/shared/money/money";
 /** Mirrors PaymentMethod used by POST /api/v1/orders. */
 export type PaymentMethod = "SIMULATED_CARD" | "CASH_ON_DELIVERY";
 
-/** Mirrors OrderStatus. A successful checkout always creates PENDING. */
+/** Mirrors OrderStatus. A successful checkout always creates CONFIRMED. */
 export type OrderStatus =
-  | "PENDING"
   | "CONFIRMED"
   | "PREPARING"
-  | "READY"
+  | "DELIVERY"
   | "DELIVERED"
   | "CANCELLED";
 
@@ -161,14 +160,12 @@ export function paymentMethodLabel(method: PaymentMethod): string {
 
 export function orderStatusLabel(status: OrderStatus): string {
   switch (status) {
-    case "PENDING":
-      return "Pendiente";
     case "CONFIRMED":
       return "Confirmado";
     case "PREPARING":
       return "En preparación";
-    case "READY":
-      return "Listo";
+    case "DELIVERY":
+      return "En camino";
     case "DELIVERED":
       return "Entregado";
     case "CANCELLED":
