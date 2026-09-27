@@ -3,6 +3,7 @@ package com.superfercho.orders.domain.model;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -25,17 +26,18 @@ class OrderTest {
     private static final UUID PAYMENT_ID = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
     private static final Instant CREATED_AT = Instant.parse("2026-01-15T12:00:00Z");
     private static final Instant CANCELLATION_DEADLINE = CREATED_AT.plus(Order.CUSTOMER_CANCELLATION_WINDOW);
-    private static final Instant AFTER_DEADLINE = Instant.parse("2026-01-15T12:15:00.001Z");
+    private static final Instant WITHIN_WINDOW = Instant.parse("2026-01-15T12:01:59.999Z");
+    private static final Instant AFTER_DEADLINE = Instant.parse("2026-01-15T12:02:00.001Z");
 
     @Test
-    void shouldCreateValidPendingOrder() {
+    void shouldCreateConfirmedOrder() {
         OrderItem item = milk(2);
         Order order = validOrder().items(List.of(item)).build();
 
         assertEquals(ORDER_ID, order.id());
         assertEquals("ORD-1001", order.orderNumber().value());
         assertEquals(CUSTOMER_ID, order.customerId());
-        assertEquals(OrderStatus.PENDING, order.status());
+        assertEquals(OrderStatus.CONFIRMED, order.status());
         assertEquals(1, order.items().size());
         assertEquals(item, order.items().get(0));
         assertEquals(Money.cop(new BigDecimal("21.00")), order.subtotal());
@@ -44,7 +46,7 @@ class OrderTest {
         assertEquals("Calle 1 # 2-3", order.shippingAddress().addressLine());
         assertNull(order.paymentId());
         assertEquals(CREATED_AT, order.createdAt());
-        assertNull(order.confirmedAt());
+        assertEquals(CREATED_AT, order.confirmedAt());
         assertNull(order.cancelledAt());
         assertEquals(CREATED_AT, order.updatedAt());
     }
@@ -133,30 +135,100 @@ class OrderTest {
     }
 
     @Test
-    void shouldConfirmPendingOrder() {
-        Instant confirmedAt = Instant.parse("2026-01-15T12:05:00Z");
-        Order confirmed = validOrder().build().confirm(confirmedAt);
-
-        assertEquals(OrderStatus.CONFIRMED, confirmed.status());
-        assertEquals(confirmedAt, confirmed.confirmedAt());
-        assertEquals(confirmedAt, confirmed.updatedAt());
-        assertEquals(CREATED_AT, confirmed.createdAt());
-        assertNull(confirmed.cancelledAt());
+    void shouldResolveTargetStatusFromConfirmedAtAge() {
+        assertEquals(OrderStatus.CONFIRMED, Order.targetStatusAt(CREATED_AT, CREATED_AT));
+        assertEquals(OrderStatus.CONFIRMED, Order.targetStatusAt(CREATED_AT, CREATED_AT.plusSeconds(119)));
+        assertEquals(OrderStatus.PREPARING, Order.targetStatusAt(CREATED_AT, CREATED_AT.plusSeconds(120)));
+        assertEquals(OrderStatus.PREPARING, Order.targetStatusAt(CREATED_AT, CREATED_AT.plusSeconds(239)));
+        assertEquals(OrderStatus.DELIVERY, Order.targetStatusAt(CREATED_AT, CREATED_AT.plusSeconds(240)));
+        assertEquals(OrderStatus.DELIVERY, Order.targetStatusAt(CREATED_AT, CREATED_AT.plusSeconds(359)));
+        assertEquals(OrderStatus.DELIVERED, Order.targetStatusAt(CREATED_AT, CREATED_AT.plusSeconds(360)));
+        assertEquals(OrderStatus.DELIVERED, Order.targetStatusAt(CREATED_AT, CREATED_AT.plusSeconds(3600)));
     }
 
     @Test
-    void shouldCancelPendingOrderWithinWindow() {
-        Instant cancelledAt = Instant.parse("2026-01-15T12:10:00Z");
-        Order cancelled = validOrder().build().cancel(cancelledAt);
+    void shouldRejectTargetStatusBeforeConfirmedAtOrWithNulls() {
+        assertThrows(
+                InvalidOrderException.class,
+                () -> Order.targetStatusAt(CREATED_AT, CREATED_AT.minusSeconds(1)));
+        assertThrows(InvalidOrderException.class, () -> Order.targetStatusAt(null, CREATED_AT));
+        assertThrows(InvalidOrderException.class, () -> Order.targetStatusAt(CREATED_AT, null));
+    }
+
+    @Test
+    void shouldProgressConfirmedOrderToDeliveredStepByStep() {
+        Instant t1 = CREATED_AT.plusSeconds(120);
+        Instant t2 = CREATED_AT.plusSeconds(240);
+        Instant t3 = CREATED_AT.plusSeconds(360);
+
+        Order delivered =
+                validOrder().build().startPreparation(t1).startDelivery(t2).markDelivered(t3);
+
+        assertEquals(OrderStatus.DELIVERED, delivered.status());
+        assertEquals(CREATED_AT, delivered.confirmedAt());
+        assertEquals(t3, delivered.updatedAt());
+        assertNull(delivered.cancelledAt());
+    }
+
+    @Test
+    void shouldAdvanceLifecycleOneStepAtATime() {
+        Order confirmed = validOrder().build();
+
+        Order preparing = confirmed.advanceLifecycle(CREATED_AT.plusSeconds(120));
+        assertEquals(OrderStatus.PREPARING, preparing.status());
+        assertEquals(CREATED_AT.plusSeconds(120), preparing.updatedAt());
+
+        Order delivery = preparing.advanceLifecycle(CREATED_AT.plusSeconds(240));
+        assertEquals(OrderStatus.DELIVERY, delivery.status());
+
+        Order delivered = delivery.advanceLifecycle(CREATED_AT.plusSeconds(360));
+        assertEquals(OrderStatus.DELIVERED, delivered.status());
+        assertEquals(CREATED_AT, delivered.confirmedAt());
+        assertNull(delivered.cancelledAt());
+    }
+
+    @Test
+    void shouldCatchUpLifecycleToTargetStatusInOneJump() {
+        Order delivered = validOrder().build().advanceLifecycle(CREATED_AT.plusSeconds(3600));
+
+        assertEquals(OrderStatus.DELIVERED, delivered.status());
+        assertEquals(CREATED_AT, delivered.confirmedAt());
+    }
+
+    @Test
+    void shouldReturnSameInstanceWhenLifecycleTargetIsCurrentStatus() {
+        Order confirmed = validOrder().build();
+
+        assertSame(confirmed, confirmed.advanceLifecycle(CREATED_AT.plusSeconds(60)));
+    }
+
+    @Test
+    void shouldRejectAdvanceLifecycleFromTerminalStatuses() {
+        Order delivered = reconstitute(
+                OrderStatus.DELIVERED, PAYMENT_ID, CREATED_AT, CREATED_AT, null, CREATED_AT.plusSeconds(360));
+        Order cancelled = reconstitute(
+                OrderStatus.CANCELLED, PAYMENT_ID, CREATED_AT, null, CREATED_AT, CREATED_AT);
+
+        assertThrows(
+                InvalidOrderStateTransitionException.class,
+                () -> delivered.advanceLifecycle(CREATED_AT.plusSeconds(3600)));
+        assertThrows(
+                InvalidOrderStateTransitionException.class,
+                () -> cancelled.advanceLifecycle(CREATED_AT.plusSeconds(3600)));
+    }
+
+    @Test
+    void shouldCancelConfirmedOrderWithinWindow() {
+        Order cancelled = validOrder().build().cancel(WITHIN_WINDOW);
 
         assertEquals(OrderStatus.CANCELLED, cancelled.status());
-        assertEquals(cancelledAt, cancelled.cancelledAt());
-        assertEquals(cancelledAt, cancelled.updatedAt());
+        assertEquals(WITHIN_WINDOW, cancelled.cancelledAt());
+        assertEquals(WITHIN_WINDOW, cancelled.updatedAt());
         assertNull(cancelled.confirmedAt());
     }
 
     @Test
-    void shouldCancelPendingOrderAtCreatedAt() {
+    void shouldCancelConfirmedOrderAtCreatedAt() {
         Order cancelled = validOrder().build().cancel(CREATED_AT);
 
         assertEquals(OrderStatus.CANCELLED, cancelled.status());
@@ -164,12 +236,11 @@ class OrderTest {
     }
 
     @Test
-    void shouldCancelPendingOrderExactlyAtDeadline() {
-        Order cancelled = validOrder().build().cancel(CANCELLATION_DEADLINE);
+    void shouldRejectCancellationExactlyAtDeadline() {
+        Order order = validOrder().build();
 
-        assertEquals(OrderStatus.CANCELLED, cancelled.status());
-        assertEquals(CANCELLATION_DEADLINE, cancelled.cancelledAt());
-        assertEquals(CANCELLATION_DEADLINE, cancelled.updatedAt());
+        assertThrows(OrderCancellationNotAllowedException.class, () -> order.cancel(CANCELLATION_DEADLINE));
+        assertEquals(OrderStatus.CONFIRMED, order.status());
     }
 
     @Test
@@ -177,163 +248,164 @@ class OrderTest {
         Order order = validOrder().build();
 
         assertThrows(OrderCancellationNotAllowedException.class, () -> order.cancel(AFTER_DEADLINE));
-        assertEquals(OrderStatus.PENDING, order.status());
+        assertEquals(OrderStatus.CONFIRMED, order.status());
     }
 
     @Test
-    void shouldRejectCancellationFromConfirmedOrder() {
-        Order confirmed = validOrder().build().confirm(Instant.parse("2026-01-15T12:01:00Z"));
+    void shouldRejectCancellationFromPreparing() {
+        Order preparing = validOrder().build().startPreparation(CREATED_AT.plusSeconds(120));
 
         assertThrows(
                 InvalidOrderStateTransitionException.class,
-                () -> confirmed.cancel(Instant.parse("2026-01-15T12:02:00Z")));
+                () -> preparing.cancel(CREATED_AT.plusSeconds(121)));
     }
 
     @Test
-    void shouldProgressConfirmedOrderToDelivered() {
-        Instant t1 = Instant.parse("2026-01-15T12:16:00Z");
-        Instant t2 = Instant.parse("2026-01-15T12:20:00Z");
-        Instant t3 = Instant.parse("2026-01-15T12:30:00Z");
-        Instant t4 = Instant.parse("2026-01-15T13:00:00Z");
+    void shouldRejectCancellationFromDeliveryAndDelivered() {
+        Order delivery = validOrder()
+                .build()
+                .startPreparation(CREATED_AT.plusSeconds(120))
+                .startDelivery(CREATED_AT.plusSeconds(240));
+        Order delivered = delivery.markDelivered(CREATED_AT.plusSeconds(360));
 
+        assertThrows(
+                InvalidOrderStateTransitionException.class,
+                () -> delivery.cancel(CREATED_AT.plusSeconds(241)));
+        assertThrows(
+                InvalidOrderStateTransitionException.class,
+                () -> delivered.cancel(CREATED_AT.plusSeconds(361)));
+    }
+
+    @Test
+    void shouldForceCleanupCancellationFromAnyInProgressStatusWithoutWindow() {
+        Order confirmed = validOrder().build();
+        Order preparing = confirmed.startPreparation(CREATED_AT.plusSeconds(120));
+        Order delivery = preparing.startDelivery(CREATED_AT.plusSeconds(240));
+        Instant longAfterWindow = CREATED_AT.plusSeconds(3600);
+
+        for (Order order : List.of(confirmed, preparing, delivery)) {
+            Order cancelled = order.cancelForCleanup(longAfterWindow);
+
+            assertEquals(OrderStatus.CANCELLED, cancelled.status());
+            assertEquals(longAfterWindow, cancelled.cancelledAt());
+            assertEquals(longAfterWindow, cancelled.updatedAt());
+            assertNull(cancelled.confirmedAt());
+        }
+    }
+
+    @Test
+    void shouldRejectCleanupCancellationFromTerminalStatuses() {
         Order delivered = validOrder()
                 .build()
-                .confirm(t1)
-                .startPreparation(t2)
-                .markReady(t3)
-                .markDelivered(t4);
-
-        assertEquals(OrderStatus.DELIVERED, delivered.status());
-        assertEquals(t1, delivered.confirmedAt());
-        assertEquals(t4, delivered.updatedAt());
-        assertNull(delivered.cancelledAt());
-    }
-
-    @Test
-    void shouldRejectPendingToPreparing() {
-        assertThrows(
-                InvalidOrderStateTransitionException.class,
-                () -> validOrder().build().startPreparation(Instant.parse("2026-01-15T12:01:00Z")));
-    }
-
-    @Test
-    void shouldRejectConfirmedToDelivered() {
-        Order confirmed = validOrder().build().confirm(Instant.parse("2026-01-15T12:01:00Z"));
+                .startPreparation(CREATED_AT.plusSeconds(120))
+                .startDelivery(CREATED_AT.plusSeconds(240))
+                .markDelivered(CREATED_AT.plusSeconds(360));
+        Order cancelled = validOrder().build().cancel(CREATED_AT);
 
         assertThrows(
                 InvalidOrderStateTransitionException.class,
-                () -> confirmed.markDelivered(Instant.parse("2026-01-15T12:02:00Z")));
+                () -> delivered.cancelForCleanup(CREATED_AT.plusSeconds(3600)));
+        assertThrows(
+                InvalidOrderStateTransitionException.class,
+                () -> cancelled.cancelForCleanup(CREATED_AT.plusSeconds(3600)));
     }
 
     @Test
-    void shouldRejectPreparingToCancelled() {
-        Order preparing = validOrder()
-                .build()
-                .confirm(Instant.parse("2026-01-15T12:01:00Z"))
-                .startPreparation(Instant.parse("2026-01-15T12:02:00Z"));
+    void shouldReportCustomerCancellableOnlyForConfirmedWithinWindow() {
+        Order confirmed = validOrder().build();
+
+        assertTrue(confirmed.isCustomerCancellable(CREATED_AT));
+        assertTrue(confirmed.isCustomerCancellable(WITHIN_WINDOW));
+        assertFalse(confirmed.isCustomerCancellable(CANCELLATION_DEADLINE));
+        assertFalse(confirmed.isCustomerCancellable(AFTER_DEADLINE));
+        assertFalse(confirmed
+                .startPreparation(CREATED_AT.plusSeconds(120))
+                .isCustomerCancellable(CREATED_AT.plusSeconds(120)));
+        assertFalse(confirmed.cancel(CREATED_AT).isCustomerCancellable(CREATED_AT));
+    }
+
+    @Test
+    void shouldRejectConfirmedToDelivery() {
+        Order confirmed = validOrder().build();
 
         assertThrows(
                 InvalidOrderStateTransitionException.class,
-                () -> preparing.cancel(Instant.parse("2026-01-15T12:03:00Z")));
+                () -> confirmed.startDelivery(CREATED_AT.plusSeconds(120)));
+        assertThrows(
+                InvalidOrderStateTransitionException.class,
+                () -> confirmed.markDelivered(CREATED_AT.plusSeconds(120)));
     }
 
     @Test
     void shouldRejectDeliveredToAnyFurtherTransition() {
         Order delivered = validOrder()
                 .build()
-                .confirm(Instant.parse("2026-01-15T12:16:00Z"))
-                .startPreparation(Instant.parse("2026-01-15T12:17:00Z"))
-                .markReady(Instant.parse("2026-01-15T12:18:00Z"))
-                .markDelivered(Instant.parse("2026-01-15T12:19:00Z"));
+                .startPreparation(CREATED_AT.plusSeconds(120))
+                .startDelivery(CREATED_AT.plusSeconds(240))
+                .markDelivered(CREATED_AT.plusSeconds(360));
 
         assertThrows(
                 InvalidOrderStateTransitionException.class,
-                () -> delivered.markReady(Instant.parse("2026-01-15T12:20:00Z")));
+                () -> delivered.startDelivery(CREATED_AT.plusSeconds(400)));
         assertThrows(
                 InvalidOrderStateTransitionException.class,
-                () -> delivered.cancel(Instant.parse("2026-01-15T12:20:00Z")));
+                () -> delivered.startPreparation(CREATED_AT.plusSeconds(400)));
+        assertThrows(
+                InvalidOrderStateTransitionException.class,
+                () -> delivered.markDelivered(CREATED_AT.plusSeconds(400)));
     }
 
     @Test
-    void shouldNotBeEligibleForAutomaticConfirmationWithinWindow() {
+    void shouldRejectTransitionsBeforeCreatedAt() {
         Order order = validOrder().build();
 
-        assertFalse(order.isEligibleForAutomaticConfirmation(CREATED_AT));
-        assertFalse(order.isEligibleForAutomaticConfirmation(Instant.parse("2026-01-15T12:14:59Z")));
-    }
-
-    @Test
-    void shouldNotBeEligibleForAutomaticConfirmationExactlyAtDeadline() {
-        assertFalse(validOrder().build().isEligibleForAutomaticConfirmation(CANCELLATION_DEADLINE));
-    }
-
-    @Test
-    void shouldBeEligibleForAutomaticConfirmationAfterDeadline() {
-        assertTrue(validOrder().build().isEligibleForAutomaticConfirmation(AFTER_DEADLINE));
-    }
-
-    @Test
-    void shouldNotBeEligibleForAutomaticConfirmationWhenNotPending() {
-        Order confirmed = validOrder().build().confirm(AFTER_DEADLINE);
-
-        assertFalse(confirmed.isEligibleForAutomaticConfirmation(AFTER_DEADLINE.plusSeconds(60)));
+        assertThrows(
+                InvalidOrderException.class, () -> order.startPreparation(CREATED_AT.minusSeconds(1)));
+        assertThrows(InvalidOrderException.class, () -> order.cancel(CREATED_AT.minusSeconds(1)));
+        assertThrows(InvalidOrderException.class, () -> order.cancelForCleanup(CREATED_AT.minusSeconds(1)));
+        assertThrows(InvalidOrderException.class, () -> order.advanceLifecycle(CREATED_AT.minusSeconds(1)));
     }
 
     @Test
     void shouldPreservePaymentIdWhenPresent() {
-        UUID paymentId = PAYMENT_ID;
-        Order order = validOrder().paymentId(paymentId).build();
+        Order order = validOrder().paymentId(PAYMENT_ID).build();
 
-        assertEquals(paymentId, order.paymentId());
-        assertEquals(paymentId, order.confirm(Instant.parse("2026-01-15T12:01:00Z")).paymentId());
-    }
-
-    @Test
-    void shouldReconstitutePendingOrder() {
-        Order reconstituted = reconstitute(
-                OrderStatus.PENDING, PAYMENT_ID, CREATED_AT, null, null, CREATED_AT);
-
-        assertReconstitutedIdentity(reconstituted);
-        assertEquals(OrderStatus.PENDING, reconstituted.status());
-        assertEquals(CREATED_AT, reconstituted.createdAt());
-        assertEquals(CREATED_AT, reconstituted.updatedAt());
-        assertNull(reconstituted.confirmedAt());
-        assertNull(reconstituted.cancelledAt());
-        assertEquals(PAYMENT_ID, reconstituted.paymentId());
+        assertEquals(PAYMENT_ID, order.paymentId());
+        assertEquals(PAYMENT_ID, order.startPreparation(CREATED_AT.plusSeconds(120)).paymentId());
+        assertEquals(PAYMENT_ID, order.cancel(CREATED_AT).paymentId());
     }
 
     @Test
     void shouldReconstituteConfirmedOrderPreservingDistinctUpdatedAt() {
-        Instant updatedAt = Instant.parse("2026-01-15T12:20:00Z");
-        Instant confirmedAt = Instant.parse("2026-01-15T12:16:00Z");
-        Order reconstituted = reconstitute(
-                OrderStatus.CONFIRMED, PAYMENT_ID, CREATED_AT, confirmedAt, null, updatedAt);
+        Instant updatedAt = Instant.parse("2026-01-15T12:01:00Z");
+        Order reconstituted =
+                reconstitute(OrderStatus.CONFIRMED, PAYMENT_ID, CREATED_AT, CREATED_AT, null, updatedAt);
 
+        assertReconstitutedIdentity(reconstituted);
         assertEquals(OrderStatus.CONFIRMED, reconstituted.status());
-        assertEquals(confirmedAt, reconstituted.confirmedAt());
+        assertEquals(CREATED_AT, reconstituted.confirmedAt());
         assertEquals(updatedAt, reconstituted.updatedAt());
         assertNull(reconstituted.cancelledAt());
         assertEquals(PAYMENT_ID, reconstituted.paymentId());
     }
 
     @Test
-    void shouldReconstitutePreparingReadyAndDeliveredOrders() {
-        Instant confirmedAt = Instant.parse("2026-01-15T12:16:00Z");
+    void shouldReconstitutePreparingDeliveryAndDeliveredOrders() {
+        Instant confirmedAt = CREATED_AT;
         Instant updatedAt = Instant.parse("2026-01-15T13:00:00Z");
 
         Order preparing =
                 reconstitute(OrderStatus.PREPARING, PAYMENT_ID, CREATED_AT, confirmedAt, null, updatedAt);
-        Order ready = reconstitute(OrderStatus.READY, PAYMENT_ID, CREATED_AT, confirmedAt, null, updatedAt);
+        Order delivery =
+                reconstitute(OrderStatus.DELIVERY, PAYMENT_ID, CREATED_AT, confirmedAt, null, updatedAt);
         Order delivered =
                 reconstitute(OrderStatus.DELIVERED, PAYMENT_ID, CREATED_AT, confirmedAt, null, updatedAt);
 
         assertEquals(OrderStatus.PREPARING, preparing.status());
-        assertEquals(OrderStatus.READY, ready.status());
+        assertEquals(OrderStatus.DELIVERY, delivery.status());
         assertEquals(OrderStatus.DELIVERED, delivered.status());
         assertEquals(confirmedAt, preparing.confirmedAt());
-        assertEquals(updatedAt, preparing.updatedAt());
-        assertEquals(confirmedAt, ready.confirmedAt());
-        assertEquals(updatedAt, ready.updatedAt());
+        assertEquals(confirmedAt, delivery.confirmedAt());
         assertEquals(confirmedAt, delivered.confirmedAt());
         assertEquals(updatedAt, delivered.updatedAt());
         assertNull(delivered.cancelledAt());
@@ -341,9 +413,9 @@ class OrderTest {
 
     @Test
     void shouldReconstituteCancelledOrder() {
-        Instant cancelledAt = Instant.parse("2026-01-15T12:10:00Z");
-        Order reconstituted = reconstitute(
-                OrderStatus.CANCELLED, PAYMENT_ID, CREATED_AT, null, cancelledAt, cancelledAt);
+        Instant cancelledAt = Instant.parse("2026-01-15T12:01:00Z");
+        Order reconstituted =
+                reconstitute(OrderStatus.CANCELLED, PAYMENT_ID, CREATED_AT, null, cancelledAt, cancelledAt);
 
         assertEquals(OrderStatus.CANCELLED, reconstituted.status());
         assertEquals(cancelledAt, reconstituted.cancelledAt());
@@ -352,19 +424,6 @@ class OrderTest {
         assertEquals(PAYMENT_ID, reconstituted.paymentId());
         assertEquals(validAddress(), reconstituted.shippingAddress());
         assertEquals(milk(2), reconstituted.items().get(0));
-    }
-
-    @Test
-    void shouldRejectReconstitutePendingWithConfirmedAt() {
-        assertThrows(
-                InvalidOrderException.class,
-                () -> reconstitute(
-                        OrderStatus.PENDING,
-                        PAYMENT_ID,
-                        CREATED_AT,
-                        Instant.parse("2026-01-15T12:01:00Z"),
-                        null,
-                        CREATED_AT));
     }
 
     @Test
@@ -382,16 +441,27 @@ class OrderTest {
                         OrderStatus.CANCELLED,
                         PAYMENT_ID,
                         CREATED_AT,
+                        CREATED_AT,
                         Instant.parse("2026-01-15T12:01:00Z"),
-                        Instant.parse("2026-01-15T12:10:00Z"),
-                        Instant.parse("2026-01-15T12:10:00Z")));
+                        Instant.parse("2026-01-15T12:01:00Z")));
     }
 
     @Test
-    void shouldRejectReconstituteConfirmedWithoutConfirmedAt() {
+    void shouldRejectReconstituteInProgressWithoutConfirmedAt() {
+        for (OrderStatus status :
+                List.of(OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.DELIVERY, OrderStatus.DELIVERED)) {
+            assertThrows(
+                    InvalidOrderException.class,
+                    () -> reconstitute(status, PAYMENT_ID, CREATED_AT, null, null, CREATED_AT));
+        }
+    }
+
+    @Test
+    void shouldRejectReconstituteInProgressWithCancelledAt() {
         assertThrows(
                 InvalidOrderException.class,
-                () -> reconstitute(OrderStatus.CONFIRMED, PAYMENT_ID, CREATED_AT, null, null, CREATED_AT));
+                () -> reconstitute(
+                        OrderStatus.CONFIRMED, PAYMENT_ID, CREATED_AT, CREATED_AT, CREATED_AT, CREATED_AT));
     }
 
     @Test
@@ -399,10 +469,10 @@ class OrderTest {
         assertThrows(
                 InvalidOrderException.class,
                 () -> reconstitute(
-                        OrderStatus.PENDING,
+                        OrderStatus.CONFIRMED,
                         PAYMENT_ID,
                         Instant.parse("2026-01-15T12:10:00Z"),
-                        null,
+                        Instant.parse("2026-01-15T12:10:00Z"),
                         null,
                         CREATED_AT));
     }
@@ -415,12 +485,12 @@ class OrderTest {
                         ORDER_ID,
                         new OrderNumber("ORD-1001"),
                         CUSTOMER_ID,
-                        OrderStatus.PENDING,
+                        OrderStatus.CONFIRMED,
                         List.of(),
                         validAddress(),
                         PAYMENT_ID,
                         CREATED_AT,
-                        null,
+                        CREATED_AT,
                         null,
                         CREATED_AT));
     }
@@ -433,17 +503,17 @@ class OrderTest {
                         null,
                         new OrderNumber("ORD-1001"),
                         CUSTOMER_ID,
-                        OrderStatus.PENDING,
+                        OrderStatus.CONFIRMED,
                         List.of(milk(2)),
                         validAddress(),
                         PAYMENT_ID,
                         CREATED_AT,
-                        null,
+                        CREATED_AT,
                         null,
                         CREATED_AT));
         assertThrows(
                 InvalidOrderException.class,
-                () -> reconstitute(null, PAYMENT_ID, CREATED_AT, null, null, CREATED_AT));
+                () -> reconstitute(null, PAYMENT_ID, CREATED_AT, CREATED_AT, null, CREATED_AT));
     }
 
     private static void assertReconstitutedIdentity(Order order) {

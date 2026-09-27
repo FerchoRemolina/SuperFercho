@@ -146,7 +146,7 @@ class TransactionalCheckoutUseCaseIntegrationTest {
         Order order = orderRepository.findById(result.orderId()).orElseThrow();
         Payment payment = paymentRepository.findById(order.paymentId()).orElseThrow();
 
-        assertThat(result.status()).isEqualTo(OrderStatus.PENDING);
+        assertThat(result.status()).isEqualTo(OrderStatus.CONFIRMED);
         assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.APPROVED);
         assertThat(result.total()).isEqualTo(Money.cop(new BigDecimal("21.00")));
         assertThat(result.orderId()).isEqualTo(order.id());
@@ -180,7 +180,7 @@ class TransactionalCheckoutUseCaseIntegrationTest {
         Order order = orderRepository.findById(result.orderId()).orElseThrow();
         Payment payment = paymentRepository.findById(order.paymentId()).orElseThrow();
 
-        assertThat(result.status()).isEqualTo(OrderStatus.PENDING);
+        assertThat(result.status()).isEqualTo(OrderStatus.CONFIRMED);
         assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.PENDING);
         assertThat(payment.status()).isEqualTo(com.superfercho.payments.domain.model.PaymentStatus.PENDING);
         assertThat(payment.providerReference()).isEqualTo("cod-pending");
@@ -620,7 +620,8 @@ class TransactionalCheckoutUseCaseIntegrationTest {
                 id,
                 "CC",
                 token.substring(0, 16),
-                "Ada Lovelace",
+                "Ada",
+                "Lovelace",
                 token + "@checkout-it.test",
                 "3001234567",
                 "hashed-password",

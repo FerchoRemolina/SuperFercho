@@ -51,7 +51,7 @@ class AdminOrderQueryUseCasesTest {
     private static final UUID PAYMENT_ID = UUID.fromString("55555555-5555-5555-5555-555555555555");
     private static final Money TOTAL = Money.cop(new BigDecimal("21.00"));
     private static final List<OrderStatus> SALES_STATUSES =
-            List.of(OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.DELIVERED);
+            List.of(OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.DELIVERY, OrderStatus.DELIVERED);
 
     @Mock
     private CurrentUserProvider currentUserProvider;
@@ -155,7 +155,7 @@ class AdminOrderQueryUseCasesTest {
                 .thenReturn(new PagedResult<>(List.of(), 1, 10, 3));
 
         PagedResult<OrderResult> result = listAdminOrders.execute(ListAdminOrdersCommand.of(
-                1, 10, List.of("CONFIRMED,PREPARING", "READY", "DELIVERED")));
+                1, 10, List.of("CONFIRMED,PREPARING", "DELIVERY", "DELIVERED")));
 
         assertEquals(1, result.page());
         assertEquals(10, result.size());
@@ -205,9 +205,8 @@ class AdminOrderQueryUseCasesTest {
     private static Order deliveredOrder(UUID paymentId) {
         Instant at = CREATED_AT.plusSeconds(60);
         return order(CUSTOMER_ID, paymentId)
-                .confirm(at)
                 .startPreparation(at)
-                .markReady(at)
+                .startDelivery(at)
                 .markDelivered(at);
     }
 

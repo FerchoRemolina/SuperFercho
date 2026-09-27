@@ -61,13 +61,13 @@ class CheckoutIdempotencyPersistenceMapperTest {
 
     @Test
     void shouldMapPendingCashOnDeliveryResult() {
-        IdempotencyRecord record = record(OrderStatus.PENDING, PaymentStatus.PENDING, TOTAL);
+        IdempotencyRecord record = record(OrderStatus.CONFIRMED, PaymentStatus.PENDING, TOTAL);
 
         CheckoutIdempotencyJpaEntity entity = mapper.toEntity(ENTITY_ID, record);
 
-        assertEquals(OrderStatus.PENDING, entity.getResultOrderStatus());
+        assertEquals(OrderStatus.CONFIRMED, entity.getResultOrderStatus());
         assertEquals(PaymentStatus.PENDING, entity.getResultPaymentStatus());
-        assertEquals(OrderStatus.PENDING, mapper.toRecord(entity).result().status());
+        assertEquals(OrderStatus.CONFIRMED, mapper.toRecord(entity).result().status());
         assertEquals(PaymentStatus.PENDING, mapper.toRecord(entity).result().paymentStatus());
     }
 

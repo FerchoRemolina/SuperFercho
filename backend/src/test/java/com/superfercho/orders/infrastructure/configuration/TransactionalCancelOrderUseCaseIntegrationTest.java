@@ -29,11 +29,9 @@ import com.superfercho.orders.application.dto.CheckoutItem;
 import com.superfercho.orders.application.dto.CheckoutResult;
 import com.superfercho.orders.application.dto.OrderResult;
 import com.superfercho.orders.application.dto.PaymentMethod;
-import com.superfercho.orders.application.dto.UpdateOrderStatusCommand;
 import com.superfercho.orders.application.exception.OrderNotFoundException;
 import com.superfercho.orders.application.exception.OrderOwnershipException;
 import com.superfercho.orders.application.port.OrderRepository;
-import com.superfercho.orders.application.usecase.UpdateOrderStatusUseCase;
 import com.superfercho.orders.domain.exception.InvalidOrderStateTransitionException;
 import com.superfercho.orders.domain.exception.OrderCancellationNotAllowedException;
 import com.superfercho.orders.domain.model.Order;
@@ -102,9 +100,6 @@ class TransactionalCancelOrderUseCaseIntegrationTest {
     private TransactionalCheckoutUseCase transactionalCheckoutUseCase;
 
     @Autowired
-    private UpdateOrderStatusUseCase updateOrderStatusUseCase;
-
-    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -140,7 +135,7 @@ class TransactionalCancelOrderUseCaseIntegrationTest {
     }
 
     @Test
-    void shouldCancelPendingOrderWithApprovedPaymentAndRestoreStock() {
+    void shouldCancelConfirmedOrderWithApprovedPaymentAndRestoreStock() {
         PreparedOrder prepared = checkoutWith(PaymentMethod.SIMULATED_CARD);
         int stockAfterCheckout = productRepository.findById(prepared.productId()).orElseThrow().stock();
         assertThat(stockAfterCheckout).isEqualTo(INITIAL_STOCK - QUANTITY);
@@ -170,7 +165,7 @@ class TransactionalCancelOrderUseCaseIntegrationTest {
     }
 
     @Test
-    void shouldCancelPendingOrderWithPendingPaymentWithoutRefunding() {
+    void shouldCancelConfirmedOrderWithPendingPaymentWithoutRefunding() {
         PreparedOrder prepared = checkoutWith(PaymentMethod.CASH_ON_DELIVERY);
         Payment before = paymentRepository.findById(prepared.paymentId()).orElseThrow();
         int stockAfterCheckout = productRepository.findById(prepared.productId()).orElseThrow().stock();
@@ -193,9 +188,10 @@ class TransactionalCancelOrderUseCaseIntegrationTest {
     }
 
     @Test
-    void shouldRejectCancellationWhenOrderIsNotPending() {
+    void shouldRejectCancellationWhenOrderAlreadyLeftConfirmed() {
         PreparedOrder prepared = checkoutWith(PaymentMethod.SIMULATED_CARD);
-        updateOrderStatusUseCase.execute(new UpdateOrderStatusCommand(prepared.orderId(), OrderStatus.CONFIRMED));
+        Order confirmed = orderRepository.findById(prepared.orderId()).orElseThrow();
+        orderRepository.saveIfConfirmed(confirmed.startPreparation(clock.instant())).orElseThrow();
         PaymentSnapshot paymentBefore = paymentSnapshot(prepared.paymentId());
         int stockBefore = productRepository.findById(prepared.productId()).orElseThrow().stock();
 
@@ -203,7 +199,7 @@ class TransactionalCancelOrderUseCaseIntegrationTest {
                 .isInstanceOf(InvalidOrderStateTransitionException.class);
 
         Order order = orderRepository.findById(prepared.orderId()).orElseThrow();
-        assertThat(order.status()).isEqualTo(OrderStatus.CONFIRMED);
+        assertThat(order.status()).isEqualTo(OrderStatus.PREPARING);
         assertThat(order.cancelledAt()).isNull();
         assertThat(productRepository.findById(prepared.productId()).orElseThrow().stock()).isEqualTo(stockBefore);
         assertPaymentUnchanged(prepared.paymentId(), paymentBefore);
@@ -220,7 +216,7 @@ class TransactionalCancelOrderUseCaseIntegrationTest {
                 .isInstanceOf(OrderCancellationNotAllowedException.class);
 
         Order order = orderRepository.findById(prepared.orderId()).orElseThrow();
-        assertThat(order.status()).isEqualTo(OrderStatus.PENDING);
+        assertThat(order.status()).isEqualTo(OrderStatus.CONFIRMED);
         assertThat(order.cancelledAt()).isNull();
         assertThat(productRepository.findById(prepared.productId()).orElseThrow().stock()).isEqualTo(stockBefore);
         assertPaymentUnchanged(prepared.paymentId(), paymentBefore);
@@ -255,7 +251,7 @@ class TransactionalCancelOrderUseCaseIntegrationTest {
                 .isInstanceOf(OrderOwnershipException.class);
 
         Order order = orderRepository.findById(owner.orderId()).orElseThrow();
-        assertThat(order.status()).isEqualTo(OrderStatus.PENDING);
+        assertThat(order.status()).isEqualTo(OrderStatus.CONFIRMED);
         assertThat(order.customerId()).isEqualTo(owner.customerId());
         assertThat(order.cancelledAt()).isNull();
         assertThat(productRepository.findById(owner.productId()).orElseThrow().stock()).isEqualTo(stockBefore);
@@ -330,11 +326,11 @@ class TransactionalCancelOrderUseCaseIntegrationTest {
     }
 
     private void ageOrderBeyondCancellationWindow(UUID orderId) {
-        Instant expiredCreatedAt =
-                clock.instant().minus(Order.CUSTOMER_CANCELLATION_WINDOW).minusMillis(1);
+        Instant expired = clock.instant().minus(Order.CUSTOMER_CANCELLATION_WINDOW).minusMillis(1);
         jdbcTemplate.update(
-                "update orders.orders set created_at = ? where id = ?",
-                Timestamp.from(expiredCreatedAt),
+                "update orders.orders set created_at = ?, confirmed_at = ? where id = ?",
+                Timestamp.from(expired),
+                Timestamp.from(expired),
                 orderId);
     }
 
@@ -437,7 +433,8 @@ class TransactionalCancelOrderUseCaseIntegrationTest {
                 id,
                 "CC",
                 token.substring(0, 16),
-                "Ada Lovelace",
+                "Ada",
+                "Lovelace",
                 token + "@cancel-it.test",
                 "3001234567",
                 "hashed-password",

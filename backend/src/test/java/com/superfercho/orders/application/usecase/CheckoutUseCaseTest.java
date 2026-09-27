@@ -125,7 +125,7 @@ class CheckoutUseCaseTest {
 
         CheckoutResult result = checkout.execute(cardCommand());
 
-        assertEquals(OrderStatus.PENDING, result.status());
+        assertEquals(OrderStatus.CONFIRMED, result.status());
         assertEquals(PaymentStatus.APPROVED, result.paymentStatus());
         assertEquals(Money.cop(new BigDecimal("21.00")), result.total());
         verify(shoppingCartPort).clearCart(CUSTOMER_ID);
@@ -139,7 +139,7 @@ class CheckoutUseCaseTest {
 
         CheckoutResult result = checkout.execute(codCommand());
 
-        assertEquals(OrderStatus.PENDING, result.status());
+        assertEquals(OrderStatus.CONFIRMED, result.status());
         assertEquals(PaymentStatus.PENDING, result.paymentStatus());
         verify(shoppingCartPort).clearCart(CUSTOMER_ID);
         verify(paymentPort, never()).refundPayment(any());
@@ -372,7 +372,7 @@ class CheckoutUseCaseTest {
         Order order = saved.getValue();
         assertEquals(CUSTOMER_ID, order.customerId());
         assertEquals(PAYMENT_ID, order.paymentId());
-        assertEquals(OrderStatus.PENDING, order.status());
+        assertEquals(OrderStatus.CONFIRMED, order.status());
         assertEquals("Leche entera", order.items().get(0).productName());
         assertEquals(PRICE, order.items().get(0).unitPrice());
         assertEquals(QUANTITY, order.items().get(0).quantity());

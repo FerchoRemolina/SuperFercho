@@ -14,12 +14,11 @@ import com.superfercho.orders.application.port.ProductCatalogPort;
 import com.superfercho.orders.application.port.ShoppingCartPort;
 import com.superfercho.orders.application.port.in.CancelOrderUseCase;
 import com.superfercho.orders.application.port.in.CheckoutUseCase;
-import com.superfercho.orders.application.usecase.AutoConfirmPendingOrdersUseCase;
+import com.superfercho.orders.application.usecase.AdvanceOrderLifecycleUseCase;
 import com.superfercho.orders.application.usecase.GetAdminOrderUseCase;
 import com.superfercho.orders.application.usecase.GetOrderUseCase;
 import com.superfercho.orders.application.usecase.ListAdminOrdersUseCase;
 import com.superfercho.orders.application.usecase.ListOrdersUseCase;
-import com.superfercho.orders.application.usecase.UpdateOrderStatusUseCase;
 import com.superfercho.orders.infrastructure.clock.SystemClockAdapter;
 import com.superfercho.platform.time.ClockConfiguration;
 import java.time.Clock;
@@ -122,10 +121,7 @@ class OrdersUseCaseConfigurationTest {
     private ListAdminOrdersUseCase listAdminOrdersUseCase;
 
     @Autowired
-    private UpdateOrderStatusUseCase updateOrderStatusUseCase;
-
-    @Autowired
-    private AutoConfirmPendingOrdersUseCase autoConfirmPendingOrdersUseCase;
+    private AdvanceOrderLifecycleUseCase advanceOrderLifecycleUseCase;
 
     @Test
     void shouldWireOrdersUseCasesWithoutExposingRawTransactionalDelegates() {
@@ -140,8 +136,7 @@ class OrdersUseCaseConfigurationTest {
         assertThat(listOrdersUseCase).isNotNull();
         assertThat(getAdminOrderUseCase).isNotNull();
         assertThat(listAdminOrdersUseCase).isNotNull();
-        assertThat(updateOrderStatusUseCase).isNotNull();
-        assertThat(autoConfirmPendingOrdersUseCase).isNotNull();
+        assertThat(advanceOrderLifecycleUseCase).isNotNull();
         assertThat(applicationContext.getBeanNamesForType(
                         com.superfercho.orders.application.usecase.CheckoutUseCase.class))
                 .isEmpty();

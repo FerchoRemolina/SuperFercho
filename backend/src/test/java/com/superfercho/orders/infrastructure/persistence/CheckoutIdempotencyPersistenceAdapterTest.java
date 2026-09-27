@@ -162,7 +162,7 @@ class CheckoutIdempotencyPersistenceAdapterTest {
                 key,
                 CUSTOMER_ID,
                 reusedFingerprint,
-                new CheckoutResult(ORDER_ID, "ORD-P-2002", OrderStatus.PENDING, PaymentStatus.PENDING, reusedTotal),
+                new CheckoutResult(ORDER_ID, "ORD-P-2002", OrderStatus.CONFIRMED, PaymentStatus.PENDING, reusedTotal),
                 REUSE_AT,
                 reusedExpiry));
 
@@ -171,7 +171,7 @@ class CheckoutIdempotencyPersistenceAdapterTest {
                     assertThat(entity.getId()).isEqualTo(originalId);
                     assertThat(entity.getFingerprint()).isEqualTo(reusedFingerprint.value());
                     assertThat(entity.getResultOrderNumber()).isEqualTo("ORD-P-2002");
-                    assertThat(entity.getResultOrderStatus()).isEqualTo(OrderStatus.PENDING);
+                    assertThat(entity.getResultOrderStatus()).isEqualTo(OrderStatus.CONFIRMED);
                     assertThat(entity.getResultPaymentStatus()).isEqualTo(PaymentStatus.PENDING);
                     assertThat(entity.getResultTotalAmount()).isEqualByComparingTo("16.00");
                     assertThat(entity.getResultTotalCurrency()).isEqualTo(Money.COP);

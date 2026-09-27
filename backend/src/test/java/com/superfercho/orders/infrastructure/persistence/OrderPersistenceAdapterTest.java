@@ -35,7 +35,7 @@ import org.testcontainers.utility.DockerImageName;
 class OrderPersistenceAdapterTest {
 
     private static final Instant CREATED_AT = Instant.parse("2026-03-01T10:00:00Z");
-    private static final Instant CONFIRMED_AT = Instant.parse("2026-03-01T10:16:00Z");
+    private static final Instant PREPARING_AT = Instant.parse("2026-03-01T10:02:00Z");
     private static final UUID CUSTOMER_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
     private static final UUID OTHER_CUSTOMER_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     private static final UUID PRODUCT_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
@@ -72,19 +72,19 @@ class OrderPersistenceAdapterTest {
 
     @Test
     void shouldPersistAndReloadOrderById() {
-        Order saved = orderRepository.save(pendingOrder("ORD-P-1001", CUSTOMER_ID, PAYMENT_ID));
+        Order saved = orderRepository.save(confirmedOrder("ORD-P-1001", CUSTOMER_ID, PAYMENT_ID));
 
         Order loaded = orderRepository.findById(saved.id()).orElseThrow();
 
         assertThat(loaded.id()).isEqualTo(saved.id());
         assertThat(loaded.orderNumber().value()).isEqualTo("ORD-P-1001");
         assertThat(loaded.customerId()).isEqualTo(CUSTOMER_ID);
-        assertThat(loaded.status()).isEqualTo(OrderStatus.PENDING);
+        assertThat(loaded.status()).isEqualTo(OrderStatus.CONFIRMED);
         assertThat(loaded.paymentId()).isEqualTo(PAYMENT_ID);
         assertThat(loaded.total()).isEqualTo(Money.cop(new BigDecimal("21.00")));
         assertThat(loaded.createdAt()).isEqualTo(CREATED_AT);
         assertThat(loaded.updatedAt()).isEqualTo(CREATED_AT);
-        assertThat(loaded.confirmedAt()).isNull();
+        assertThat(loaded.confirmedAt()).isEqualTo(CREATED_AT);
         assertThat(loaded.cancelledAt()).isNull();
         assertThat(loaded.shippingAddress().recipientName()).isEqualTo("Ada Lovelace");
         assertThat(loaded.shippingAddress().addressLine()).isEqualTo("Calle 1 # 2-3");
@@ -99,7 +99,7 @@ class OrderPersistenceAdapterTest {
 
     @Test
     void shouldFindByOrderNumber() {
-        Order saved = orderRepository.save(pendingOrder("ORD-P-1002", CUSTOMER_ID, null));
+        Order saved = orderRepository.save(confirmedOrder("ORD-P-1002", CUSTOMER_ID, null));
 
         assertThat(orderJpaRepository.findByOrderNumber("ORD-P-1002"))
                 .hasValueSatisfying(entity -> assertThat(entity.getId()).isEqualTo(saved.id()));
@@ -112,8 +112,8 @@ class OrderPersistenceAdapterTest {
     void shouldFindAllOrdersAcrossCustomers() {
         UUID customerId = UUID.randomUUID();
         UUID otherCustomerId = UUID.randomUUID();
-        Order own = orderRepository.save(pendingOrder("ORD-P-ALL-1", customerId, PAYMENT_ID));
-        Order other = orderRepository.save(pendingOrder("ORD-P-ALL-2", otherCustomerId, PAYMENT_ID));
+        Order own = orderRepository.save(confirmedOrder("ORD-P-ALL-1", customerId, PAYMENT_ID));
+        Order other = orderRepository.save(confirmedOrder("ORD-P-ALL-2", otherCustomerId, PAYMENT_ID));
 
         assertThat(orderRepository.findAll(PageRequest.of(0, 20)).items())
                 .extracting(Order::id)
@@ -124,24 +124,22 @@ class OrderPersistenceAdapterTest {
     void shouldFindOrdersByStatusesAtDatabaseWithCorrectTotalElements() {
         UUID customerId = UUID.randomUUID();
         Instant at = CREATED_AT.plusSeconds(60);
-        Order pending = orderRepository.save(pendingOrder("ORD-P-SALES-1", customerId, PAYMENT_ID));
-        Order confirmed = orderRepository.save(pendingOrder("ORD-P-SALES-2", customerId, PAYMENT_ID).confirm(at));
+        Order confirmed = orderRepository.save(confirmedOrder("ORD-P-SALES-2", customerId, PAYMENT_ID));
         Order cancelled = orderRepository.save(
-                pendingOrder("ORD-P-SALES-3", customerId, PAYMENT_ID).cancel(CREATED_AT.plusSeconds(30)));
-        Order delivered = orderRepository.save(pendingOrder("ORD-P-SALES-4", customerId, PAYMENT_ID)
-                .confirm(at)
+                confirmedOrder("ORD-P-SALES-3", customerId, PAYMENT_ID).cancel(CREATED_AT.plusSeconds(30)));
+        Order delivered = orderRepository.save(confirmedOrder("ORD-P-SALES-4", customerId, PAYMENT_ID)
                 .startPreparation(at)
-                .markReady(at)
+                .startDelivery(at)
                 .markDelivered(at));
 
-        var sales = List.of(OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.DELIVERED);
+        var sales = List.of(OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.DELIVERY, OrderStatus.DELIVERED);
         var allSales = orderRepository.findByStatuses(sales, PageRequest.of(0, 100));
         var firstPage = orderRepository.findByStatuses(sales, new PageRequest(0, 1));
 
         assertThat(allSales.items())
                 .extracting(Order::id)
                 .contains(confirmed.id(), delivered.id())
-                .doesNotContain(pending.id(), cancelled.id());
+                .doesNotContain(cancelled.id());
         assertThat(allSales.totalElements()).isEqualTo(allSales.items().size());
         assertThat(firstPage.items()).hasSize(1);
         assertThat(firstPage.size()).isEqualTo(1);
@@ -153,8 +151,8 @@ class OrderPersistenceAdapterTest {
     void shouldFindOrdersByCustomerId() {
         UUID customerId = UUID.randomUUID();
         UUID otherCustomerId = UUID.randomUUID();
-        Order own = orderRepository.save(pendingOrder("ORD-P-1003", customerId, PAYMENT_ID));
-        orderRepository.save(pendingOrder("ORD-P-1004", otherCustomerId, PAYMENT_ID));
+        Order own = orderRepository.save(confirmedOrder("ORD-P-1003", customerId, PAYMENT_ID));
+        orderRepository.save(confirmedOrder("ORD-P-1004", otherCustomerId, PAYMENT_ID));
 
         assertThat(orderRepository.findByCustomerId(customerId, PageRequest.of(0, 20)).items())
                 .extracting(Order::id)
@@ -174,21 +172,22 @@ class OrderPersistenceAdapterTest {
     }
 
     @Test
-    void shouldPersistConfirmedStatusAndTimestamps() {
-        Order saved = orderRepository.save(pendingOrder("ORD-P-1006", CUSTOMER_ID, PAYMENT_ID).confirm(CONFIRMED_AT));
+    void shouldPersistLifecycleStatusAndTimestamps() {
+        Order saved = orderRepository.save(
+                confirmedOrder("ORD-P-1006", CUSTOMER_ID, PAYMENT_ID).startPreparation(PREPARING_AT));
 
         Order loaded = orderRepository.findById(saved.id()).orElseThrow();
 
-        assertThat(loaded.status()).isEqualTo(OrderStatus.CONFIRMED);
-        assertThat(loaded.confirmedAt()).isEqualTo(CONFIRMED_AT);
-        assertThat(loaded.updatedAt()).isEqualTo(CONFIRMED_AT);
+        assertThat(loaded.status()).isEqualTo(OrderStatus.PREPARING);
+        assertThat(loaded.confirmedAt()).isEqualTo(CREATED_AT);
+        assertThat(loaded.updatedAt()).isEqualTo(PREPARING_AT);
     }
 
     @Test
     void shouldRejectDuplicateOrderNumber() {
-        orderRepository.save(pendingOrder("ORD-P-DUP", CUSTOMER_ID, PAYMENT_ID));
+        orderRepository.save(confirmedOrder("ORD-P-DUP", CUSTOMER_ID, PAYMENT_ID));
 
-        assertThatThrownBy(() -> orderRepository.save(pendingOrder("ORD-P-DUP", OTHER_CUSTOMER_ID, PAYMENT_ID)))
+        assertThatThrownBy(() -> orderRepository.save(confirmedOrder("ORD-P-DUP", OTHER_CUSTOMER_ID, PAYMENT_ID)))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -235,59 +234,82 @@ class OrderPersistenceAdapterTest {
     }
 
     @Test
-    void shouldFindPendingOrdersEligibleForAutomaticConfirmation() {
-        Instant now = Instant.parse("2026-03-01T10:20:00Z");
-        Order eligible = orderRepository.save(orderAt("ORD-P-AUTO-1", CUSTOMER_ID, CREATED_AT));
-        orderRepository.save(orderAt("ORD-P-AUTO-2", CUSTOMER_ID, Instant.parse("2026-03-01T10:10:00Z")));
+    void shouldFindInProgressOrdersForLifecycle() {
+        UUID customerId = UUID.randomUUID();
+        Order confirmed = orderRepository.save(orderAt("ORD-P-AUTO-1", customerId, CREATED_AT));
+        Order preparing = orderRepository.save(
+                orderAt("ORD-P-AUTO-2", customerId, CREATED_AT).startPreparation(PREPARING_AT));
+        Order delivery = orderRepository.save(orderAt("ORD-P-AUTO-3", customerId, CREATED_AT)
+                .startPreparation(PREPARING_AT)
+                .startDelivery(PREPARING_AT.plusSeconds(120)));
+        Order delivered = orderRepository.save(orderAt("ORD-P-AUTO-4", customerId, CREATED_AT)
+                .startPreparation(PREPARING_AT)
+                .startDelivery(PREPARING_AT.plusSeconds(120))
+                .markDelivered(PREPARING_AT.plusSeconds(240)));
+        Order cancelled =
+                orderRepository.save(orderAt("ORD-P-AUTO-5", customerId, CREATED_AT).cancel(CREATED_AT));
 
-        List<Order> found = orderRepository.findPendingOrdersEligibleForAutomaticConfirmation(now);
+        List<Order> found = orderRepository.findInProgressForLifecycle();
 
-        assertThat(found).extracting(Order::id).contains(eligible.id());
-        assertThat(found).allMatch(order -> order.status() == OrderStatus.PENDING);
         assertThat(found)
-                .allMatch(order -> now.isAfter(order.createdAt().plus(Order.CUSTOMER_CANCELLATION_WINDOW)));
+                .extracting(Order::id)
+                .contains(confirmed.id(), preparing.id(), delivery.id())
+                .doesNotContain(delivered.id(), cancelled.id());
+        assertThat(found).allMatch(order -> order.confirmedAt() != null);
+        assertThat(found)
+                .allMatch(order -> order.status() == OrderStatus.CONFIRMED
+                        || order.status() == OrderStatus.PREPARING
+                        || order.status() == OrderStatus.DELIVERY);
     }
 
     @Test
-    void shouldConfirmPendingOrderOnlyWhileStillPending() {
-        Order pending = orderRepository.save(pendingOrder("ORD-P-PEND-1", CUSTOMER_ID, PAYMENT_ID));
-        Instant at = CONFIRMED_AT;
+    void shouldStartPreparationOnlyWhileStillConfirmed() {
+        Order confirmed = orderRepository.save(confirmedOrder("ORD-P-PEND-1", CUSTOMER_ID, PAYMENT_ID));
 
-        assertThat(orderRepository.saveIfPending(pending.confirm(at)))
+        assertThat(orderRepository.saveIfConfirmed(confirmed.startPreparation(PREPARING_AT)))
                 .hasValueSatisfying(order -> {
-                    assertThat(order.status()).isEqualTo(OrderStatus.CONFIRMED);
-                    assertThat(order.confirmedAt()).isEqualTo(at);
+                    assertThat(order.status()).isEqualTo(OrderStatus.PREPARING);
+                    assertThat(order.confirmedAt()).isEqualTo(CREATED_AT);
                     assertThat(order.cancelledAt()).isNull();
                 });
-        Instant withinWindow = Instant.parse("2026-03-01T10:10:00Z");
-        assertThat(orderRepository.saveIfPending(pending.cancel(withinWindow))).isEmpty();
+        assertThat(orderRepository.saveIfConfirmed(confirmed.cancel(CREATED_AT.plusSeconds(30))))
+                .isEmpty();
 
-        Order loaded = orderRepository.findById(pending.id()).orElseThrow();
-        assertThat(loaded.status()).isEqualTo(OrderStatus.CONFIRMED);
+        Order loaded = orderRepository.findById(confirmed.id()).orElseThrow();
+        assertThat(loaded.status()).isEqualTo(OrderStatus.PREPARING);
         assertThat(loaded.cancelledAt()).isNull();
-        assertThat(loaded.confirmedAt()).isEqualTo(at);
+        assertThat(loaded.confirmedAt()).isEqualTo(CREATED_AT);
     }
 
     @Test
-    void shouldCancelPendingOrderOnlyWhileStillPending() {
-        Order pending = orderRepository.save(pendingOrder("ORD-P-PEND-2", CUSTOMER_ID, PAYMENT_ID));
-        Instant at = Instant.parse("2026-03-01T10:10:00Z");
+    void shouldCancelOrderOnlyWhileStillConfirmed() {
+        Order confirmed = orderRepository.save(confirmedOrder("ORD-P-PEND-2", CUSTOMER_ID, PAYMENT_ID));
+        Instant at = CREATED_AT.plusSeconds(30);
 
-        assertThat(orderRepository.saveIfPending(pending.cancel(at)))
+        assertThat(orderRepository.saveIfConfirmed(confirmed.cancel(at)))
                 .hasValueSatisfying(order -> {
                     assertThat(order.status()).isEqualTo(OrderStatus.CANCELLED);
                     assertThat(order.cancelledAt()).isEqualTo(at);
                     assertThat(order.confirmedAt()).isNull();
                 });
-        assertThat(orderRepository.saveIfPending(pending.confirm(CONFIRMED_AT))).isEmpty();
+        assertThat(orderRepository.saveIfConfirmed(confirmed.startPreparation(PREPARING_AT)))
+                .isEmpty();
 
-        Order loaded = orderRepository.findById(pending.id()).orElseThrow();
+        Order loaded = orderRepository.findById(confirmed.id()).orElseThrow();
         assertThat(loaded.status()).isEqualTo(OrderStatus.CANCELLED);
         assertThat(loaded.confirmedAt()).isNull();
         assertThat(loaded.cancelledAt()).isEqualTo(at);
     }
 
-    private static Order pendingOrder(String orderNumber, UUID customerId, UUID paymentId) {
+    @Test
+    void shouldRejectSaveIfConfirmedWhenStatusIsStillConfirmed() {
+        Order confirmed = orderRepository.save(confirmedOrder("ORD-P-PEND-3", CUSTOMER_ID, PAYMENT_ID));
+
+        assertThatThrownBy(() -> orderRepository.saveIfConfirmed(confirmed))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    private static Order confirmedOrder(String orderNumber, UUID customerId, UUID paymentId) {
         return orderAt(orderNumber, customerId, CREATED_AT, paymentId, List.of(milk()));
     }
 
@@ -331,7 +353,7 @@ class OrderPersistenceAdapterTest {
     }
 
     private void insertOrderHeader(UUID orderId, String orderNumber) {
-        insertOrderHeaderWithStatus(orderId, orderNumber, "PENDING");
+        insertOrderHeaderWithStatus(orderId, orderNumber, "CONFIRMED");
     }
 
     private void insertOrderHeaderWithStatus(UUID orderId, String orderNumber, String status) {

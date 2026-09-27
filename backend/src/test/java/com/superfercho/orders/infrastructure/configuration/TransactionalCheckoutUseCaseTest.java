@@ -39,7 +39,7 @@ class TransactionalCheckoutUseCaseTest {
     private static final CheckoutResult RESULT = new CheckoutResult(
             UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
             "ORD-P-1001",
-            OrderStatus.PENDING,
+            OrderStatus.CONFIRMED,
             PaymentStatus.APPROVED,
             Money.cop(new BigDecimal("21.00")));
 

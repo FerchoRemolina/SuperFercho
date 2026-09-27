@@ -32,27 +32,27 @@ class OrderPersistenceMapperTest {
     private final OrderPersistenceMapper mapper = new OrderPersistenceMapper();
 
     @Test
-    void shouldMapPendingOrderRoundTrip() {
-        Order order = pendingOrder(null);
+    void shouldMapConfirmedOrderRoundTrip() {
+        Order order = confirmedOrder(null);
 
         Order mapped = mapper.toDomain(mapper.toEntity(order));
 
         assertEquals(order.id(), mapped.id());
         assertEquals(order.orderNumber().value(), mapped.orderNumber().value());
         assertEquals(order.customerId(), mapped.customerId());
-        assertEquals(OrderStatus.PENDING, mapped.status());
+        assertEquals(OrderStatus.CONFIRMED, mapped.status());
         assertEquals(order.subtotal(), mapped.subtotal());
         assertEquals(order.total(), mapped.total());
         assertEquals(order.createdAt(), mapped.createdAt());
         assertEquals(order.updatedAt(), mapped.updatedAt());
-        assertNull(mapped.confirmedAt());
+        assertEquals(order.confirmedAt(), mapped.confirmedAt());
         assertNull(mapped.cancelledAt());
         assertNull(mapped.paymentId());
     }
 
     @Test
     void shouldMapNullablePaymentId() {
-        OrderJpaEntity entity = mapper.toEntity(pendingOrder(null));
+        OrderJpaEntity entity = mapper.toEntity(confirmedOrder(null));
 
         assertNull(entity.getPaymentId());
         assertNull(mapper.toDomain(entity).paymentId());
@@ -60,7 +60,7 @@ class OrderPersistenceMapperTest {
 
     @Test
     void shouldMapPaymentIdWhenPresent() {
-        Order order = pendingOrder(PAYMENT_ID);
+        Order order = confirmedOrder(PAYMENT_ID);
 
         Order mapped = mapper.toDomain(mapper.toEntity(order));
 
@@ -70,7 +70,7 @@ class OrderPersistenceMapperTest {
 
     @Test
     void shouldMapItemsAndMoney() {
-        Order order = pendingOrder(PAYMENT_ID);
+        Order order = confirmedOrder(PAYMENT_ID);
         OrderJpaEntity entity = mapper.toEntity(order);
 
         assertEquals(1, entity.getItems().size());
@@ -110,7 +110,7 @@ class OrderPersistenceMapperTest {
 
     @Test
     void shouldMapShippingAddressSnapshotIncludingNullAdditionalInfo() {
-        Order order = pendingOrder(PAYMENT_ID);
+        Order order = confirmedOrder(PAYMENT_ID);
         OrderJpaEntity entity = mapper.toEntity(order);
 
         assertEquals("Ada Lovelace", entity.getShippingRecipientName());
@@ -134,7 +134,7 @@ class OrderPersistenceMapperTest {
 
     @Test
     void shouldPreservePersistedTimestampsAndAddressOnRoundTrip() {
-        Order order = pendingOrder(PAYMENT_ID);
+        Order order = confirmedOrder(PAYMENT_ID);
         Order mapped = mapper.toDomain(mapper.toEntity(order));
 
         assertEquals(order.id(), mapped.id());
@@ -146,7 +146,7 @@ class OrderPersistenceMapperTest {
         assertEquals(order.status(), mapped.status());
         assertEquals(order.createdAt(), mapped.createdAt());
         assertEquals(order.updatedAt(), mapped.updatedAt());
-        assertNull(mapped.confirmedAt());
+        assertEquals(order.confirmedAt(), mapped.confirmedAt());
         assertNull(mapped.cancelledAt());
     }
 
@@ -178,22 +178,22 @@ class OrderPersistenceMapperTest {
     }
 
     @Test
-    void shouldReconstitutePreparingReadyAndDeliveredWithoutReplayingTransitions() {
+    void shouldReconstitutePreparingDeliveryAndDeliveredWithoutReplayingTransitions() {
         Order preparing = reconstituted(OrderStatus.PREPARING, CONFIRMED_AT, null, UPDATED_AT);
-        Order ready = reconstituted(OrderStatus.READY, CONFIRMED_AT, null, UPDATED_AT);
+        Order delivery = reconstituted(OrderStatus.DELIVERY, CONFIRMED_AT, null, UPDATED_AT);
         Order delivered = reconstituted(OrderStatus.DELIVERED, CONFIRMED_AT, null, UPDATED_AT);
 
         Order mappedPreparing = mapper.toDomain(mapper.toEntity(preparing));
-        Order mappedReady = mapper.toDomain(mapper.toEntity(ready));
+        Order mappedDelivery = mapper.toDomain(mapper.toEntity(delivery));
         Order mappedDelivered = mapper.toDomain(mapper.toEntity(delivered));
 
         assertEquals(OrderStatus.PREPARING, mappedPreparing.status());
-        assertEquals(OrderStatus.READY, mappedReady.status());
+        assertEquals(OrderStatus.DELIVERY, mappedDelivery.status());
         assertEquals(OrderStatus.DELIVERED, mappedDelivered.status());
         assertEquals(CONFIRMED_AT, mappedPreparing.confirmedAt());
         assertEquals(UPDATED_AT, mappedPreparing.updatedAt());
-        assertEquals(CONFIRMED_AT, mappedReady.confirmedAt());
-        assertEquals(UPDATED_AT, mappedReady.updatedAt());
+        assertEquals(CONFIRMED_AT, mappedDelivery.confirmedAt());
+        assertEquals(UPDATED_AT, mappedDelivery.updatedAt());
         assertEquals(CONFIRMED_AT, mappedDelivered.confirmedAt());
         assertEquals(UPDATED_AT, mappedDelivered.updatedAt());
         assertEquals(CREATED_AT, mappedDelivered.createdAt());
@@ -234,7 +234,7 @@ class OrderPersistenceMapperTest {
                 updatedAt);
     }
 
-    private static Order pendingOrder(UUID paymentId) {
+    private static Order confirmedOrder(UUID paymentId) {
         return Order.create(
                 ORDER_ID,
                 new OrderNumber("ORD-1001"),

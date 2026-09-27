@@ -143,7 +143,7 @@ class IdempotencyPersistenceAdapterTest {
                 KEY,
                 CUSTOMER_ID,
                 newFingerprint,
-                new CheckoutResult(ORDER_ID, "ORD-P-2002", OrderStatus.PENDING, PaymentStatus.PENDING, newTotal),
+                new CheckoutResult(ORDER_ID, "ORD-P-2002", OrderStatus.CONFIRMED, PaymentStatus.PENDING, newTotal),
                 REUSE_AT,
                 newExpiry));
 
@@ -152,7 +152,7 @@ class IdempotencyPersistenceAdapterTest {
         assertEquals(CUSTOMER_ID, saved.getCustomerId());
         assertEquals(KEY, saved.getIdempotencyKey());
         assertEquals(newFingerprint.value(), saved.getFingerprint());
-        assertEquals(OrderStatus.PENDING, saved.getResultOrderStatus());
+        assertEquals(OrderStatus.CONFIRMED, saved.getResultOrderStatus());
         assertEquals(PaymentStatus.PENDING, saved.getResultPaymentStatus());
         assertEquals(new BigDecimal("42.00"), saved.getResultTotalAmount());
         assertEquals(Money.COP, saved.getResultTotalCurrency());

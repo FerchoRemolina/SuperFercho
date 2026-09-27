@@ -42,8 +42,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class CancelOrderUseCaseTest {
 
     private static final Instant CREATED_AT = Instant.parse("2026-03-01T10:00:00Z");
-    private static final Instant WITHIN_WINDOW = Instant.parse("2026-03-01T10:10:00Z");
-    private static final Instant AFTER_WINDOW = Instant.parse("2026-03-01T10:15:00.001Z");
+    private static final Instant WITHIN_WINDOW = Instant.parse("2026-03-01T10:01:00Z");
+    private static final Instant AFTER_WINDOW = Instant.parse("2026-03-01T10:02:00.001Z");
     private static final UUID CUSTOMER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID OTHER_CUSTOMER_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final UUID ORDER_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
@@ -76,10 +76,10 @@ class CancelOrderUseCaseTest {
 
     @Test
     void shouldCancelOwnedOrderWithinWindow() {
-        Order order = pendingOrder(CUSTOMER_ID, PAYMENT_ID);
+        Order order = confirmedOrder(CUSTOMER_ID, PAYMENT_ID);
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
         when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
-        when(orderRepository.saveIfPending(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
+        when(orderRepository.saveIfConfirmed(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         when(paymentPort.getPayment(PAYMENT_ID))
                 .thenReturn(paymentResult(PaymentStatus.APPROVED, "sim-1"));
 
@@ -93,7 +93,7 @@ class CancelOrderUseCaseTest {
 
     @Test
     void shouldRejectCancellationOfAnotherCustomersOrder() {
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(pendingOrder(OTHER_CUSTOMER_ID, PAYMENT_ID)));
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(confirmedOrder(OTHER_CUSTOMER_ID, PAYMENT_ID)));
 
         assertThrows(
                 OrderOwnershipException.class, () -> cancelOrder.execute(new CancelOrderCommand(ORDER_ID)));
@@ -103,22 +103,22 @@ class CancelOrderUseCaseTest {
 
     @Test
     void shouldRejectCancellationOutsideWindow() {
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(pendingOrder(CUSTOMER_ID, PAYMENT_ID)));
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(confirmedOrder(CUSTOMER_ID, PAYMENT_ID)));
         when(clockProvider.currentTime()).thenReturn(AFTER_WINDOW);
 
         assertThrows(
                 OrderCancellationNotAllowedException.class,
                 () -> cancelOrder.execute(new CancelOrderCommand(ORDER_ID)));
-        verify(orderRepository, never()).saveIfPending(any());
+        verify(orderRepository, never()).saveIfConfirmed(any());
         verify(inventoryPort, never()).restoreStock(any());
         verify(paymentPort, never()).refundPayment(any());
     }
 
     @Test
     void shouldRestoreStockWhenCancellationSucceeds() {
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(pendingOrder(CUSTOMER_ID, PAYMENT_ID)));
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(confirmedOrder(CUSTOMER_ID, PAYMENT_ID)));
         when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
-        when(orderRepository.saveIfPending(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
+        when(orderRepository.saveIfConfirmed(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         when(paymentPort.getPayment(PAYMENT_ID))
                 .thenReturn(paymentResult(PaymentStatus.APPROVED, "sim-1"));
 
@@ -129,9 +129,9 @@ class CancelOrderUseCaseTest {
 
     @Test
     void shouldRefundApprovedSimulatedCardPayment() {
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(pendingOrder(CUSTOMER_ID, PAYMENT_ID)));
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(confirmedOrder(CUSTOMER_ID, PAYMENT_ID)));
         when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
-        when(orderRepository.saveIfPending(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
+        when(orderRepository.saveIfConfirmed(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         when(paymentPort.getPayment(PAYMENT_ID))
                 .thenReturn(paymentResult(PaymentStatus.APPROVED, "sim-1"));
 
@@ -142,9 +142,9 @@ class CancelOrderUseCaseTest {
 
     @Test
     void shouldNotRefundCashOnDelivery() {
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(pendingOrder(CUSTOMER_ID, PAYMENT_ID)));
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(confirmedOrder(CUSTOMER_ID, PAYMENT_ID)));
         when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
-        when(orderRepository.saveIfPending(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
+        when(orderRepository.saveIfConfirmed(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         when(paymentPort.getPayment(PAYMENT_ID))
                 .thenReturn(paymentResult(PaymentStatus.PENDING, "cod-1"));
 
@@ -155,10 +155,10 @@ class CancelOrderUseCaseTest {
     }
 
     @Test
-    void shouldRejectCancellationWhenPendingTransitionIsLost() {
-        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(pendingOrder(CUSTOMER_ID, PAYMENT_ID)));
+    void shouldRejectCancellationWhenConfirmedTransitionIsLost() {
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(confirmedOrder(CUSTOMER_ID, PAYMENT_ID)));
         when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
-        when(orderRepository.saveIfPending(any())).thenReturn(Optional.empty());
+        when(orderRepository.saveIfConfirmed(any())).thenReturn(Optional.empty());
 
         assertThrows(
                 InvalidOrderStateTransitionException.class,
@@ -168,7 +168,7 @@ class CancelOrderUseCaseTest {
         verify(paymentPort, never()).getPayment(any());
     }
 
-    private static Order pendingOrder(UUID customerId, UUID paymentId) {
+    private static Order confirmedOrder(UUID customerId, UUID paymentId) {
         return Order.create(
                 ORDER_ID,
                 new OrderNumber("ORD-1001"),

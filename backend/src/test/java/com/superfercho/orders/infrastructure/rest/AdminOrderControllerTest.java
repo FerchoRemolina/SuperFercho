@@ -69,7 +69,8 @@ class AdminOrderControllerTest {
                 .andExpect(jsonPath("$.id").value(ORDER_ID.toString()))
                 .andExpect(jsonPath("$.orderNumber").value("ORD-P-1001"))
                 .andExpect(jsonPath("$.customerId").value(CUSTOMER_ID.toString()))
-                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.confirmedAt").value(CREATED_AT.toString()))
                 .andExpect(jsonPath("$.items[0].productId").value(PRODUCT_ID.toString()))
                 .andExpect(jsonPath("$.items[0].productName").value("Leche entera"))
                 .andExpect(jsonPath("$.items[0].quantity").value(2))
@@ -139,13 +140,13 @@ class AdminOrderControllerTest {
     @Test
     void shouldPassSalesStatusFilterToUseCase() throws Exception {
         ListAdminOrdersCommand command = ListAdminOrdersCommand.of(
-                null, null, List.of("CONFIRMED", "PREPARING", "READY", "DELIVERED"));
+                null, null, List.of("CONFIRMED", "PREPARING", "DELIVERY", "DELIVERED"));
         when(listAdminOrdersUseCase.execute(command)).thenReturn(new PagedResult<>(List.of(), 0, 20, 0));
 
         mockMvc.perform(get("/api/v1/admin/orders")
                         .param("status", "CONFIRMED")
                         .param("status", "PREPARING")
-                        .param("status", "READY")
+                        .param("status", "DELIVERY")
                         .param("status", "DELIVERED"))
                 .andExpect(status().isOk());
 
@@ -155,10 +156,10 @@ class AdminOrderControllerTest {
     @Test
     void shouldPassCommaSeparatedStatusFilterToUseCase() throws Exception {
         ListAdminOrdersCommand command =
-                ListAdminOrdersCommand.of(null, null, List.of("CONFIRMED,PREPARING,READY,DELIVERED"));
+                ListAdminOrdersCommand.of(null, null, List.of("CONFIRMED,PREPARING,DELIVERY,DELIVERED"));
         when(listAdminOrdersUseCase.execute(command)).thenReturn(new PagedResult<>(List.of(), 0, 20, 0));
 
-        mockMvc.perform(get("/api/v1/admin/orders").param("status", "CONFIRMED,PREPARING,READY,DELIVERED"))
+        mockMvc.perform(get("/api/v1/admin/orders").param("status", "CONFIRMED,PREPARING,DELIVERY,DELIVERED"))
                 .andExpect(status().isOk());
 
         verify(listAdminOrdersUseCase).execute(command);
@@ -178,7 +179,7 @@ class AdminOrderControllerTest {
                 ORDER_ID,
                 "ORD-P-1001",
                 CUSTOMER_ID,
-                OrderStatus.PENDING,
+                OrderStatus.CONFIRMED,
                 List.of(new OrderItemResult(ITEM_ID, PRODUCT_ID, "Leche entera", PRICE, 2, TOTAL)),
                 TOTAL,
                 TOTAL,
@@ -186,7 +187,7 @@ class AdminOrderControllerTest {
                         "Ada Lovelace", "Calle 1 # 2-3", "Apto 101", "Bogotá", "Cundinamarca", "3001234567"),
                 PAYMENT_ID,
                 CREATED_AT,
-                null,
+                CREATED_AT,
                 null,
                 CREATED_AT,
                 payment);

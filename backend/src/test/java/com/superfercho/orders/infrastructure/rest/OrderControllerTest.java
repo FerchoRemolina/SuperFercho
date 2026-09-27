@@ -24,14 +24,10 @@ import com.superfercho.orders.application.dto.PaymentMethod;
 import com.superfercho.orders.application.dto.PaymentResult;
 import com.superfercho.orders.application.dto.PaymentStatus;
 import com.superfercho.orders.application.dto.ShippingAddressResult;
-import com.superfercho.orders.application.dto.UpdateOrderStatusCommand;
-import com.superfercho.orders.application.exception.InvalidOrderStatusUpdateException;
 import com.superfercho.orders.application.exception.OrderNotFoundException;
 import com.superfercho.orders.application.exception.OrderOwnershipException;
 import com.superfercho.orders.application.usecase.GetOrderUseCase;
 import com.superfercho.orders.application.usecase.ListOrdersUseCase;
-import com.superfercho.orders.application.usecase.UpdateOrderStatusUseCase;
-import com.superfercho.orders.domain.exception.InvalidOrderStateTransitionException;
 import com.superfercho.orders.domain.model.OrderStatus;
 import com.superfercho.orders.infrastructure.configuration.TransactionalCancelOrderUseCase;
 import com.superfercho.orders.infrastructure.configuration.TransactionalCheckoutUseCase;
@@ -81,9 +77,6 @@ class OrderControllerTest {
     @MockitoBean
     private ListOrdersUseCase listOrdersUseCase;
 
-    @MockitoBean
-    private UpdateOrderStatusUseCase updateOrderStatusUseCase;
-
     @Test
     void shouldCheckoutWithIdempotencyKeyHeader() throws Exception {
         when(transactionalCheckoutUseCase.execute(any())).thenReturn(checkoutResult());
@@ -96,7 +89,7 @@ class OrderControllerTest {
                 .andExpect(header().string("Location", org.hamcrest.Matchers.endsWith("/api/v1/orders/" + ORDER_ID)))
                 .andExpect(jsonPath("$.orderId").value(ORDER_ID.toString()))
                 .andExpect(jsonPath("$.orderNumber").value("ORD-P-1001"))
-                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.paymentStatus").value("APPROVED"))
                 .andExpect(jsonPath("$.total.amount").value(21.00))
                 .andExpect(jsonPath("$.total.currency").value("COP"));
@@ -107,7 +100,7 @@ class OrderControllerTest {
                         PaymentMethod.SIMULATED_CARD,
                         List.of(new CheckoutItem(PRODUCT_ID, 2, PRICE)),
                         "checkout-key-1"));
-        verifyNoInteractions(transactionalCancelOrderUseCase, getOrderUseCase, listOrdersUseCase, updateOrderStatusUseCase);
+        verifyNoInteractions(transactionalCancelOrderUseCase, getOrderUseCase, listOrdersUseCase);
     }
 
     @Test
@@ -128,14 +121,14 @@ class OrderControllerTest {
     @Test
     void shouldGetOrderById() throws Exception {
         when(getOrderUseCase.execute(new GetOrderCommand(ORDER_ID)))
-                .thenReturn(orderResult(OrderStatus.PENDING, null, cardPayment()));
+                .thenReturn(orderResult(OrderStatus.CONFIRMED, null, cardPayment()));
 
         mockMvc.perform(get("/api/v1/orders/{orderId}", ORDER_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(ORDER_ID.toString()))
                 .andExpect(jsonPath("$.orderNumber").value("ORD-P-1001"))
                 .andExpect(jsonPath("$.customerId").value(CUSTOMER_ID.toString()))
-                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.items[0].productId").value(PRODUCT_ID.toString()))
                 .andExpect(jsonPath("$.items[0].productName").value("Leche entera"))
                 .andExpect(jsonPath("$.items[0].quantity").value(2))
@@ -153,10 +146,10 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.payment.createdAt").value(CREATED_AT.toString()))
                 .andExpect(jsonPath("$.payment.updatedAt").value(CREATED_AT.toString()))
                 .andExpect(jsonPath("$.createdAt").value(CREATED_AT.toString()))
-                .andExpect(jsonPath("$.confirmedAt").isEmpty());
+                .andExpect(jsonPath("$.confirmedAt").value(CREATED_AT.toString()));
 
         verify(getOrderUseCase).execute(new GetOrderCommand(ORDER_ID));
-        verifyNoInteractions(transactionalCheckoutUseCase, transactionalCancelOrderUseCase, listOrdersUseCase, updateOrderStatusUseCase);
+        verifyNoInteractions(transactionalCheckoutUseCase, transactionalCancelOrderUseCase, listOrdersUseCase);
     }
 
     @Test
@@ -180,7 +173,7 @@ class OrderControllerTest {
     @Test
     void shouldReturnNullPaymentWhenOrderHasNoPaymentId() throws Exception {
         when(getOrderUseCase.execute(new GetOrderCommand(ORDER_ID)))
-                .thenReturn(orderResult(OrderStatus.PENDING, null, null));
+                .thenReturn(orderResult(OrderStatus.CONFIRMED, null, null));
 
         mockMvc.perform(get("/api/v1/orders/{orderId}", ORDER_ID))
                 .andExpect(status().isOk())
@@ -200,7 +193,7 @@ class OrderControllerTest {
     @Test
     void shouldListOrdersWithPageAndSize() throws Exception {
         when(listOrdersUseCase.execute(new ListOrdersCommand(1, 10)))
-                .thenReturn(new PagedResult<>(List.of(orderResult(OrderStatus.PENDING, null)), 1, 10, 1));
+                .thenReturn(new PagedResult<>(List.of(orderResult(OrderStatus.CONFIRMED, null)), 1, 10, 1));
 
         mockMvc.perform(get("/api/v1/orders").param("page", "1").param("size", "10"))
                 .andExpect(status().isOk())
@@ -211,7 +204,7 @@ class OrderControllerTest {
 
         verify(listOrdersUseCase).execute(new ListOrdersCommand(1, 10));
         verify(listOrdersUseCase, never()).execute(new ListOrdersCommand(null, null));
-        verifyNoInteractions(transactionalCheckoutUseCase, transactionalCancelOrderUseCase, getOrderUseCase, updateOrderStatusUseCase);
+        verifyNoInteractions(transactionalCheckoutUseCase, transactionalCancelOrderUseCase, getOrderUseCase);
     }
 
     @Test
@@ -241,71 +234,20 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.cancelledAt").value(CREATED_AT.toString()));
 
         verify(transactionalCancelOrderUseCase).execute(new CancelOrderCommand(ORDER_ID));
-        verifyNoInteractions(transactionalCheckoutUseCase, getOrderUseCase, listOrdersUseCase, updateOrderStatusUseCase);
+        verifyNoInteractions(transactionalCheckoutUseCase, getOrderUseCase, listOrdersUseCase);
     }
 
     @Test
-    void shouldUpdateOrderStatus() throws Exception {
-        when(updateOrderStatusUseCase.execute(new UpdateOrderStatusCommand(ORDER_ID, OrderStatus.PREPARING)))
-                .thenReturn(orderResult(OrderStatus.PREPARING, null));
-
+    void shouldNotExposeManualStatusEndpoint() throws Exception {
         mockMvc.perform(post("/api/v1/orders/{orderId}/status", ORDER_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"status": "PREPARING"}
                                 """))
-                .andExpect(status().isOk())
-                .andExpect(header().doesNotExist("Location"))
-                .andExpect(jsonPath("$.id").value(ORDER_ID.toString()))
-                .andExpect(jsonPath("$.orderNumber").value("ORD-P-1001"))
-                .andExpect(jsonPath("$.status").value("PREPARING"))
-                .andExpect(jsonPath("$.items[0].productId").value(PRODUCT_ID.toString()))
-                .andExpect(jsonPath("$.paymentId").value(PAYMENT_ID.toString()));
+                .andExpect(status().isNotFound());
 
-        verify(updateOrderStatusUseCase).execute(new UpdateOrderStatusCommand(ORDER_ID, OrderStatus.PREPARING));
         verifyNoInteractions(
                 transactionalCheckoutUseCase, transactionalCancelOrderUseCase, getOrderUseCase, listOrdersUseCase);
-    }
-
-    @Test
-    void shouldMapOrderNotFoundWhenUpdatingStatus() throws Exception {
-        when(updateOrderStatusUseCase.execute(any())).thenThrow(new OrderNotFoundException(ORDER_ID));
-
-        mockMvc.perform(post("/api/v1/orders/{orderId}/status", ORDER_ID)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"status": "PREPARING"}
-                                """))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("ORDER_NOT_FOUND"));
-    }
-
-    @Test
-    void shouldMapInvalidTransitionWhenUpdatingStatus() throws Exception {
-        when(updateOrderStatusUseCase.execute(any()))
-                .thenThrow(new InvalidOrderStateTransitionException(OrderStatus.PENDING, OrderStatus.PREPARING));
-
-        mockMvc.perform(post("/api/v1/orders/{orderId}/status", ORDER_ID)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"status": "PREPARING"}
-                                """))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("INVALID_ORDER_TRANSITION"));
-    }
-
-    @Test
-    void shouldMapInvalidOrderStatusUpdate() throws Exception {
-        when(updateOrderStatusUseCase.execute(any()))
-                .thenThrow(new InvalidOrderStatusUpdateException(OrderStatus.CANCELLED));
-
-        mockMvc.perform(post("/api/v1/orders/{orderId}/status", ORDER_ID)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"status": "CANCELLED"}
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_ORDER_STATUS_UPDATE"));
     }
 
     private static String checkoutJson() {
@@ -325,7 +267,7 @@ class OrderControllerTest {
     }
 
     private static CheckoutResult checkoutResult() {
-        return new CheckoutResult(ORDER_ID, "ORD-P-1001", OrderStatus.PENDING, PaymentStatus.APPROVED, TOTAL);
+        return new CheckoutResult(ORDER_ID, "ORD-P-1001", OrderStatus.CONFIRMED, PaymentStatus.APPROVED, TOTAL);
     }
 
     private static OrderResult orderResult(OrderStatus status, Instant cancelledAt) {
@@ -345,7 +287,7 @@ class OrderControllerTest {
                         "Ada Lovelace", "Calle 1 # 2-3", "Apto 101", "Bogotá", "Cundinamarca", "3001234567"),
                 PAYMENT_ID,
                 CREATED_AT,
-                null,
+                status == OrderStatus.CANCELLED ? null : CREATED_AT,
                 cancelledAt,
                 CREATED_AT,
                 payment);
