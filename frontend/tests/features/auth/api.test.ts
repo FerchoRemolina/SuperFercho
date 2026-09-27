@@ -21,6 +21,8 @@ describe("auth api", () => {
         JSON.stringify({
           userId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
           role: "CUSTOMER",
+          firstName: "Ada",
+          lastName: "Lovelace",
           accessToken: "jwt-token",
           expiresAt: "2026-03-01T11:00:00Z",
         }),
@@ -47,19 +49,22 @@ describe("auth api", () => {
     expect(sessionFromAuthentication(response)).toEqual({
       userId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
       role: "CUSTOMER",
+      firstName: "Ada",
+      lastName: "Lovelace",
       accessToken: "jwt-token",
       expiresAt: "2026-03-01T11:00:00Z",
     });
   });
 
-  it("posts the six register fields and does not treat the 201 as a session", async () => {
+  it("posts the seven register fields and does not treat the 201 as a session", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
           id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
           documentType: "CC",
           documentNumber: "123",
-          fullName: "Ada",
+          firstName: "Ada",
+          lastName: "Lovelace",
           email: "ada@identity.test",
           phone: "3001234567",
           role: "CUSTOMER",
@@ -74,7 +79,8 @@ describe("auth api", () => {
     const created = await registerCustomer({
       documentType: "CC",
       documentNumber: "123",
-      fullName: "Ada",
+      firstName: "Ada",
+      lastName: "Lovelace",
       email: "ada@identity.test",
       phone: "3001234567",
       password: "secret-password",
@@ -86,7 +92,8 @@ describe("auth api", () => {
     expect(JSON.parse(String(init.body))).toEqual({
       documentType: "CC",
       documentNumber: "123",
-      fullName: "Ada",
+      firstName: "Ada",
+      lastName: "Lovelace",
       email: "ada@identity.test",
       phone: "3001234567",
       password: "secret-password",

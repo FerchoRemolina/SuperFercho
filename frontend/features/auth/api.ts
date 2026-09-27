@@ -11,6 +11,8 @@ export type AuthenticateUserRequest = {
 export type AuthenticationRestResponse = {
   userId: string;
   role: Role;
+  firstName: string;
+  lastName: string;
   accessToken: string;
   expiresAt: string;
 };
@@ -19,7 +21,8 @@ export type AuthenticationRestResponse = {
 export type RegisterCustomerRequest = {
   documentType: string;
   documentNumber: string;
-  fullName: string;
+  firstName: string;
+  lastName: string;
   email: string;
   phone: string;
   password: string;
@@ -35,7 +38,8 @@ export type RegisteredCustomerRestResponse = {
   id: string;
   documentType: string;
   documentNumber: string;
-  fullName: string;
+  firstName: string;
+  lastName: string;
   email: string;
   phone: string;
   role: Role;
@@ -64,11 +68,15 @@ export async function registerCustomer(
 export function sessionFromAuthentication(
   response: AuthenticationRestResponse,
 ): NonNullable<Session> {
+  const firstName = response.firstName?.trim();
+  const lastName = response.lastName?.trim() ?? "";
   return {
     userId: response.userId,
     role: response.role,
     accessToken: response.accessToken,
     expiresAt: response.expiresAt,
+    ...(firstName ? { firstName } : {}),
+    ...(lastName ? { lastName } : {}),
   };
 }
 
