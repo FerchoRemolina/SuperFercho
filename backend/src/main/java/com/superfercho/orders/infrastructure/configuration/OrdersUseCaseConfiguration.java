@@ -46,6 +46,7 @@ public class OrdersUseCaseConfiguration {
             PaymentPort paymentPort,
             OrderRepository orderRepository,
             IdempotencyPort idempotencyPort,
+            PreviewCustomerExclusionPort previewCustomerExclusionPort,
             PlatformTransactionManager transactionManager) {
         CheckoutUseCase checkoutUseCase = new CheckoutUseCase(
                 currentUserProvider,
@@ -56,7 +57,8 @@ public class OrdersUseCaseConfiguration {
                 inventoryPort,
                 paymentPort,
                 orderRepository,
-                idempotencyPort);
+                idempotencyPort,
+                previewCustomerExclusionPort);
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
         return new TransactionalCheckoutUseCase(checkoutUseCase, transaction);
     }
@@ -68,9 +70,15 @@ public class OrdersUseCaseConfiguration {
             OrderRepository orderRepository,
             InventoryPort inventoryPort,
             PaymentPort paymentPort,
+            PreviewCustomerExclusionPort previewCustomerExclusionPort,
             PlatformTransactionManager transactionManager) {
         CancelOrderUseCase cancelOrderUseCase = new CancelOrderUseCase(
-                currentUserProvider, ordersClockProvider, orderRepository, inventoryPort, paymentPort);
+                currentUserProvider,
+                ordersClockProvider,
+                orderRepository,
+                inventoryPort,
+                paymentPort,
+                previewCustomerExclusionPort);
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
         return new TransactionalCancelOrderUseCase(cancelOrderUseCase, transaction);
     }
@@ -98,21 +106,13 @@ public class OrdersUseCaseConfiguration {
 
     @Bean
     AdvanceOrderLifecycleUseCase advanceOrderLifecycleUseCase(
-            OrderRepository orderRepository,
-            ClockProvider ordersClockProvider,
-            PreviewCustomerExclusionPort previewCustomerExclusionPort) {
-        return new AdvanceOrderLifecycleUseCase(
-                orderRepository, ordersClockProvider, previewCustomerExclusionPort);
+            OrderRepository orderRepository, ClockProvider ordersClockProvider) {
+        return new AdvanceOrderLifecycleUseCase(orderRepository, ordersClockProvider);
     }
 
     @Bean
     CancelAndDeletePreviewOrdersUseCase cancelAndDeletePreviewOrdersUseCase(
-            OrderRepository orderRepository,
-            InventoryPort inventoryPort,
-            PaymentPort paymentPort,
-            IdempotencyPort idempotencyPort,
-            ClockProvider ordersClockProvider) {
-        return new CancelAndDeletePreviewOrdersUseCase(
-                orderRepository, inventoryPort, paymentPort, idempotencyPort, ordersClockProvider);
+            OrderRepository orderRepository, PaymentPort paymentPort, IdempotencyPort idempotencyPort) {
+        return new CancelAndDeletePreviewOrdersUseCase(orderRepository, paymentPort, idempotencyPort);
     }
 }

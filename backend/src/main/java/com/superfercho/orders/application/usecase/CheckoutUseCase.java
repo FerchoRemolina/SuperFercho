@@ -31,6 +31,7 @@ import com.superfercho.orders.application.port.CustomerAddressPort;
 import com.superfercho.orders.application.port.IdempotencyPort;
 import com.superfercho.orders.application.port.OrderRepository;
 import com.superfercho.orders.application.port.PaymentPort;
+import com.superfercho.orders.application.port.PreviewCustomerExclusionPort;
 import com.superfercho.orders.application.port.ProductCatalogPort;
 import com.superfercho.orders.application.port.ShoppingCartPort;
 import com.superfercho.orders.domain.model.Order;
@@ -50,6 +51,9 @@ import java.util.UUID;
  * {@link #execute(CheckoutCommand)} in a single local database transaction so
  * payment, inventory, order persistence, cart clear, and idempotency commit or
  * roll back together. This class does not start a transaction.
+ *
+ * <p>Storefront-preview temporary customers run the full checkout simulation
+ * (availability, payment, order) but never decrement persistent catalog stock.
  */
 public final class CheckoutUseCase {
 
@@ -64,6 +68,7 @@ public final class CheckoutUseCase {
     private final PaymentPort paymentPort;
     private final OrderRepository orderRepository;
     private final IdempotencyPort idempotencyPort;
+    private final PreviewCustomerExclusionPort previewCustomerExclusionPort;
 
     public CheckoutUseCase(
             CurrentUserProvider currentUserProvider,
@@ -74,7 +79,8 @@ public final class CheckoutUseCase {
             InventoryPort inventoryPort,
             PaymentPort paymentPort,
             OrderRepository orderRepository,
-            IdempotencyPort idempotencyPort) {
+            IdempotencyPort idempotencyPort,
+            PreviewCustomerExclusionPort previewCustomerExclusionPort) {
         this.currentUserProvider = currentUserProvider;
         this.clockProvider = clockProvider;
         this.shoppingCartPort = shoppingCartPort;
@@ -84,6 +90,7 @@ public final class CheckoutUseCase {
         this.paymentPort = paymentPort;
         this.orderRepository = orderRepository;
         this.idempotencyPort = idempotencyPort;
+        this.previewCustomerExclusionPort = previewCustomerExclusionPort;
     }
 
     public CheckoutResult execute(CheckoutCommand command) {
@@ -128,9 +135,12 @@ public final class CheckoutUseCase {
             throw new PaymentDeclinedException();
         }
 
-        StockDecrementResult stock = inventoryPort.decreaseStockAtomically(stockQuantities(cart));
-        if (!stock.succeeded()) {
-            throw new StockUnavailableException(stock.unavailableProducts());
+        boolean previewCheckout = previewCustomerExclusionPort.isPreviewTemporaryCustomer(customerId);
+        if (!previewCheckout) {
+            StockDecrementResult stock = inventoryPort.decreaseStockAtomically(stockQuantities(cart));
+            if (!stock.succeeded()) {
+                throw new StockUnavailableException(stock.unavailableProducts());
+            }
         }
 
         Order order = Order.create(

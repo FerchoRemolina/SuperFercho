@@ -269,6 +269,47 @@ class CatalogPersistenceAdapterTest {
     }
 
     @Test
+    void shouldNotRestoreStockOntoArchivedProduct() {
+        Category category = categoryRepository.save(newCategory("Archivo", CategoryStatus.ACTIVE));
+        ProductType type = productTypeRepository.save(newProductType(category.id(), "Archivo"));
+        Product active = productRepository.save(
+                newProduct(category.id(), type.id(), "770501", "Para archivar", ProductStatus.ACTIVE, 10, "1000.00"));
+
+        assertThat(inventoryPort
+                        .decreaseStockAtomically(List.of(new StockQuantity(active.id(), 3)))
+                        .succeeded())
+                .isTrue();
+        Product archived = productRepository.save(
+                productRepository.findById(active.id()).orElseThrow().archive(NOW.plusSeconds(1)));
+        assertThat(archived.status()).isEqualTo(ProductStatus.ARCHIVED);
+        assertThat(archived.stock()).isEqualTo(0);
+
+        inventoryPort.restoreStock(List.of(new StockQuantity(archived.id(), 3)));
+
+        Product afterRestore = productRepository.findById(archived.id()).orElseThrow();
+        assertThat(afterRestore.status()).isEqualTo(ProductStatus.ARCHIVED);
+        assertThat(afterRestore.stock()).isEqualTo(0);
+    }
+
+    @Test
+    void shouldRestoreStockForActiveAndInactiveProducts() {
+        Category category = categoryRepository.save(newCategory("Restore", CategoryStatus.ACTIVE));
+        ProductType type = productTypeRepository.save(newProductType(category.id(), "Restore"));
+        Product active = productRepository.save(
+                newProduct(category.id(), type.id(), "770601", "Activo", ProductStatus.ACTIVE, 1, "1000.00"));
+        Product inactive = productRepository.save(
+                newProduct(category.id(), type.id(), "770602", "Inactivo", ProductStatus.INACTIVE, 0, "1000.00"));
+
+        inventoryPort.restoreStock(List.of(
+                new StockQuantity(active.id(), 4), new StockQuantity(inactive.id(), 2)));
+
+        assertThat(productRepository.findById(active.id()).orElseThrow().stock()).isEqualTo(5);
+        assertThat(productRepository.findById(inactive.id()).orElseThrow().stock()).isEqualTo(2);
+        assertThat(productRepository.findById(inactive.id()).orElseThrow().status())
+                .isEqualTo(ProductStatus.INACTIVE);
+    }
+
+    @Test
     void shouldAdjustStockAtomicallyWithCas() {
         Category category = categoryRepository.save(newCategory("Ajuste", CategoryStatus.ACTIVE));
         ProductType type = productTypeRepository.save(newProductType(category.id(), "Ajuste"));

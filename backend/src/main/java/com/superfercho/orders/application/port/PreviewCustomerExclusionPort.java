@@ -3,8 +3,8 @@ package com.superfercho.orders.application.port;
 import java.util.UUID;
 
 /**
- * Allows Orders fulfillment flows to skip operational transitions for storefront-preview
- * temporary customers without embedding Identity types in Orders.
+ * Identifies storefront-preview temporary customers so Orders can skip persistent inventory
+ * mutations (decrement on checkout, restore on cancel) without embedding Identity types.
  */
 public interface PreviewCustomerExclusionPort {
 

@@ -43,6 +43,7 @@ public class PasswordRecoveryTokenPersistenceAdapter implements PasswordRecovery
     }
 
     @Override
+    @Transactional
     public void deleteAllByUserId(UUID userId) {
         repository.deleteAllByUserId(userId);
     }

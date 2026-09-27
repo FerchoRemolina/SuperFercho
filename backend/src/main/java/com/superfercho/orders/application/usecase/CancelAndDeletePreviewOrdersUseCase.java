@@ -1,16 +1,11 @@
 package com.superfercho.orders.application.usecase;
 
-import com.superfercho.catalog.application.dto.StockQuantity;
-import com.superfercho.catalog.application.port.InventoryPort;
 import com.superfercho.orders.application.dto.PageRequest;
 import com.superfercho.orders.application.dto.PagedResult;
-import com.superfercho.orders.application.dto.PaymentStatus;
-import com.superfercho.orders.application.port.ClockProvider;
 import com.superfercho.orders.application.port.IdempotencyPort;
 import com.superfercho.orders.application.port.OrderRepository;
 import com.superfercho.orders.application.port.PaymentPort;
 import com.superfercho.orders.domain.model.Order;
-import com.superfercho.orders.domain.model.OrderStatus;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -18,31 +13,22 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Preview cleanup: restores stock / refunds for in-progress temporary-customer orders via
- * {@link Order#cancelForCleanup}, then deletes orders, payments, and idempotency rows.
- * Not a customer cancellation.
+ * Preview cleanup: deletes temporary-customer orders, payments, and idempotency rows.
+ * Preview never consumes real inventory, so cleanup must not restore stock.
  */
 public final class CancelAndDeletePreviewOrdersUseCase {
 
     private static final int PAGE_SIZE = PageRequest.MAX_SIZE;
 
     private final OrderRepository orderRepository;
-    private final InventoryPort inventoryPort;
     private final PaymentPort paymentPort;
     private final IdempotencyPort idempotencyPort;
-    private final ClockProvider clockProvider;
 
     public CancelAndDeletePreviewOrdersUseCase(
-            OrderRepository orderRepository,
-            InventoryPort inventoryPort,
-            PaymentPort paymentPort,
-            IdempotencyPort idempotencyPort,
-            ClockProvider clockProvider) {
+            OrderRepository orderRepository, PaymentPort paymentPort, IdempotencyPort idempotencyPort) {
         this.orderRepository = orderRepository;
-        this.inventoryPort = inventoryPort;
         this.paymentPort = paymentPort;
         this.idempotencyPort = idempotencyPort;
-        this.clockProvider = clockProvider;
     }
 
     public void execute(UUID customerId) {
@@ -52,33 +38,12 @@ public final class CancelAndDeletePreviewOrdersUseCase {
             if (order.paymentId() != null) {
                 paymentIds.add(order.paymentId());
             }
-            if (isInProgress(order.status())) {
-                cancelInProgressForCleanup(order);
-            }
         }
         for (UUID paymentId : paymentIds) {
             paymentPort.deletePayment(paymentId);
         }
         orderRepository.deleteAllByCustomerId(customerId);
         idempotencyPort.deleteAllByCustomerId(customerId);
-    }
-
-    private static boolean isInProgress(OrderStatus status) {
-        return status == OrderStatus.CONFIRMED
-                || status == OrderStatus.PREPARING
-                || status == OrderStatus.DELIVERY;
-    }
-
-    private void cancelInProgressForCleanup(Order order) {
-        Order cancelled = order.cancelForCleanup(clockProvider.currentTime());
-        orderRepository.save(cancelled);
-        inventoryPort.restoreStock(order.items().stream()
-                .map(item -> new StockQuantity(item.productId(), item.quantity()))
-                .toList());
-        if (order.paymentId() != null
-                && paymentPort.getPayment(order.paymentId()).status() == PaymentStatus.APPROVED) {
-            paymentPort.refundPayment(order.paymentId());
-        }
     }
 
     private List<Order> loadAllOrders(UUID customerId) {

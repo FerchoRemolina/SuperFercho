@@ -281,6 +281,23 @@ class TransactionalCancelOrderUseCaseIntegrationTest {
                 .isEqualTo(OrderStatus.CANCELLED);
     }
 
+    @Test
+    void shouldKeepArchivedProductAtZeroStockWhenCancelledOrderRestoresInventory() {
+        PreparedOrder prepared = checkoutWith(PaymentMethod.SIMULATED_CARD);
+        Product archived = productRepository.save(
+                productRepository.findById(prepared.productId()).orElseThrow().archive(clock.instant()));
+        assertThat(archived.status()).isEqualTo(ProductStatus.ARCHIVED);
+        assertThat(archived.stock()).isEqualTo(0);
+
+        executeCancel(prepared.customerId(), prepared.orderId());
+
+        Product afterCancel = productRepository.findById(prepared.productId()).orElseThrow();
+        assertThat(orderRepository.findById(prepared.orderId()).orElseThrow().status())
+                .isEqualTo(OrderStatus.CANCELLED);
+        assertThat(afterCancel.status()).isEqualTo(ProductStatus.ARCHIVED);
+        assertThat(afterCancel.stock()).isEqualTo(0);
+    }
+
     private PreparedOrder checkoutWith(PaymentMethod paymentMethod) {
         Fixture fixture = prepareReadyCheckout();
         CheckoutResult checkout = transactionalCheckoutUseCase.execute(checkoutCommand(fixture, paymentMethod));

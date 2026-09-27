@@ -8,6 +8,7 @@ import com.superfercho.identity.application.exception.StorefrontPreviewForbidden
 import com.superfercho.identity.application.exception.StorefrontPreviewNotFoundException;
 import com.superfercho.identity.application.fakes.InMemoryAddressRepository;
 import com.superfercho.identity.application.fakes.InMemoryCustomerPreviewRepository;
+import com.superfercho.identity.application.fakes.InMemoryPasswordRecoveryTokenRepository;
 import com.superfercho.identity.application.fakes.InMemoryUserRepository;
 import com.superfercho.identity.application.port.AccessTokenIssuer;
 import com.superfercho.identity.application.port.CurrentUserProvider;
@@ -16,7 +17,9 @@ import com.superfercho.identity.application.port.PasswordHasher;
 import com.superfercho.identity.application.port.PreviewAssistantCleanupPort;
 import com.superfercho.identity.application.port.PreviewOrdersCleanupPort;
 import com.superfercho.identity.application.port.PreviewShoppingCleanupPort;
+import com.superfercho.identity.domain.model.CustomerPreview;
 import com.superfercho.identity.domain.model.CustomerPreviewStatus;
+import com.superfercho.identity.domain.model.PasswordRecoveryToken;
 import com.superfercho.identity.domain.model.Role;
 import com.superfercho.identity.domain.model.User;
 import com.superfercho.identity.domain.model.UserStatus;
@@ -37,6 +40,7 @@ class StorefrontPreviewUseCasesTest {
     private InMemoryUserRepository users;
     private InMemoryCustomerPreviewRepository previews;
     private InMemoryAddressRepository addresses;
+    private InMemoryPasswordRecoveryTokenRepository recoveryTokens;
     private RecordingCleanup ordersCleanup;
     private RecordingCleanup shoppingCleanup;
     private RecordingCleanup assistantCleanup;
@@ -53,6 +57,7 @@ class StorefrontPreviewUseCasesTest {
         users = new InMemoryUserRepository();
         previews = new InMemoryCustomerPreviewRepository();
         addresses = new InMemoryAddressRepository();
+        recoveryTokens = new InMemoryPasswordRecoveryTokenRepository();
         ordersCleanup = new RecordingCleanup();
         shoppingCleanup = new RecordingCleanup();
         assistantCleanup = new RecordingCleanup();
@@ -65,6 +70,7 @@ class StorefrontPreviewUseCasesTest {
                 ordersCleanup,
                 shoppingCleanup,
                 assistantCleanup,
+                recoveryTokens,
                 addresses,
                 users,
                 clock);
@@ -185,7 +191,7 @@ class StorefrontPreviewUseCasesTest {
     }
 
     @Test
-    void onlyClaimingWriterRunsCleanup() {
+    void finalizeIsIdempotentAfterSuccessfulCleanup() {
         StorefrontPreviewSessionResult session = start.execute();
         UUID temporaryCustomerId = session.temporaryCustomerId();
 
@@ -194,6 +200,43 @@ class StorefrontPreviewUseCasesTest {
         assertThat(ordersCleanup.calls).containsExactly(temporaryCustomerId);
         assertThat(previews.findById(session.previewId())).isEmpty();
         assertThat(users.findById(temporaryCustomerId)).isEmpty();
+    }
+
+    @Test
+    void finalizeRetriesCleanupWhenPreviewAlreadyClosedWithLeftoverData() {
+        StorefrontPreviewSessionResult session = start.execute();
+        UUID temporaryCustomerId = session.temporaryCustomerId();
+        UUID previewId = session.previewId();
+        Instant closedAt = NOW.plusSeconds(60);
+        CustomerPreview closed = previews.claimClose(previewId, closedAt).orElseThrow();
+        assertThat(closed.status()).isEqualTo(CustomerPreviewStatus.CLOSED);
+        assertThat(users.findById(temporaryCustomerId)).isPresent();
+
+        assertThat(finalize.execute(previewId)).isTrue();
+        assertThat(finalize.execute(previewId)).isFalse();
+        assertThat(ordersCleanup.calls).containsExactly(temporaryCustomerId);
+        assertThat(previews.findById(previewId)).isEmpty();
+        assertThat(users.findById(temporaryCustomerId)).isEmpty();
+    }
+
+    @Test
+    void finalizeDeletesPasswordRecoveryTokensBeforeRemovingTemporaryUser() {
+        StorefrontPreviewSessionResult session = start.execute();
+        UUID temporaryCustomerId = session.temporaryCustomerId();
+        recoveryTokens.save(PasswordRecoveryToken.create(
+                UUID.randomUUID(),
+                temporaryCustomerId,
+                "hash-preview-recovery",
+                "127.0.0.1",
+                NOW,
+                NOW.plusSeconds(3600)));
+        assertThat(recoveryTokens.all()).hasSize(1);
+
+        assertThat(finalize.execute(session.previewId())).isTrue();
+
+        assertThat(recoveryTokens.all()).isEmpty();
+        assertThat(users.findById(temporaryCustomerId)).isEmpty();
+        assertThat(previews.findById(session.previewId())).isEmpty();
     }
 
     @Test

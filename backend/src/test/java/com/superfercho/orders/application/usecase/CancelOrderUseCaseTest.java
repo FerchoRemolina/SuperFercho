@@ -3,6 +3,7 @@ package com.superfercho.orders.application.usecase;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -19,6 +20,7 @@ import com.superfercho.orders.application.port.ClockProvider;
 import com.superfercho.orders.application.port.CurrentUserProvider;
 import com.superfercho.orders.application.port.OrderRepository;
 import com.superfercho.orders.application.port.PaymentPort;
+import com.superfercho.orders.application.port.PreviewCustomerExclusionPort;
 import com.superfercho.orders.domain.exception.InvalidOrderStateTransitionException;
 import com.superfercho.orders.domain.exception.OrderCancellationNotAllowedException;
 import com.superfercho.orders.domain.model.Order;
@@ -65,13 +67,22 @@ class CancelOrderUseCaseTest {
     @Mock
     private PaymentPort paymentPort;
 
+    @Mock
+    private PreviewCustomerExclusionPort previewCustomerExclusionPort;
+
     private CancelOrderUseCase cancelOrder;
 
     @BeforeEach
     void setUp() {
         cancelOrder = new CancelOrderUseCase(
-                currentUserProvider, clockProvider, orderRepository, inventoryPort, paymentPort);
+                currentUserProvider,
+                clockProvider,
+                orderRepository,
+                inventoryPort,
+                paymentPort,
+                previewCustomerExclusionPort);
         when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        lenient().when(previewCustomerExclusionPort.isPreviewTemporaryCustomer(CUSTOMER_ID)).thenReturn(false);
     }
 
     @Test
@@ -166,6 +177,22 @@ class CancelOrderUseCaseTest {
         verify(inventoryPort, never()).restoreStock(any());
         verify(paymentPort, never()).refundPayment(any());
         verify(paymentPort, never()).getPayment(any());
+    }
+
+    @Test
+    void shouldCancelPreviewOrderWithoutRestoringStock() {
+        when(previewCustomerExclusionPort.isPreviewTemporaryCustomer(CUSTOMER_ID)).thenReturn(true);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(confirmedOrder(CUSTOMER_ID, PAYMENT_ID)));
+        when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
+        when(orderRepository.saveIfConfirmed(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
+        when(paymentPort.getPayment(PAYMENT_ID))
+                .thenReturn(paymentResult(PaymentStatus.APPROVED, "sim-1"));
+
+        OrderResult result = cancelOrder.execute(new CancelOrderCommand(ORDER_ID));
+
+        assertEquals(OrderStatus.CANCELLED, result.status());
+        verify(inventoryPort, never()).restoreStock(any());
+        verify(paymentPort).refundPayment(PAYMENT_ID);
     }
 
     private static Order confirmedOrder(UUID customerId, UUID paymentId) {

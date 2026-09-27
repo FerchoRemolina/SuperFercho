@@ -53,6 +53,7 @@ public interface ProductJpaRepository extends JpaRepository<ProductJpaEntity, UU
                        set stock = stock + :quantity,
                            updated_at = :updatedAt
                      where id = :id
+                       and status <> 'ARCHIVED'
                        and :quantity > 0
                     """,
             nativeQuery = true)

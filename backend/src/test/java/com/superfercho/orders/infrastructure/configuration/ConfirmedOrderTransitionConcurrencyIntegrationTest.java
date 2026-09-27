@@ -217,8 +217,7 @@ class ConfirmedOrderTransitionConcurrencyIntegrationTest {
         PreparedOrder prepared = checkout();
         int stockAfterCheckout = productStock(prepared.productId());
         AdvanceOrderLifecycleUseCase futureLifecycle =
-                new AdvanceOrderLifecycleUseCase(
-                        orderRepository, futureClockPastPreparingWindow(), customerId -> false);
+                new AdvanceOrderLifecycleUseCase(orderRepository, futureClockPastPreparingWindow());
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {

@@ -2,7 +2,6 @@ package com.superfercho.orders.application.usecase;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -11,7 +10,6 @@ import static org.mockito.Mockito.when;
 import com.superfercho.orders.application.dto.OrderResult;
 import com.superfercho.orders.application.port.ClockProvider;
 import com.superfercho.orders.application.port.OrderRepository;
-import com.superfercho.orders.application.port.PreviewCustomerExclusionPort;
 import com.superfercho.orders.domain.model.Order;
 import com.superfercho.orders.domain.model.OrderItem;
 import com.superfercho.orders.domain.model.OrderNumber;
@@ -43,16 +41,11 @@ class AdvanceOrderLifecycleUseCaseTest {
     @Mock
     private ClockProvider clockProvider;
 
-    @Mock
-    private PreviewCustomerExclusionPort previewCustomerExclusionPort;
-
     private AdvanceOrderLifecycleUseCase advanceLifecycle;
 
     @BeforeEach
     void setUp() {
-        advanceLifecycle =
-                new AdvanceOrderLifecycleUseCase(orderRepository, clockProvider, previewCustomerExclusionPort);
-        lenient().when(previewCustomerExclusionPort.isPreviewTemporaryCustomer(any())).thenReturn(false);
+        advanceLifecycle = new AdvanceOrderLifecycleUseCase(orderRepository, clockProvider);
     }
 
     @Test
@@ -114,23 +107,24 @@ class AdvanceOrderLifecycleUseCaseTest {
     }
 
     @Test
+    void shouldAdvancePreviewTemporaryCustomerOrdersThroughLifecycle() {
+        Order previewOrder = confirmedOrder("ORD-PREVIEW");
+        when(clockProvider.currentTime()).thenReturn(CONFIRMED_AT.plusSeconds(360));
+        when(orderRepository.findInProgressForLifecycle()).thenReturn(List.of(previewOrder));
+        when(orderRepository.saveIfConfirmed(any())).thenAnswer(call -> Optional.of(call.getArgument(0)));
+
+        List<OrderResult> advanced = advanceLifecycle.execute();
+
+        assertEquals(1, advanced.size());
+        assertEquals(OrderStatus.DELIVERED, advanced.get(0).status());
+        verify(orderRepository).saveIfConfirmed(any());
+    }
+
+    @Test
     void shouldSkipOrdersAlreadyAtTargetStatus() {
         Order confirmed = confirmedOrder("ORD-1");
         when(clockProvider.currentTime()).thenReturn(CONFIRMED_AT.plusSeconds(60));
         when(orderRepository.findInProgressForLifecycle()).thenReturn(List.of(confirmed));
-
-        List<OrderResult> advanced = advanceLifecycle.execute();
-
-        assertEquals(List.of(), advanced);
-        verify(orderRepository, never()).saveIfConfirmed(any());
-        verify(orderRepository, never()).save(any());
-    }
-
-    @Test
-    void shouldSkipPreviewTemporaryCustomers() {
-        when(clockProvider.currentTime()).thenReturn(CONFIRMED_AT.plusSeconds(120));
-        when(orderRepository.findInProgressForLifecycle()).thenReturn(List.of(confirmedOrder("ORD-1")));
-        when(previewCustomerExclusionPort.isPreviewTemporaryCustomer(CUSTOMER_ID)).thenReturn(true);
 
         List<OrderResult> advanced = advanceLifecycle.execute();
 

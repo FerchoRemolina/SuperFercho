@@ -42,6 +42,7 @@ import com.superfercho.orders.application.port.CustomerAddressPort;
 import com.superfercho.orders.application.port.IdempotencyPort;
 import com.superfercho.orders.application.port.OrderRepository;
 import com.superfercho.orders.application.port.PaymentPort;
+import com.superfercho.orders.application.port.PreviewCustomerExclusionPort;
 import com.superfercho.orders.application.port.ProductCatalogPort;
 import com.superfercho.orders.application.port.ShoppingCartPort;
 import com.superfercho.orders.domain.model.Order;
@@ -98,6 +99,9 @@ class CheckoutUseCaseTest {
     @Mock
     private OrderRepository orderRepository;
 
+    @Mock
+    private PreviewCustomerExclusionPort previewCustomerExclusionPort;
+
     private InMemoryIdempotencyPort idempotencyPort;
     private CheckoutUseCase checkout;
 
@@ -113,9 +117,11 @@ class CheckoutUseCaseTest {
                 inventoryPort,
                 paymentPort,
                 orderRepository,
-                idempotencyPort);
+                idempotencyPort,
+                previewCustomerExclusionPort);
         when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(clockProvider.currentTime()).thenReturn(NOW);
+        lenient().when(previewCustomerExclusionPort.isPreviewTemporaryCustomer(CUSTOMER_ID)).thenReturn(false);
     }
 
     @Test
@@ -358,6 +364,34 @@ class CheckoutUseCaseTest {
         verify(paymentPort).processPayment(payment.capture());
         assertEquals(Money.cop(new BigDecimal("21.00")), payment.getValue().amount());
         assertEquals(PaymentMethod.SIMULATED_CARD, payment.getValue().paymentMethod());
+    }
+
+    @Test
+    void shouldCompletePreviewCheckoutWithoutDecrementingPersistentStock() {
+        when(previewCustomerExclusionPort.isPreviewTemporaryCustomer(CUSTOMER_ID)).thenReturn(true);
+        givenReadyCartAndCatalog();
+        givenApprovedCardPayment();
+
+        CheckoutResult result = checkout.execute(cardCommand());
+
+        assertEquals(OrderStatus.CONFIRMED, result.status());
+        assertEquals(PaymentStatus.APPROVED, result.paymentStatus());
+        verify(inventoryPort, never()).decreaseStockAtomically(any());
+        verify(orderRepository).save(any());
+        verify(shoppingCartPort).clearCart(CUSTOMER_ID);
+    }
+
+    @Test
+    void shouldStillRejectInsufficientStockDuringPreviewCheckout() {
+        lenient().when(previewCustomerExclusionPort.isPreviewTemporaryCustomer(CUSTOMER_ID)).thenReturn(true);
+        givenReadyCartAndCatalog();
+        when(productCatalogPort.checkAvailability(any()))
+                .thenReturn(AvailabilityResult.unavailable(List.of(PRODUCT_ID)));
+
+        assertThrows(StockUnavailableException.class, () -> checkout.execute(cardCommand()));
+        verify(inventoryPort, never()).decreaseStockAtomically(any());
+        verify(paymentPort, never()).processPayment(any());
+        verify(orderRepository, never()).save(any());
     }
 
     @Test

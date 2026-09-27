@@ -9,9 +9,11 @@ import com.superfercho.orders.application.port.ClockProvider;
 import com.superfercho.orders.application.port.CurrentUserProvider;
 import com.superfercho.orders.application.port.OrderRepository;
 import com.superfercho.orders.application.port.PaymentPort;
+import com.superfercho.orders.application.port.PreviewCustomerExclusionPort;
 import com.superfercho.orders.domain.exception.InvalidOrderStateTransitionException;
 import com.superfercho.orders.domain.model.Order;
 import com.superfercho.orders.domain.model.OrderStatus;
+import java.util.UUID;
 
 public final class CancelOrderUseCase {
 
@@ -20,31 +22,37 @@ public final class CancelOrderUseCase {
     private final OrderRepository orderRepository;
     private final InventoryPort inventoryPort;
     private final PaymentPort paymentPort;
+    private final PreviewCustomerExclusionPort previewCustomerExclusionPort;
 
     public CancelOrderUseCase(
             CurrentUserProvider currentUserProvider,
             ClockProvider clockProvider,
             OrderRepository orderRepository,
             InventoryPort inventoryPort,
-            PaymentPort paymentPort) {
+            PaymentPort paymentPort,
+            PreviewCustomerExclusionPort previewCustomerExclusionPort) {
         this.currentUserProvider = currentUserProvider;
         this.clockProvider = clockProvider;
         this.orderRepository = orderRepository;
         this.inventoryPort = inventoryPort;
         this.paymentPort = paymentPort;
+        this.previewCustomerExclusionPort = previewCustomerExclusionPort;
     }
 
     public OrderResult execute(CancelOrderCommand command) {
-        Order order = OwnedOrderAccess.requireOwnedOrder(
-                orderRepository, currentUserProvider.getCurrentUserId(), command.orderId());
+        UUID customerId = currentUserProvider.getCurrentUserId();
+        Order order = OwnedOrderAccess.requireOwnedOrder(orderRepository, customerId, command.orderId());
         Order cancelled = order.cancel(clockProvider.currentTime());
         Order saved = orderRepository
                 .saveIfConfirmed(cancelled)
                 .orElseThrow(
                         () -> new InvalidOrderStateTransitionException(OrderStatus.CONFIRMED, OrderStatus.CANCELLED));
-        inventoryPort.restoreStock(order.items().stream()
-                .map(item -> new StockQuantity(item.productId(), item.quantity()))
-                .toList());
+        boolean previewCustomer = previewCustomerExclusionPort.isPreviewTemporaryCustomer(customerId);
+        if (!previewCustomer) {
+            inventoryPort.restoreStock(order.items().stream()
+                    .map(item -> new StockQuantity(item.productId(), item.quantity()))
+                    .toList());
+        }
         if (order.paymentId() != null
                 && paymentPort.getPayment(order.paymentId()).status() == PaymentStatus.APPROVED) {
             paymentPort.refundPayment(order.paymentId());

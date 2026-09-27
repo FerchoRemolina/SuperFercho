@@ -8,6 +8,7 @@ import com.superfercho.identity.application.port.AddressRepository;
 import com.superfercho.identity.application.port.CurrentUserProvider;
 import com.superfercho.identity.application.port.CustomerPreviewRepository;
 import com.superfercho.identity.application.port.PasswordHasher;
+import com.superfercho.identity.application.port.PasswordRecoveryTokenRepository;
 import com.superfercho.identity.application.port.PreviewAssistantCleanupPort;
 import com.superfercho.identity.application.port.PreviewOrdersCleanupPort;
 import com.superfercho.identity.application.port.PreviewShoppingCleanupPort;
@@ -25,6 +26,7 @@ import com.superfercho.identity.application.usecase.SetDefaultAddressUseCase;
 import com.superfercho.identity.application.usecase.StartStorefrontPreviewUseCase;
 import com.superfercho.identity.application.usecase.UpdateAddressUseCase;
 import java.time.Clock;
+import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -101,23 +103,42 @@ public class IdentityUseCaseConfiguration {
     }
 
     @Bean
-    @ConditionalOnBean(CustomerPreviewRepository.class)
+    @ConditionalOnBean({CustomerPreviewRepository.class, PasswordRecoveryTokenRepository.class})
     FinalizeStorefrontPreviewUseCase finalizeStorefrontPreviewUseCase(
             CustomerPreviewRepository customerPreviewRepository,
             PreviewOrdersCleanupPort previewOrdersCleanupPort,
             PreviewShoppingCleanupPort previewShoppingCleanupPort,
             PreviewAssistantCleanupPort previewAssistantCleanupPort,
+            PasswordRecoveryTokenRepository passwordRecoveryTokenRepository,
             AddressRepository addressRepository,
             UserRepository userRepository,
-            Clock clock) {
+            Clock clock,
+            PlatformTransactionManager transactionManager) {
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        FinalizeStorefrontPreviewUseCase useCase = new FinalizeStorefrontPreviewUseCase(
+                customerPreviewRepository,
+                previewOrdersCleanupPort,
+                previewShoppingCleanupPort,
+                previewAssistantCleanupPort,
+                passwordRecoveryTokenRepository,
+                addressRepository,
+                userRepository,
+                clock);
         return new FinalizeStorefrontPreviewUseCase(
                 customerPreviewRepository,
                 previewOrdersCleanupPort,
                 previewShoppingCleanupPort,
                 previewAssistantCleanupPort,
+                passwordRecoveryTokenRepository,
                 addressRepository,
                 userRepository,
-                clock);
+                clock) {
+            @Override
+            public boolean execute(UUID previewId) {
+                Boolean result = transaction.execute(status -> useCase.execute(previewId));
+                return Boolean.TRUE.equals(result);
+            }
+        };
     }
 
     @Bean
