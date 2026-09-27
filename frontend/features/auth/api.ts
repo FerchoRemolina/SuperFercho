@@ -65,6 +65,38 @@ export async function registerCustomer(
   });
 }
 
+export type RequestPasswordRecoveryRequest = {
+  email: string;
+};
+
+export type PasswordRecoveryRequestRestResponse = {
+  message: string;
+};
+
+export type ResetPasswordRequest = {
+  token: string;
+  newPassword: string;
+  confirmPassword: string;
+};
+
+export async function requestPasswordRecovery(
+  body: RequestPasswordRecoveryRequest,
+): Promise<PasswordRecoveryRequestRestResponse> {
+  return request<PasswordRecoveryRequestRestResponse>("/auth/password-recovery", {
+    method: "POST",
+    body,
+    anonymous: true,
+  });
+}
+
+export async function resetPassword(body: ResetPasswordRequest): Promise<void> {
+  await request<void>("/auth/password-recovery/reset", {
+    method: "POST",
+    body,
+    anonymous: true,
+  });
+}
+
 export function sessionFromAuthentication(
   response: AuthenticationRestResponse,
 ): NonNullable<Session> {

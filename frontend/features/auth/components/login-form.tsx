@@ -58,7 +58,14 @@ export function LoginForm() {
       router.replace(nextPath ?? homePathForRole(response.role));
     } catch (cause) {
       if (isApiError(cause)) {
-        setError(messageForApiProblem(cause.problem));
+        if (
+          cause.problem.code === "INVALID_CREDENTIALS" ||
+          cause.problem.status === 401
+        ) {
+          setError("Correo o contraseña incorrectos.");
+        } else {
+          setError(messageForApiProblem(cause.problem));
+        }
       } else {
         setError("No se pudo iniciar sesión.");
       }
@@ -70,6 +77,7 @@ export function LoginForm() {
   const registerHref = nextPath
     ? `/register?next=${encodeURIComponent(nextPath)}`
     : "/register";
+  const forgotPasswordHref = "/forgot-password";
 
   return (
     <form onSubmit={onSubmit} className="grid gap-4" noValidate>
@@ -103,6 +111,14 @@ export function LoginForm() {
         value={password}
         onChange={(event) => setPassword(event.target.value)}
       />
+      <p className="-mt-2 text-sm">
+        <Link
+          href={forgotPasswordHref}
+          className="font-semibold text-sf-accent transition-colors hover:text-sf-ink"
+        >
+          ¿Olvidaste tu contraseña?
+        </Link>
+      </p>
       <Button type="submit" disabled={pending}>
         {pending ? "Entrando…" : "Entrar"}
       </Button>

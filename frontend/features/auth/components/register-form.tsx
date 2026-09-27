@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { isApiError } from "@/shared/errors/api-problem";
@@ -9,6 +9,7 @@ import { safeNextPath } from "@/shared/auth/safe-next-path";
 import { useSession } from "@/shared/session/session-provider";
 import { Alert } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
+import { PasswordField } from "@/shared/ui/password-field";
 import { SelectField } from "@/shared/ui/select-field";
 import { TextField } from "@/shared/ui/text-field";
 import {
@@ -16,6 +17,34 @@ import {
   REGISTER_DOCUMENT_TYPES,
   registerCustomer,
 } from "@/features/auth/api";
+import { PasswordRequirementsList } from "@/features/auth/components/password-requirements-list";
+import { shouldShowPasswordRequirements } from "@/features/auth/password-recovery-presentation";
+import {
+  digitsOnly,
+  isPasswordValid,
+  normalizeRegisterPersonName,
+  REGISTER_DOCUMENT_NUMBER_MAX,
+  REGISTER_NAME_MAX,
+  REGISTER_PASSWORD_MAX,
+  REGISTER_PHONE_LENGTH,
+  validateRegisterForm,
+  type RegisterFieldErrors,
+  type RegisterFormValues,
+} from "@/features/auth/register-validation";
+
+type TouchedFields = Partial<Record<keyof RegisterFormValues, boolean>>;
+
+function fieldError(
+  errors: RegisterFieldErrors,
+  field: keyof RegisterFormValues,
+  touched: TouchedFields,
+  submitAttempted: boolean,
+): string | undefined {
+  if (!(submitAttempted || touched[field])) {
+    return undefined;
+  }
+  return errors[field];
+}
 
 export function RegisterForm() {
   const { session } = useSession();
@@ -24,12 +53,37 @@ export function RegisterForm() {
   const nextPath = safeNextPath(searchParams.get("next"));
   const [documentType, setDocumentType] = useState("");
   const [documentNumber, setDocumentNumber] = useState("");
-  const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordHintsVisible, setPasswordHintsVisible] = useState(false);
+  const [touched, setTouched] = useState<TouchedFields>({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  const values: RegisterFormValues = useMemo(
+    () => ({
+      documentType,
+      documentNumber,
+      firstName,
+      lastName,
+      email,
+      phone,
+      password,
+    }),
+    [documentNumber, documentType, email, firstName, lastName, password, phone],
+  );
+
+  const errors = useMemo(() => validateRegisterForm(values), [values]);
+
+  const showRequirements = shouldShowPasswordRequirements({
+    interacted: passwordHintsVisible,
+    submitAttempted,
+    passwordLength: password.length,
+  });
 
   useEffect(() => {
     if (session) {
@@ -37,16 +91,28 @@ export function RegisterForm() {
     }
   }, [nextPath, router, session]);
 
+  function markTouched(field: keyof RegisterFormValues) {
+    setTouched((current) => ({ ...current, [field]: true }));
+  }
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setSubmitAttempted(true);
     setError(null);
+
+    const nextErrors = validateRegisterForm(values);
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
+
     setPending(true);
     try {
       await registerCustomer({
         documentType,
         documentNumber,
-        fullName,
-        email,
+        firstName: normalizeRegisterPersonName(firstName),
+        lastName: normalizeRegisterPersonName(lastName),
+        email: email.trim().toLowerCase(),
         phone,
         password,
       });
@@ -79,6 +145,8 @@ export function RegisterForm() {
         name="documentType"
         required
         value={documentType}
+        error={fieldError(errors, "documentType", touched, submitAttempted)}
+        onBlur={() => markTouched("documentType")}
         onChange={(event) => setDocumentType(event.target.value)}
       >
         <option value="" disabled>
@@ -94,19 +162,46 @@ export function RegisterForm() {
         id="register-document-number"
         label="Número de documento"
         name="documentNumber"
+        inputMode="numeric"
         autoComplete="off"
         required
+        maxLength={REGISTER_DOCUMENT_NUMBER_MAX}
         value={documentNumber}
-        onChange={(event) => setDocumentNumber(event.target.value)}
+        error={fieldError(errors, "documentNumber", touched, submitAttempted)}
+        onBlur={() => markTouched("documentNumber")}
+        onChange={(event) =>
+          setDocumentNumber(
+            digitsOnly(event.target.value).slice(0, REGISTER_DOCUMENT_NUMBER_MAX),
+          )
+        }
       />
       <TextField
-        id="register-full-name"
-        label="Nombre completo"
-        name="fullName"
-        autoComplete="name"
+        id="register-first-name"
+        label="Nombre"
+        name="firstName"
+        autoComplete="given-name"
         required
-        value={fullName}
-        onChange={(event) => setFullName(event.target.value)}
+        maxLength={REGISTER_NAME_MAX}
+        value={firstName}
+        error={fieldError(errors, "firstName", touched, submitAttempted)}
+        onBlur={() => markTouched("firstName")}
+        onChange={(event) =>
+          setFirstName(event.target.value.slice(0, REGISTER_NAME_MAX))
+        }
+      />
+      <TextField
+        id="register-last-name"
+        label="Apellido"
+        name="lastName"
+        autoComplete="family-name"
+        required
+        maxLength={REGISTER_NAME_MAX}
+        value={lastName}
+        error={fieldError(errors, "lastName", touched, submitAttempted)}
+        onBlur={() => markTouched("lastName")}
+        onChange={(event) =>
+          setLastName(event.target.value.slice(0, REGISTER_NAME_MAX))
+        }
       />
       <TextField
         id="register-email"
@@ -116,27 +211,49 @@ export function RegisterForm() {
         autoComplete="email"
         required
         value={email}
+        error={fieldError(errors, "email", touched, submitAttempted)}
+        onBlur={() => markTouched("email")}
         onChange={(event) => setEmail(event.target.value)}
       />
       <TextField
         id="register-phone"
-        label="Teléfono"
+        label="Celular"
         type="tel"
         name="phone"
+        inputMode="numeric"
         autoComplete="tel"
         required
+        maxLength={REGISTER_PHONE_LENGTH}
         value={phone}
-        onChange={(event) => setPhone(event.target.value)}
+        error={fieldError(errors, "phone", touched, submitAttempted)}
+        onBlur={() => markTouched("phone")}
+        onChange={(event) =>
+          setPhone(digitsOnly(event.target.value).slice(0, REGISTER_PHONE_LENGTH))
+        }
       />
-      <TextField
+      <PasswordField
         id="register-password"
         label="Contraseña"
-        type="password"
         name="password"
         autoComplete="new-password"
         required
+        maxLength={REGISTER_PASSWORD_MAX}
         value={password}
-        onChange={(event) => setPassword(event.target.value)}
+        error={fieldError(errors, "password", touched, submitAttempted)}
+        valid={
+          (submitAttempted || touched.password) && isPasswordValid(password)
+        }
+        onFocus={() => setPasswordHintsVisible(true)}
+        onBlur={() => markTouched("password")}
+        onChange={(event) => {
+          setPasswordHintsVisible(true);
+          setPassword(event.target.value.slice(0, REGISTER_PASSWORD_MAX));
+        }}
+        description={
+          showRequirements ? (
+            <PasswordRequirementsList password={password} />
+          ) : undefined
+        }
       />
       <Button type="submit" disabled={pending}>
         {pending ? "Creando cuenta…" : "Crear cuenta"}
