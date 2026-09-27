@@ -57,7 +57,7 @@ export function messageForApiProblem(problem: ApiProblem): string {
     case "ORDER_NOT_FOUND":
       return "No encontramos ese pedido.";
     case "CANCELLATION_NOT_ALLOWED":
-      return "Este pedido ya no puede cancelarse. El plazo de 15 minutos terminó o el pedido ya cambió de estado.";
+      return "Este pedido ya no puede cancelarse. El plazo de 2 minutos terminó o el pedido ya cambió de estado.";
     case "INVALID_ORDER_TRANSITION":
       return "El pedido ya no está en un estado que permita esta acción.";
     case "INVALID_ORDER_STATUS_UPDATE":

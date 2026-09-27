@@ -159,7 +159,7 @@ describe("messageForApiProblem", () => {
         detail: "customer cancellation window has expired",
       }),
     ).toBe(
-      "Este pedido ya no puede cancelarse. El plazo de 15 minutos terminó o el pedido ya cambió de estado.",
+      "Este pedido ya no puede cancelarse. El plazo de 2 minutos terminó o el pedido ya cambió de estado.",
     );
   });
 
