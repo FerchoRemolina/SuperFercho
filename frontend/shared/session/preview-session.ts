@@ -18,6 +18,10 @@ export type PreviewMeta = {
 
 const metaListeners = new Set<() => void>();
 
+/** Cached snapshot for useSyncExternalStore — same reference until meta storage changes. */
+let cachedMetaRaw: string | null | undefined = undefined;
+let cachedMeta: PreviewMeta | null = null;
+
 export function subscribeToPreviewMeta(listener: () => void): () => void {
   metaListeners.add(listener);
   return () => {
@@ -29,6 +33,15 @@ function emitPreviewMeta(): void {
   for (const listener of metaListeners) {
     listener();
   }
+}
+
+function rememberPreviewMeta(
+  raw: string | null | undefined,
+  meta: PreviewMeta | null,
+): PreviewMeta | null {
+  cachedMetaRaw = raw;
+  cachedMeta = meta;
+  return cachedMeta;
 }
 
 function parseSessionShape(value: unknown): NonNullable<Session> | null {
@@ -49,6 +62,12 @@ function parseSessionShape(value: unknown): NonNullable<Session> | null {
     role: "ADMIN",
     accessToken: record.accessToken,
     expiresAt: record.expiresAt,
+    ...(typeof record.firstName === "string" && record.firstName.trim()
+      ? { firstName: record.firstName.trim() }
+      : {}),
+    ...(typeof record.lastName === "string" && record.lastName.trim()
+      ? { lastName: record.lastName.trim() }
+      : {}),
   };
 }
 
@@ -105,29 +124,36 @@ export function setPreviewMeta(meta: PreviewMeta): void {
   if (!persistence) {
     return;
   }
-  persistence.setItem(PREVIEW_META_STORAGE_KEY, JSON.stringify(meta));
+  const raw = JSON.stringify(meta);
+  persistence.setItem(PREVIEW_META_STORAGE_KEY, raw);
+  rememberPreviewMeta(raw, meta);
   emitPreviewMeta();
 }
 
 export function getPreviewMeta(): PreviewMeta | null {
   const persistence = getSessionPersistence();
   if (!persistence) {
-    return null;
+    return rememberPreviewMeta(undefined, null);
   }
   const raw = persistence.getItem(PREVIEW_META_STORAGE_KEY);
+  if (raw === cachedMetaRaw) {
+    return cachedMeta;
+  }
   if (!raw) {
-    return null;
+    return rememberPreviewMeta(null, null);
   }
   try {
-    return parsePreviewMeta(JSON.parse(raw));
+    const parsed = parsePreviewMeta(JSON.parse(raw));
+    return rememberPreviewMeta(raw, parsed);
   } catch {
     persistence.removeItem(PREVIEW_META_STORAGE_KEY);
-    return null;
+    return rememberPreviewMeta(null, null);
   }
 }
 
 export function clearPreviewMeta(): void {
   getSessionPersistence()?.removeItem(PREVIEW_META_STORAGE_KEY);
+  rememberPreviewMeta(null, null);
   emitPreviewMeta();
 }
 

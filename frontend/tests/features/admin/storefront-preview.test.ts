@@ -189,6 +189,11 @@ describe("storefront-preview composition", () => {
     expect(header).toContain("Volver a administración");
     expect(header).toContain("Salir de preview");
     expect(banner).toContain("Modo de prueba");
+    expect(banner).toContain("Salir del modo de prueba");
+    expect(banner).toContain("Volver a administración");
+    expect(banner).toContain("remainingToneClass");
+    expect(banner).not.toContain("Customer temporal");
+    expect(banner).not.toContain("Salir de preview");
     expect(customerCountdown).toContain("session.expiresAt");
     expect(customerCountdown).toContain("isPreview");
     expect(customerCountdown).toContain("clearSession");

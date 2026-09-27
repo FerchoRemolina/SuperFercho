@@ -116,6 +116,36 @@ describe("preview-session stash and meta", () => {
     );
   });
 
+  it("returns a stable PreviewMeta reference across getSnapshot reads", () => {
+    const store = new MemoryPersistence();
+    configureSessionPersistence(store);
+    const meta = {
+      previewId: previewResponse.previewId,
+      previewExpiresAt: previewResponse.previewExpiresAt,
+      temporaryCustomerId: previewResponse.temporaryCustomerId,
+    };
+    setPreviewMeta(meta);
+    const first = getPreviewMeta();
+    const second = getPreviewMeta();
+    expect(first).toBe(meta);
+    expect(second).toBe(first);
+
+    store.setItem(
+      PREVIEW_META_STORAGE_KEY,
+      JSON.stringify({
+        previewId: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+        previewExpiresAt: previewResponse.previewExpiresAt,
+        temporaryCustomerId: previewResponse.temporaryCustomerId,
+      }),
+    );
+    const afterExternalWrite = getPreviewMeta();
+    const afterExternalWriteAgain = getPreviewMeta();
+    expect(afterExternalWrite?.previewId).toBe(
+      "dddddddd-dddd-dddd-dddd-dddddddddddd",
+    );
+    expect(afterExternalWriteAgain).toBe(afterExternalWrite);
+  });
+
   it("detects an active storefront preview only for the temporary customer", () => {
     configureSessionPersistence(new MemoryPersistence());
     const meta = {

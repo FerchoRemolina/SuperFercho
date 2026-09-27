@@ -5,6 +5,9 @@ export type Session = {
   role: Role;
   accessToken: string;
   expiresAt: string;
+  /** Customer/Admin first name from Identity login; used for Cuenta label and avatar. */
+  firstName?: string;
+  lastName?: string;
 } | null;
 
 export const SESSION_STORAGE_KEY = "superfercho.session";
@@ -149,10 +152,20 @@ function parseSession(value: unknown): Session {
   ) {
     return null;
   }
+  const firstName =
+    typeof record.firstName === "string" && record.firstName.trim()
+      ? record.firstName.trim()
+      : undefined;
+  const lastName =
+    typeof record.lastName === "string" && record.lastName.trim()
+      ? record.lastName.trim()
+      : undefined;
   return {
     userId: record.userId,
     role: record.role,
     accessToken: record.accessToken,
     expiresAt: record.expiresAt,
+    ...(firstName ? { firstName } : {}),
+    ...(lastName ? { lastName } : {}),
   };
 }

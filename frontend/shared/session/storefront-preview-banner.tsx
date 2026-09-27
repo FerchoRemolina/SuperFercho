@@ -6,10 +6,21 @@ import {
   previewRemainingMs,
   type PreviewMeta,
 } from "@/shared/session/preview-session";
-import { Button } from "@/shared/ui/button";
+import { Button, buttonClassName } from "@/shared/ui/button";
 import { cx } from "@/shared/utils/cx";
 
+const FIVE_MINUTES_MS = 5 * 60_000;
 const TWO_MINUTES_MS = 2 * 60_000;
+
+function remainingToneClass(remainingMs: number): string {
+  if (remainingMs > FIVE_MINUTES_MS) {
+    return "text-sf-ink";
+  }
+  if (remainingMs >= TWO_MINUTES_MS) {
+    return "text-amber-700";
+  }
+  return "text-red-600";
+}
 
 export function StorefrontPreviewBanner({
   previewExpiresAt,
@@ -44,33 +55,41 @@ export function StorefrontPreviewBanner({
     return null;
   }
 
-  const nearExpiry = remainingMs <= TWO_MINUTES_MS;
-
   return (
     <div
       role="status"
       aria-live="polite"
-      className={cx(
-        "border-b border-sf-warning/40 bg-amber-50 text-sf-ink",
-        nearExpiry && "bg-amber-100",
-      )}
+      className="border-b border-amber-200/70 bg-amber-50 text-sf-ink"
     >
       <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between md:px-8">
         <div className="min-w-0">
-          <p className="font-semibold text-sf-warning">Modo de prueba</p>
-          <p className="mt-1 text-sm text-sf-ink">
-            Customer temporal ·{" "}
-            <span className="font-semibold tabular-nums">
-              {formatPreviewRemaining(remainingMs)}
-            </span>
+          <p className="font-semibold text-sf-ink">Modo de prueba</p>
+          <p
+            className={cx(
+              "mt-1 text-sm font-semibold tabular-nums",
+              remainingToneClass(remainingMs),
+            )}
+          >
+            {formatPreviewRemaining(remainingMs)}
           </p>
         </div>
         <div className="flex flex-wrap gap-2 md:shrink-0">
-          <Button type="button" variant="secondary" onClick={onReturnToAdmin}>
+          <button
+            type="button"
+            onClick={onReturnToAdmin}
+            className={buttonClassName(
+              "secondary",
+              cx(
+                "border-emerald-200/90 bg-emerald-50 text-emerald-800",
+                "hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-900",
+                "transition-colors duration-150",
+              ),
+            )}
+          >
             Volver a administración
-          </Button>
+          </button>
           <Button type="button" variant="destructive" onClick={onExitPreview}>
-            Salir de preview
+            Salir del modo de prueba
           </Button>
         </div>
       </div>
