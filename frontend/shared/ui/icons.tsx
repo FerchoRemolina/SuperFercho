@@ -168,6 +168,16 @@ export function EyeIcon(props: IconProps) {
   );
 }
 
+export function EyeOffIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" />
+      <circle cx="12" cy="12" r="2.75" />
+      <path d="M4 4l16 16" />
+    </Icon>
+  );
+}
+
 export function RefreshIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -175,6 +185,25 @@ export function RefreshIcon(props: IconProps) {
       <path d="M17.5 4.5v4h-4" />
       <path d="M19.5 12a7.5 7.5 0 0 1-12.7 5.4" />
       <path d="M6.5 19.5v-4h4" />
+    </Icon>
+  );
+}
+
+export function MapPinIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 21s-6.5-5.2-6.5-10a6.5 6.5 0 1 1 13 0c0 4.8-6.5 10-6.5 10z" />
+      <circle cx="12" cy="11" r="2.25" />
+    </Icon>
+  );
+}
+
+export function LogOutIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M10 4.5H6.5A2 2 0 0 0 4.5 6.5v11A2 2 0 0 0 6.5 19.5H10" />
+      <path d="M10 12h9.5" />
+      <path d="M16.5 8.5L20 12l-3.5 3.5" />
     </Icon>
   );
 }

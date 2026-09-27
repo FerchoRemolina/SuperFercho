@@ -11,7 +11,7 @@ export function BrandLogo({
     <Link
       href="/"
       className={cx(
-        "inline-flex min-h-11 items-center",
+        "inline-flex shrink-0 items-center min-h-11",
         className,
       )}
       aria-label="SuperFercho"
@@ -20,9 +20,9 @@ export function BrandLogo({
       <img
         src={brandingAssets.logo}
         alt="SuperFercho"
-        width={176}
-        height={32}
-        className="h-8 w-auto"
+        width={208}
+        height={38}
+        className="h-auto w-[170px] shrink-0 md:w-[208px]"
       />
     </Link>
   );

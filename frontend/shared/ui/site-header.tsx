@@ -12,12 +12,20 @@ import { BrandLogo } from "@/shared/ui/brand-logo";
 import { Button, buttonClassName } from "@/shared/ui/button";
 import { Container } from "@/shared/ui/container";
 import {
+  ClipboardListIcon,
   CloseIcon,
   HeartIcon,
+  LogOutIcon,
+  MapPinIcon,
   MenuIcon,
+  PackageIcon,
   SearchIcon,
   UserIcon,
 } from "@/shared/ui/icons";
+import {
+  accountAvatarInitial,
+  accountMenuDisplayName,
+} from "@/shared/ui/account-menu-presentation";
 import { cx } from "@/shared/utils/cx";
 
 const publicLinks = [
@@ -45,18 +53,46 @@ export function SiteHeader() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [accountMenuMounted, setAccountMenuMounted] = useState(false);
+  const [accountMenuShown, setAccountMenuShown] = useState(false);
   const [navPath, setNavPath] = useState(pathname);
   const accountRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
   const isCustomer = session?.role === "CUSTOMER";
   const isAdmin = session?.role === "ADMIN";
   const showHeaderSearch = pathname !== "/search";
+  const accountName = accountMenuDisplayName({
+    firstName: session?.firstName,
+    isPreview,
+  });
+  const accountInitial = accountAvatarInitial(accountName ?? "");
+
+  const accountMenuItemClass = cx(
+    "flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-sf-ink",
+    "transition-colors duration-150 hover:bg-sf-bg",
+    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sf-primary",
+  );
 
   if (navPath !== pathname) {
     setNavPath(pathname);
     setMenuOpen(false);
     setAccountOpen(false);
   }
+
+  useEffect(() => {
+    if (accountOpen) {
+      setAccountMenuMounted(true);
+      const frame = window.requestAnimationFrame(() => {
+        setAccountMenuShown(true);
+      });
+      return () => window.cancelAnimationFrame(frame);
+    }
+    setAccountMenuShown(false);
+    const timeout = window.setTimeout(() => {
+      setAccountMenuMounted(false);
+    }, 180);
+    return () => window.clearTimeout(timeout);
+  }, [accountOpen]);
 
   useEffect(() => {
     if (!accountOpen) {
@@ -93,7 +129,7 @@ export function SiteHeader() {
         />
       ) : null}
       <div className="border-b border-sf-border">
-      <Container className="flex h-16 items-center justify-between gap-4">
+      <Container className="flex h-16 items-center justify-between gap-3 md:gap-4">
         <BrandLogo />
 
         <nav
@@ -168,87 +204,133 @@ export function SiteHeader() {
                   <UserIcon />
                   Cuenta
                 </Button>
-                {accountOpen ? (
+                {accountMenuMounted ? (
                   <div
                     role="menu"
                     aria-label="Cuenta"
-                    className="absolute right-0 mt-2 w-56 rounded-xl border border-sf-border bg-sf-surface p-2 shadow-[0_8px_24px_rgba(23,33,27,0.08)]"
+                    className={cx(
+                      "absolute right-0 z-50 mt-2 w-64 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl",
+                      "origin-top border border-sf-border bg-sf-surface p-2",
+                      "shadow-[0_10px_28px_rgba(23,33,27,0.1)]",
+                      "transition-[opacity,transform] duration-[170ms] ease-out",
+                      "motion-reduce:transition-none",
+                      accountMenuShown
+                        ? "translate-y-0 scale-y-100 opacity-100"
+                        : "pointer-events-none -translate-y-1 scale-y-95 opacity-0",
+                    )}
                   >
-                    {isPreview ? (
-                      <div className="border-b border-sf-border px-3 py-2">
-                        <p className="text-sm font-semibold text-sf-ink">
-                          Cliente de prueba
-                        </p>
-                        <p className="text-xs text-sf-muted">
-                          Customer temporal · Modo de prueba
-                        </p>
+                    {isCustomer ? (
+                      <div className="flex items-center gap-3 px-3 py-2.5">
+                        <span
+                          className={cx(
+                            "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
+                            "bg-sf-primary/10 text-sm font-bold text-sf-primary",
+                          )}
+                          aria-hidden="true"
+                        >
+                          {accountInitial}
+                        </span>
+                        <div className="min-w-0">
+                          {accountName ? (
+                            <p className="truncate text-sm font-semibold text-sf-ink">
+                              {accountName}
+                            </p>
+                          ) : null}
+                          <p className="text-xs text-sf-muted">Mi cuenta</p>
+                        </div>
                       </div>
                     ) : null}
+
                     {isCustomer ? (
                       <>
+                        <div
+                          className="my-1.5 border-t border-sf-border/90"
+                          role="separator"
+                        />
+                        <div className="grid gap-0.5 py-0.5">
+                          <Link
+                            href="/lists"
+                            role="menuitem"
+                            className={accountMenuItemClass}
+                          >
+                            <ClipboardListIcon className="h-[18px] w-[18px] shrink-0 text-sf-muted" />
+                            Mis listas
+                          </Link>
+                          <Link
+                            href="/favorites"
+                            role="menuitem"
+                            className={accountMenuItemClass}
+                          >
+                            <HeartIcon className="h-[18px] w-[18px] shrink-0 text-sf-muted" />
+                            Favoritos
+                          </Link>
+                          <Link
+                            href="/orders"
+                            role="menuitem"
+                            className={accountMenuItemClass}
+                          >
+                            <PackageIcon className="h-[18px] w-[18px] shrink-0 text-sf-muted" />
+                            Pedidos
+                          </Link>
+                          <Link
+                            href="/addresses"
+                            role="menuitem"
+                            className={accountMenuItemClass}
+                          >
+                            <MapPinIcon className="h-[18px] w-[18px] shrink-0 text-sf-muted" />
+                            Direcciones
+                          </Link>
+                        </div>
+                      </>
+                    ) : null}
+
+                    {isAdmin ? (
+                      <>
+                        {isCustomer ? (
+                          <div
+                            className="my-1.5 border-t border-sf-border/90"
+                            role="separator"
+                          />
+                        ) : null}
                         <Link
-                          href="/assistant"
+                          href="/admin"
                           role="menuitem"
-                          className="flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-sf-ink hover:bg-sf-bg"
+                          className={accountMenuItemClass}
                         >
-                          Fercho
-                        </Link>
-                        <Link
-                          href="/lists"
-                          role="menuitem"
-                          className="flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-sf-ink hover:bg-sf-bg"
-                        >
-                          Mis listas
-                        </Link>
-                        <Link
-                          href="/favorites"
-                          role="menuitem"
-                          className="flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-sf-ink hover:bg-sf-bg"
-                        >
-                          Favoritos
-                        </Link>
-                        <Link
-                          href="/orders"
-                          role="menuitem"
-                          className="flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-sf-ink hover:bg-sf-bg"
-                        >
-                          Pedidos
-                        </Link>
-                        <Link
-                          href="/addresses"
-                          role="menuitem"
-                          className="flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-sf-ink hover:bg-sf-bg"
-                        >
-                          Direcciones
+                          <UserIcon className="h-[18px] w-[18px] shrink-0 text-sf-muted" />
+                          Administración
                         </Link>
                       </>
                     ) : null}
-                    {isAdmin ? (
-                      <Link
-                        href="/admin"
-                        role="menuitem"
-                        className="flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-sf-ink hover:bg-sf-bg"
-                      >
-                        Administración
-                      </Link>
-                    ) : null}
+
                     {isPreview ? (
                       <button
                         type="button"
                         role="menuitem"
-                        className="flex min-h-11 w-full items-center rounded-lg px-3 text-left text-sm font-semibold text-sf-ink hover:bg-sf-bg"
+                        className={cx(accountMenuItemClass, "w-full text-left")}
                         onClick={() => {
                           setAccountOpen(false);
                           returnToAdmin();
                         }}
                       >
+                        <UserIcon className="h-[18px] w-[18px] shrink-0 text-sf-muted" />
                         Volver a administración
                       </button>
                     ) : null}
+
+                    <div
+                      className="my-1.5 border-t border-sf-border/90"
+                      role="separator"
+                    />
                     <button
                       type="button"
                       role="menuitem"
-                      className="flex min-h-11 w-full items-center rounded-lg px-3 text-left text-sm font-semibold text-sf-ink hover:bg-sf-bg"
+                      className={cx(
+                        "flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold",
+                        "text-sf-error transition-colors duration-150",
+                        "hover:bg-red-50",
+                        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sf-error",
+                      )}
                       onClick={() => {
                         setAccountOpen(false);
                         if (isPreview) {
@@ -258,6 +340,7 @@ export function SiteHeader() {
                         logout();
                       }}
                     >
+                      <LogOutIcon className="h-[18px] w-[18px] shrink-0" />
                       {isPreview ? "Salir de preview" : "Cerrar sesión"}
                     </button>
                   </div>
