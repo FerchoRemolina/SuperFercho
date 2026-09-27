@@ -11,3 +11,6 @@ superfercho:
       password: ${SUPERFERCHO_DEV_ADMIN_PASSWORD:}
     demo-seed:
       enabled: ${SUPERFERCHO_DEV_DEMO_SEED:true}
+  email:
+    provider: ${SUPERFERCHO_EMAIL_PROVIDER:console}
+    recovery-base-url: ${SUPERFERCHO_EMAIL_RECOVERY_BASE_URL:http://localhost:3000}

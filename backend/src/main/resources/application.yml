@@ -44,3 +44,13 @@ superfercho:
     openfoodfacts:
       base-url: ${SUPERFERCHO_OFF_BASE_URL:https://world.openfoodfacts.org}
       user-agent: ${SUPERFERCHO_OFF_USER_AGENT:SuperFercho/0.1 (https://github.com/FerchoRemolina/SuperFercho)}
+  email:
+    # Default noop refuses real delivery. Profile `local` sets console for development logging.
+    provider: ${SUPERFERCHO_EMAIL_PROVIDER:noop}
+    recovery-base-url: ${SUPERFERCHO_EMAIL_RECOVERY_BASE_URL:http://localhost:3000}
+  password-recovery:
+    token-ttl: ${SUPERFERCHO_PASSWORD_RECOVERY_TOKEN_TTL:15m}
+    max-requests-per-window: ${SUPERFERCHO_PASSWORD_RECOVERY_MAX_REQUESTS:2}
+    request-window: ${SUPERFERCHO_PASSWORD_RECOVERY_REQUEST_WINDOW:24h}
+    ip-max-requests-per-window: ${SUPERFERCHO_PASSWORD_RECOVERY_IP_MAX_REQUESTS:20}
+    ip-window: ${SUPERFERCHO_PASSWORD_RECOVERY_IP_WINDOW:1h}
