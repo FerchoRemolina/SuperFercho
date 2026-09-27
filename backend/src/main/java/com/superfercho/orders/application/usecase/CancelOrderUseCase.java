@@ -39,8 +39,9 @@ public final class CancelOrderUseCase {
                 orderRepository, currentUserProvider.getCurrentUserId(), command.orderId());
         Order cancelled = order.cancel(clockProvider.currentTime());
         Order saved = orderRepository
-                .saveIfPending(cancelled)
-                .orElseThrow(() -> new InvalidOrderStateTransitionException(OrderStatus.PENDING, OrderStatus.CANCELLED));
+                .saveIfConfirmed(cancelled)
+                .orElseThrow(
+                        () -> new InvalidOrderStateTransitionException(OrderStatus.CONFIRMED, OrderStatus.CANCELLED));
         inventoryPort.restoreStock(order.items().stream()
                 .map(item -> new StockQuantity(item.productId(), item.quantity()))
                 .toList());

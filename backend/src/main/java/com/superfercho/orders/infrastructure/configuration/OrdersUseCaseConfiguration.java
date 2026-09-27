@@ -10,7 +10,7 @@ import com.superfercho.orders.application.port.PaymentPort;
 import com.superfercho.orders.application.port.PreviewCustomerExclusionPort;
 import com.superfercho.orders.application.port.ProductCatalogPort;
 import com.superfercho.orders.application.port.ShoppingCartPort;
-import com.superfercho.orders.application.usecase.AutoConfirmPendingOrdersUseCase;
+import com.superfercho.orders.application.usecase.AdvanceOrderLifecycleUseCase;
 import com.superfercho.orders.application.usecase.CancelAndDeletePreviewOrdersUseCase;
 import com.superfercho.orders.application.usecase.CancelOrderUseCase;
 import com.superfercho.orders.application.usecase.CheckoutUseCase;
@@ -18,7 +18,6 @@ import com.superfercho.orders.application.usecase.GetAdminOrderUseCase;
 import com.superfercho.orders.application.usecase.GetOrderUseCase;
 import com.superfercho.orders.application.usecase.ListAdminOrdersUseCase;
 import com.superfercho.orders.application.usecase.ListOrdersUseCase;
-import com.superfercho.orders.application.usecase.UpdateOrderStatusUseCase;
 import com.superfercho.orders.infrastructure.clock.SystemClockAdapter;
 import java.time.Clock;
 import org.springframework.context.annotation.Bean;
@@ -98,19 +97,11 @@ public class OrdersUseCaseConfiguration {
     }
 
     @Bean
-    UpdateOrderStatusUseCase updateOrderStatusUseCase(
+    AdvanceOrderLifecycleUseCase advanceOrderLifecycleUseCase(
             OrderRepository orderRepository,
             ClockProvider ordersClockProvider,
             PreviewCustomerExclusionPort previewCustomerExclusionPort) {
-        return new UpdateOrderStatusUseCase(orderRepository, ordersClockProvider, previewCustomerExclusionPort);
-    }
-
-    @Bean
-    AutoConfirmPendingOrdersUseCase autoConfirmPendingOrdersUseCase(
-            OrderRepository orderRepository,
-            ClockProvider ordersClockProvider,
-            PreviewCustomerExclusionPort previewCustomerExclusionPort) {
-        return new AutoConfirmPendingOrdersUseCase(
+        return new AdvanceOrderLifecycleUseCase(
                 orderRepository, ordersClockProvider, previewCustomerExclusionPort);
     }
 

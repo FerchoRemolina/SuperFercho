@@ -8,7 +8,6 @@ import com.superfercho.orders.domain.model.OrderStatus;
 import com.superfercho.orders.infrastructure.persistence.entity.OrderJpaEntity;
 import com.superfercho.orders.infrastructure.persistence.mapper.OrderPersistenceMapper;
 import com.superfercho.orders.infrastructure.persistence.repository.OrderJpaRepository;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,6 +19,9 @@ import org.springframework.stereotype.Component;
 @Component
 @Profile("!test")
 public class OrderPersistenceAdapter implements OrderRepository {
+
+    private static final List<OrderStatus> IN_PROGRESS =
+            List.of(OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.DELIVERY);
 
     private final OrderJpaRepository orderJpaRepository;
     private final OrderPersistenceMapper orderPersistenceMapper;
@@ -37,17 +39,17 @@ public class OrderPersistenceAdapter implements OrderRepository {
     }
 
     @Override
-    public Optional<Order> saveIfPending(Order order) {
-        if (order.status() != OrderStatus.CONFIRMED && order.status() != OrderStatus.CANCELLED) {
-            throw new IllegalArgumentException("saveIfPending requires CONFIRMED or CANCELLED, got " + order.status());
+    public Optional<Order> saveIfConfirmed(Order order) {
+        if (order.status() == OrderStatus.CONFIRMED) {
+            throw new IllegalArgumentException("saveIfConfirmed requires leaving CONFIRMED, got CONFIRMED");
         }
-        int updated = orderJpaRepository.updateStatusIfPending(
+        int updated = orderJpaRepository.updateStatusIfConfirmed(
                 order.id(),
                 order.status(),
                 order.confirmedAt(),
                 order.cancelledAt(),
                 order.updatedAt(),
-                OrderStatus.PENDING);
+                OrderStatus.CONFIRMED);
         if (updated == 0) {
             return Optional.empty();
         }
@@ -76,9 +78,8 @@ public class OrderPersistenceAdapter implements OrderRepository {
     }
 
     @Override
-    public List<Order> findPendingOrdersEligibleForAutomaticConfirmation(Instant currentTime) {
-        Instant createdBefore = currentTime.minus(Order.CUSTOMER_CANCELLATION_WINDOW);
-        return orderJpaRepository.findByStatusAndCreatedAtBefore(OrderStatus.PENDING, createdBefore).stream()
+    public List<Order> findInProgressForLifecycle() {
+        return orderJpaRepository.findByStatusInAndConfirmedAtIsNotNull(IN_PROGRESS).stream()
                 .map(orderPersistenceMapper::toDomain)
                 .toList();
     }

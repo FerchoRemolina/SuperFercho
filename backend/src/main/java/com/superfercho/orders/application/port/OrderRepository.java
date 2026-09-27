@@ -4,7 +4,6 @@ import com.superfercho.orders.application.dto.PageRequest;
 import com.superfercho.orders.application.dto.PagedResult;
 import com.superfercho.orders.domain.model.Order;
 import com.superfercho.orders.domain.model.OrderStatus;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -14,11 +13,11 @@ public interface OrderRepository {
     Order save(Order order);
 
     /**
-     * Persists a leaving-PENDING transition ({@code CONFIRMED} or {@code CANCELLED})
-     * only if the stored row is still {@code PENDING}. Empty means another writer
-     * already changed the status.
+     * Persists a leaving-CONFIRMED transition ({@code PREPARING} or {@code CANCELLED})
+     * only if the stored row is still {@code CONFIRMED}. Empty means another writer
+     * already changed the status (cancel vs lifecycle race).
      */
-    Optional<Order> saveIfPending(Order order);
+    Optional<Order> saveIfConfirmed(Order order);
 
     Optional<Order> findById(UUID orderId);
 
@@ -28,7 +27,8 @@ public interface OrderRepository {
 
     PagedResult<Order> findByStatuses(List<OrderStatus> statuses, PageRequest pageRequest);
 
-    List<Order> findPendingOrdersEligibleForAutomaticConfirmation(Instant currentTime);
+    /** In-progress orders eligible for automatic lifecycle progression. */
+    List<Order> findInProgressForLifecycle();
 
     void deleteAllByCustomerId(UUID customerId);
 }

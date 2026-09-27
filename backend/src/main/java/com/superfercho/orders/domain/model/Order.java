@@ -13,7 +13,10 @@ import java.util.UUID;
 
 public final class Order {
 
-    public static final Duration CUSTOMER_CANCELLATION_WINDOW = Duration.ofMinutes(15);
+    public static final Duration CUSTOMER_CANCELLATION_WINDOW = Duration.ofMinutes(2);
+    public static final Duration PREPARING_AFTER = Duration.ofMinutes(2);
+    public static final Duration DELIVERY_AFTER = Duration.ofMinutes(4);
+    public static final Duration DELIVERED_AFTER = Duration.ofMinutes(6);
 
     private final UUID id;
     private final OrderNumber orderNumber;
@@ -71,12 +74,12 @@ public final class Order {
                 id,
                 orderNumber,
                 customerId,
-                OrderStatus.PENDING,
+                OrderStatus.CONFIRMED,
                 items,
                 shippingAddress,
                 paymentId,
                 createdAt,
-                null,
+                createdAt,
                 null,
                 updatedAt);
     }
@@ -107,92 +110,111 @@ public final class Order {
                 updatedAt);
     }
 
-    public Order confirm(Instant currentTime) {
-        Instant at = requireCurrentTime(currentTime);
-        requireTransition(OrderStatus.CONFIRMED);
-        return of(
-                id,
-                orderNumber,
-                customerId,
-                OrderStatus.CONFIRMED,
-                items,
-                shippingAddress,
-                paymentId,
-                createdAt,
-                at,
-                null,
-                at);
+    /**
+     * Lifecycle status expected from {@code confirmedAt} at {@code currentTime}.
+     * Used by the automatic progression job (including catch-up).
+     */
+    public static OrderStatus targetStatusAt(Instant confirmedAt, Instant currentTime) {
+        requireStaticNonNull(confirmedAt, "confirmedAt");
+        requireStaticNonNull(currentTime, "currentTime");
+        if (currentTime.isBefore(confirmedAt)) {
+            throw new InvalidOrderException("currentTime must not be before confirmedAt");
+        }
+        Duration elapsed = Duration.between(confirmedAt, currentTime);
+        if (elapsed.compareTo(PREPARING_AFTER) < 0) {
+            return OrderStatus.CONFIRMED;
+        }
+        if (elapsed.compareTo(DELIVERY_AFTER) < 0) {
+            return OrderStatus.PREPARING;
+        }
+        if (elapsed.compareTo(DELIVERED_AFTER) < 0) {
+            return OrderStatus.DELIVERY;
+        }
+        return OrderStatus.DELIVERED;
     }
 
     public Order startPreparation(Instant currentTime) {
         Instant at = requireCurrentTime(currentTime);
         requireTransition(OrderStatus.PREPARING);
-        return of(
-                id,
-                orderNumber,
-                customerId,
-                OrderStatus.PREPARING,
-                items,
-                shippingAddress,
-                paymentId,
-                createdAt,
-                confirmedAt,
-                null,
-                at);
+        return withStatus(OrderStatus.PREPARING, at);
     }
 
-    public Order markReady(Instant currentTime) {
+    public Order startDelivery(Instant currentTime) {
         Instant at = requireCurrentTime(currentTime);
-        requireTransition(OrderStatus.READY);
-        return of(
-                id,
-                orderNumber,
-                customerId,
-                OrderStatus.READY,
-                items,
-                shippingAddress,
-                paymentId,
-                createdAt,
-                confirmedAt,
-                null,
-                at);
+        requireTransition(OrderStatus.DELIVERY);
+        return withStatus(OrderStatus.DELIVERY, at);
     }
 
     public Order markDelivered(Instant currentTime) {
         Instant at = requireCurrentTime(currentTime);
         requireTransition(OrderStatus.DELIVERED);
-        return of(
-                id,
-                orderNumber,
-                customerId,
-                OrderStatus.DELIVERED,
-                items,
-                shippingAddress,
-                paymentId,
-                createdAt,
-                confirmedAt,
-                null,
-                at);
+        return withStatus(OrderStatus.DELIVERED, at);
+    }
+
+    /**
+     * Advances (or catch-up jumps) to the lifecycle target derived from {@link #confirmedAt()}.
+     * Does not touch stock or payments. No-op when already at target.
+     */
+    public Order advanceLifecycle(Instant currentTime) {
+        Instant at = requireCurrentTime(currentTime);
+        if (status == OrderStatus.DELIVERED || status == OrderStatus.CANCELLED) {
+            throw new InvalidOrderStateTransitionException(status, status);
+        }
+        requireNonNull(confirmedAt, "confirmedAt");
+        OrderStatus target = targetStatusAt(confirmedAt, at);
+        if (target == status) {
+            return this;
+        }
+        if (lifecycleRank(target) <= lifecycleRank(status)) {
+            throw new InvalidOrderStateTransitionException(status, target);
+        }
+        return withStatus(target, at);
     }
 
     public Order cancel(Instant currentTime) {
         Instant at = requireCurrentTime(currentTime);
         requireTransition(OrderStatus.CANCELLED);
-        Instant deadline = createdAt.plus(CUSTOMER_CANCELLATION_WINDOW);
-        if (at.isAfter(deadline)) {
+        requireNonNull(confirmedAt, "confirmedAt");
+        Instant deadline = confirmedAt.plus(CUSTOMER_CANCELLATION_WINDOW);
+        if (!at.isBefore(deadline)) {
             throw new OrderCancellationNotAllowedException("customer cancellation window has expired");
         }
         return cancelledAt(at);
     }
 
     /**
-     * System cancellation for storefront-preview cleanup. Requires PENDING, ignores the
-     * customer cancellation window, and reuses the same CANCELLED state as {@link #cancel}.
+     * System cleanup for storefront-preview temporary customers. Forces CANCELLED for any
+     * non-terminal in-progress order without the customer 2-minute window. Not a customer cancel.
      */
     public Order cancelForCleanup(Instant currentTime) {
         Instant at = requireCurrentTime(currentTime);
-        requireTransition(OrderStatus.CANCELLED);
+        if (status == OrderStatus.CANCELLED || status == OrderStatus.DELIVERED) {
+            throw new InvalidOrderStateTransitionException(status, OrderStatus.CANCELLED);
+        }
         return cancelledAt(at);
+    }
+
+    public boolean isCustomerCancellable(Instant currentTime) {
+        requireNonNull(currentTime, "currentTime");
+        if (status != OrderStatus.CONFIRMED || confirmedAt == null) {
+            return false;
+        }
+        return currentTime.isBefore(confirmedAt.plus(CUSTOMER_CANCELLATION_WINDOW));
+    }
+
+    private Order withStatus(OrderStatus newStatus, Instant at) {
+        return of(
+                id,
+                orderNumber,
+                customerId,
+                newStatus,
+                items,
+                shippingAddress,
+                paymentId,
+                createdAt,
+                confirmedAt,
+                null,
+                at);
     }
 
     private Order cancelledAt(Instant at) {
@@ -208,12 +230,6 @@ public final class Order {
                 null,
                 at,
                 at);
-    }
-
-    public boolean isEligibleForAutomaticConfirmation(Instant currentTime) {
-        requireNonNull(currentTime, "currentTime");
-        return status == OrderStatus.PENDING
-                && currentTime.isAfter(createdAt.plus(CUSTOMER_CANCELLATION_WINDOW));
     }
 
     public UUID id() {
@@ -280,13 +296,13 @@ public final class Order {
             Instant confirmedAt,
             Instant cancelledAt,
             Instant updatedAt) {
-        requireNonNull(id, "id");
-        requireNonNull(orderNumber, "orderNumber");
-        requireNonNull(customerId, "customerId");
-        requireNonNull(status, "status");
-        requireNonNull(shippingAddress, "shippingAddress");
-        requireNonNull(createdAt, "createdAt");
-        requireNonNull(updatedAt, "updatedAt");
+        requireStaticNonNull(id, "id");
+        requireStaticNonNull(orderNumber, "orderNumber");
+        requireStaticNonNull(customerId, "customerId");
+        requireStaticNonNull(status, "status");
+        requireStaticNonNull(shippingAddress, "shippingAddress");
+        requireStaticNonNull(createdAt, "createdAt");
+        requireStaticNonNull(updatedAt, "updatedAt");
         if (createdAt.isAfter(updatedAt)) {
             throw new InvalidOrderException("createdAt must not be after updatedAt");
         }
@@ -294,19 +310,15 @@ public final class Order {
         List<OrderItem> snapshot = copyItems(items);
         Money computedSubtotal = sumSubtotals(snapshot);
         if (status == OrderStatus.CANCELLED) {
-            requireNonNull(cancelledAt, "cancelledAt");
+            requireStaticNonNull(cancelledAt, "cancelledAt");
             if (confirmedAt != null) {
                 throw new InvalidOrderException("cancelled order cannot have confirmedAt");
             }
         } else if (cancelledAt != null) {
             throw new InvalidOrderException("cancelledAt can only exist when the order is cancelled");
         }
-        if (status == OrderStatus.PENDING) {
-            if (confirmedAt != null) {
-                throw new InvalidOrderException("confirmedAt can only exist when the order is confirmed");
-            }
-        } else if (status != OrderStatus.CANCELLED) {
-            requireNonNull(confirmedAt, "confirmedAt");
+        if (status != OrderStatus.CANCELLED) {
+            requireStaticNonNull(confirmedAt, "confirmedAt");
         }
 
         return new Order(
@@ -323,6 +335,16 @@ public final class Order {
                 confirmedAt,
                 cancelledAt,
                 updatedAt);
+    }
+
+    private static int lifecycleRank(OrderStatus status) {
+        return switch (status) {
+            case CONFIRMED -> 0;
+            case PREPARING -> 1;
+            case DELIVERY -> 2;
+            case DELIVERED -> 3;
+            case CANCELLED -> -1;
+        };
     }
 
     private static List<OrderItem> copyItems(List<OrderItem> items) {
@@ -368,7 +390,11 @@ public final class Order {
         }
     }
 
-    private static void requireNonNull(Object value, String field) {
+    private void requireNonNull(Object value, String field) {
+        requireStaticNonNull(value, field);
+    }
+
+    private static void requireStaticNonNull(Object value, String field) {
         if (value == null) {
             throw new InvalidOrderException(field + " cannot be null");
         }

@@ -18,8 +18,9 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Cancels pending preview orders (restoring stock and refunding approved payments), then deletes
- * all orders, payments, and checkout idempotency rows for the temporary customer.
+ * Preview cleanup: restores stock / refunds for in-progress temporary-customer orders via
+ * {@link Order#cancelForCleanup}, then deletes orders, payments, and idempotency rows.
+ * Not a customer cancellation.
  */
 public final class CancelAndDeletePreviewOrdersUseCase {
 
@@ -51,8 +52,8 @@ public final class CancelAndDeletePreviewOrdersUseCase {
             if (order.paymentId() != null) {
                 paymentIds.add(order.paymentId());
             }
-            if (order.status() == OrderStatus.PENDING) {
-                cancelPendingForCleanup(order);
+            if (isInProgress(order.status())) {
+                cancelInProgressForCleanup(order);
             }
         }
         for (UUID paymentId : paymentIds) {
@@ -62,17 +63,22 @@ public final class CancelAndDeletePreviewOrdersUseCase {
         idempotencyPort.deleteAllByCustomerId(customerId);
     }
 
-    private void cancelPendingForCleanup(Order order) {
+    private static boolean isInProgress(OrderStatus status) {
+        return status == OrderStatus.CONFIRMED
+                || status == OrderStatus.PREPARING
+                || status == OrderStatus.DELIVERY;
+    }
+
+    private void cancelInProgressForCleanup(Order order) {
         Order cancelled = order.cancelForCleanup(clockProvider.currentTime());
-        orderRepository.saveIfPending(cancelled).ifPresent(saved -> {
-            inventoryPort.restoreStock(order.items().stream()
-                    .map(item -> new StockQuantity(item.productId(), item.quantity()))
-                    .toList());
-            if (order.paymentId() != null
-                    && paymentPort.getPayment(order.paymentId()).status() == PaymentStatus.APPROVED) {
-                paymentPort.refundPayment(order.paymentId());
-            }
-        });
+        orderRepository.save(cancelled);
+        inventoryPort.restoreStock(order.items().stream()
+                .map(item -> new StockQuantity(item.productId(), item.quantity()))
+                .toList());
+        if (order.paymentId() != null
+                && paymentPort.getPayment(order.paymentId()).status() == PaymentStatus.APPROVED) {
+            paymentPort.refundPayment(order.paymentId());
+        }
     }
 
     private List<Order> loadAllOrders(UUID customerId) {

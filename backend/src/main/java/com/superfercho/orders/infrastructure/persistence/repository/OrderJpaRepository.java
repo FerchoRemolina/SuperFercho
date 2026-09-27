@@ -22,7 +22,7 @@ public interface OrderJpaRepository extends JpaRepository<OrderJpaEntity, UUID> 
 
     Page<OrderJpaEntity> findAllByStatusIn(List<OrderStatus> statuses, Pageable pageable);
 
-    List<OrderJpaEntity> findByStatusAndCreatedAtBefore(OrderStatus status, Instant createdAtBefore);
+    List<OrderJpaEntity> findByStatusInAndConfirmedAtIsNotNull(List<OrderStatus> statuses);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional
@@ -34,15 +34,15 @@ public interface OrderJpaRepository extends JpaRepository<OrderJpaEntity, UUID> 
                    o.cancelledAt = :cancelledAt,
                    o.updatedAt = :updatedAt
              where o.id = :id
-               and o.status = :pendingStatus
+               and o.status = :confirmedStatus
             """)
-    int updateStatusIfPending(
+    int updateStatusIfConfirmed(
             @Param("id") UUID id,
             @Param("newStatus") OrderStatus newStatus,
             @Param("confirmedAt") Instant confirmedAt,
             @Param("cancelledAt") Instant cancelledAt,
             @Param("updatedAt") Instant updatedAt,
-            @Param("pendingStatus") OrderStatus pendingStatus);
+            @Param("confirmedStatus") OrderStatus confirmedStatus);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional

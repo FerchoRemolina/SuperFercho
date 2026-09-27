@@ -3,10 +3,9 @@ package com.superfercho.orders.domain.model;
 import java.util.Set;
 
 public enum OrderStatus {
-    PENDING,
     CONFIRMED,
     PREPARING,
-    READY,
+    DELIVERY,
     DELIVERED,
     CANCELLED;
 
@@ -16,10 +15,9 @@ public enum OrderStatus {
 
     private Set<OrderStatus> allowedTransitions() {
         return switch (this) {
-            case PENDING -> Set.of(CONFIRMED, CANCELLED);
-            case CONFIRMED -> Set.of(PREPARING);
-            case PREPARING -> Set.of(READY);
-            case READY -> Set.of(DELIVERED);
+            case CONFIRMED -> Set.of(PREPARING, CANCELLED);
+            case PREPARING -> Set.of(DELIVERY);
+            case DELIVERY -> Set.of(DELIVERED);
             case DELIVERED, CANCELLED -> Set.of();
         };
     }
