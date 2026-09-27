@@ -239,7 +239,7 @@ class ChatApplicationServiceTest {
         when(getCartUseCase.execute()).thenReturn(cartWithMilk());
         when(getProductUseCase.execute(any(GetProductCommand.class))).thenReturn(product());
         when(checkoutUseCase.execute(any(CheckoutCommand.class)))
-                .thenReturn(new CheckoutResult(ORDER_ID, "SF-1", OrderStatus.PENDING, PaymentStatus.APPROVED, Money.cop(new BigDecimal("10.50"))));
+                .thenReturn(new CheckoutResult(ORDER_ID, "SF-1", OrderStatus.CONFIRMED, PaymentStatus.APPROVED, Money.cop(new BigDecimal("10.50"))));
         llm.enqueue(LlmResponse.toolCalls(List.of(new LlmMessage.LlmToolCall(
                 "c1",
                 ToolNames.CHECKOUT,
