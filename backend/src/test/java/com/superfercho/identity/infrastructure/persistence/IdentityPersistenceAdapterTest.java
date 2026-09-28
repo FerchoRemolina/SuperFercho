@@ -21,7 +21,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -172,7 +171,7 @@ class IdentityPersistenceAdapterTest {
 
         assertThatThrownBy(() -> userRepository.save(newUserWithRecord(
                         "live-two@example.com", "CC", "2005", Role.CUSTOMER, record.id(), null)))
-                .isInstanceOf(DataIntegrityViolationException.class);
+                .isInstanceOf(DocumentAlreadyExistsException.class);
     }
 
     @Test

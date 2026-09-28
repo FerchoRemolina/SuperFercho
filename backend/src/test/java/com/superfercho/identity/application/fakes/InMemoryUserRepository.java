@@ -24,7 +24,8 @@ public final class InMemoryUserRepository implements UserRepository {
 
     @Override
     public boolean existsByEmail(String email) {
-        return users.values().stream().anyMatch(user -> user.email().equals(email));
+        return users.values().stream()
+                .anyMatch(user -> user.deletedAt() == null && user.email().equals(email));
     }
 
     @Override
@@ -37,7 +38,9 @@ public final class InMemoryUserRepository implements UserRepository {
 
     @Override
     public Optional<User> findByEmail(String email) {
-        return users.values().stream().filter(user -> user.email().equals(email)).findFirst();
+        return users.values().stream()
+                .filter(user -> user.deletedAt() == null && user.email().equals(email))
+                .findFirst();
     }
 
     @Override
@@ -46,6 +49,14 @@ public final class InMemoryUserRepository implements UserRepository {
                 .filter(user ->
                         user.documentType().equals(documentType)
                                 && user.documentNumber().equals(documentNumber))
+                .findFirst();
+    }
+
+    @Override
+    public Optional<User> findLiveByCustomerRecordId(UUID customerRecordId) {
+        return users.values().stream()
+                .filter(user -> user.deletedAt() == null
+                        && customerRecordId.equals(user.customerRecordId()))
                 .findFirst();
     }
 

@@ -10,13 +10,24 @@ public interface UserRepository {
 
     Optional<User> findById(UUID id);
 
+    /**
+     * True if a non-deleted user currently owns the email ({@code deletedAt == null}).
+     */
     boolean existsByEmail(String email);
 
     boolean existsByDocument(String documentType, String documentNumber);
 
+    /**
+     * Finds the live user ({@code deletedAt == null}) for the email, if any.
+     */
     Optional<User> findByEmail(String email);
 
     Optional<User> findByDocument(String documentType, String documentNumber);
+
+    /**
+     * Finds the non-deleted user linked to the given customer record, if any.
+     */
+    Optional<User> findLiveByCustomerRecordId(UUID customerRecordId);
 
     void deleteById(UUID id);
 }

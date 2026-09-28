@@ -40,7 +40,7 @@ public class UserPersistenceAdapter implements UserRepository {
 
     @Override
     public boolean existsByEmail(String email) {
-        return userJpaRepository.existsByEmail(email);
+        return userJpaRepository.existsByEmailAndDeletedAtIsNull(email);
     }
 
     @Override
@@ -50,13 +50,20 @@ public class UserPersistenceAdapter implements UserRepository {
 
     @Override
     public Optional<User> findByEmail(String email) {
-        return userJpaRepository.findByEmail(email).map(userPersistenceMapper::toDomain);
+        return userJpaRepository.findByEmailAndDeletedAtIsNull(email).map(userPersistenceMapper::toDomain);
     }
 
     @Override
     public Optional<User> findByDocument(String documentType, String documentNumber) {
         return userJpaRepository
                 .findByDocumentTypeAndDocumentNumber(documentType, documentNumber)
+                .map(userPersistenceMapper::toDomain);
+    }
+
+    @Override
+    public Optional<User> findLiveByCustomerRecordId(UUID customerRecordId) {
+        return userJpaRepository
+                .findByCustomerRecordIdAndDeletedAtIsNull(customerRecordId)
                 .map(userPersistenceMapper::toDomain);
     }
 

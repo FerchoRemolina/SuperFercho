@@ -2,11 +2,14 @@ package com.superfercho.identity.infrastructure.configuration;
 
 import com.superfercho.identity.application.dto.AddAddressCommand;
 import com.superfercho.identity.application.dto.AddressResult;
+import com.superfercho.identity.application.dto.RegisterCustomerCommand;
+import com.superfercho.identity.application.dto.RegisteredCustomer;
 import com.superfercho.identity.application.dto.SetDefaultAddressCommand;
 import com.superfercho.identity.application.port.AccessTokenIssuer;
 import com.superfercho.identity.application.port.AddressRepository;
 import com.superfercho.identity.application.port.CurrentUserProvider;
 import com.superfercho.identity.application.port.CustomerPreviewRepository;
+import com.superfercho.identity.application.port.CustomerRecordRepository;
 import com.superfercho.identity.application.port.PasswordHasher;
 import com.superfercho.identity.application.port.PasswordRecoveryTokenRepository;
 import com.superfercho.identity.application.port.PreviewAssistantCleanupPort;
@@ -38,9 +41,23 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class IdentityUseCaseConfiguration {
 
     @Bean
+    @ConditionalOnBean(CustomerRecordRepository.class)
     RegisterCustomerUseCase registerCustomerUseCase(
-            UserRepository userRepository, PasswordHasher passwordHasher, Clock clock) {
-        return new RegisterCustomerUseCase(userRepository, passwordHasher, clock);
+            UserRepository userRepository,
+            CustomerRecordRepository customerRecordRepository,
+            PasswordHasher passwordHasher,
+            Clock clock,
+            PlatformTransactionManager transactionManager) {
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        RegisterCustomerUseCase useCase = new RegisterCustomerUseCase(
+                userRepository, customerRecordRepository, passwordHasher, clock);
+        return new RegisterCustomerUseCase(
+                userRepository, customerRecordRepository, passwordHasher, clock) {
+            @Override
+            public RegisteredCustomer execute(RegisterCustomerCommand command) {
+                return transaction.execute(status -> useCase.execute(command));
+            }
+        };
     }
 
     @Bean

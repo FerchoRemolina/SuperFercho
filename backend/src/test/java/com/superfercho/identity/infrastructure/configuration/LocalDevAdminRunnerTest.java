@@ -105,6 +105,8 @@ class LocalDevAdminRunnerTest {
         assertEquals(LocalDevAdminRunner.FIRST_NAME, saved.firstName());
         assertEquals(LocalDevAdminRunner.LAST_NAME, saved.lastName());
         assertEquals(LocalDevAdminRunner.PHONE, saved.phone());
+        assertNull(saved.customerRecordId());
+        assertNull(saved.deletedAt());
         assertEquals(NOW, saved.createdAt());
         assertEquals(NOW, saved.updatedAt());
         assertEquals(1, users.saveCount());
@@ -260,6 +262,11 @@ class LocalDevAdminRunnerTest {
         @Override
         public Optional<User> findByDocument(String documentType, String documentNumber) {
             return delegate.findByDocument(documentType, documentNumber);
+        }
+
+        @Override
+        public Optional<User> findLiveByCustomerRecordId(UUID customerRecordId) {
+            return delegate.findLiveByCustomerRecordId(customerRecordId);
         }
 
         @Override

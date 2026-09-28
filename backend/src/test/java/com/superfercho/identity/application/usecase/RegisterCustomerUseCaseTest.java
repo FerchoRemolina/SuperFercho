@@ -1,7 +1,9 @@
 package com.superfercho.identity.application.usecase;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -11,7 +13,9 @@ import com.superfercho.identity.application.exception.DocumentAlreadyExistsExcep
 import com.superfercho.identity.application.exception.InvalidRegistrationException;
 import com.superfercho.identity.application.exception.UserAlreadyExistsException;
 import com.superfercho.identity.application.fakes.FakePasswordHasher;
+import com.superfercho.identity.application.fakes.InMemoryCustomerRecordRepository;
 import com.superfercho.identity.application.fakes.InMemoryUserRepository;
+import com.superfercho.identity.domain.model.CustomerRecord;
 import com.superfercho.identity.domain.model.Role;
 import com.superfercho.identity.domain.model.User;
 import com.superfercho.identity.domain.model.UserStatus;
@@ -20,6 +24,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Arrays;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -31,15 +36,17 @@ class RegisterCustomerUseCaseTest {
     private static final Instant NOW = Instant.parse("2026-01-15T12:00:00Z");
 
     private InMemoryUserRepository users;
+    private InMemoryCustomerRecordRepository customerRecords;
     private FakePasswordHasher passwordHasher;
     private RegisterCustomerUseCase useCase;
 
     @BeforeEach
     void setUp() {
         users = new InMemoryUserRepository();
+        customerRecords = new InMemoryCustomerRecordRepository();
         passwordHasher = new FakePasswordHasher();
         useCase = new RegisterCustomerUseCase(
-                users, passwordHasher, Clock.fixed(NOW, ZoneOffset.UTC));
+                users, customerRecords, passwordHasher, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
@@ -56,6 +63,15 @@ class RegisterCustomerUseCaseTest {
         assertEquals(Role.CUSTOMER, result.role());
         assertEquals(UserStatus.ACTIVE, result.status());
         assertEquals(NOW, result.createdAt());
+
+        User saved = users.findById(result.id()).orElseThrow();
+        assertNotNull(saved.customerRecordId());
+        assertNull(saved.deletedAt());
+        CustomerRecord record = customerRecords.findById(saved.customerRecordId()).orElseThrow();
+        assertEquals("CC", record.documentType());
+        assertEquals("12345678", record.documentNumber());
+        assertEquals("Ada", record.billingFirstName());
+        assertEquals("Lovelace", record.billingLastName());
     }
 
     @Test
@@ -107,12 +123,151 @@ class RegisterCustomerUseCaseTest {
     }
 
     @Test
-    void shouldRejectRegistrationWhenDocumentAlreadyExists() {
+    void shouldRejectRegistrationWhenDocumentAlreadyHasActiveUser() {
         useCase.execute(validCommand().build());
 
         assertThrows(
                 DocumentAlreadyExistsException.class,
                 () -> useCase.execute(validCommand().email("other@example.com").build()));
+        assertEquals(1, customerRecords.findByDocument("CC", "12345678").stream().count());
+        assertEquals(1, users.findLiveByCustomerRecordId(
+                        customerRecords.findByDocument("CC", "12345678").orElseThrow().id())
+                .stream()
+                .count());
+    }
+
+    @Test
+    void shouldRejectRegistrationWhenDocumentAlreadyHasInactiveLiveUser() {
+        RegisteredCustomer first = useCase.execute(validCommand().build());
+        User live = users.findById(first.id()).orElseThrow();
+        users.save(User.create(
+                live.id(),
+                live.documentType(),
+                live.documentNumber(),
+                live.firstName(),
+                live.lastName(),
+                live.email(),
+                live.phone(),
+                live.passwordHash(),
+                live.role(),
+                UserStatus.INACTIVE,
+                live.customerRecordId(),
+                null,
+                live.createdAt(),
+                NOW));
+
+        assertThrows(
+                DocumentAlreadyExistsException.class,
+                () -> useCase.execute(validCommand().email("other@example.com").build()));
+        assertEquals(
+                first.id(),
+                users.findLiveByCustomerRecordId(live.customerRecordId()).orElseThrow().id());
+    }
+
+    @Test
+    void shouldReRegisterWhenOnlyDeletedUsersExistForCustomerRecord() {
+        RegisteredCustomer first = useCase.execute(validCommand().build());
+        User closed = users.findById(first.id()).orElseThrow();
+        UUID recordId = closed.customerRecordId();
+        CustomerRecord original = customerRecords.findById(recordId).orElseThrow();
+        users.save(User.create(
+                closed.id(),
+                closed.documentType(),
+                closed.documentNumber(),
+                closed.firstName(),
+                closed.lastName(),
+                closed.email(),
+                closed.phone(),
+                closed.passwordHash(),
+                closed.role(),
+                UserStatus.INACTIVE,
+                recordId,
+                NOW,
+                closed.createdAt(),
+                NOW));
+
+        RegisteredCustomer second = useCase.execute(validCommand()
+                .email("ada.reopened@example.com")
+                .phone("3009999999")
+                .password("Nuevo123!")
+                .firstName("Ada")
+                .lastName("Reloaded")
+                .build());
+
+        assertNotEquals(first.id(), second.id());
+        User reopened = users.findById(second.id()).orElseThrow();
+        assertEquals(recordId, reopened.customerRecordId());
+        assertEquals(UserStatus.ACTIVE, reopened.status());
+        assertNull(reopened.deletedAt());
+        assertEquals("ada.reopened@example.com", reopened.email());
+        assertEquals("3009999999", reopened.phone());
+        assertEquals("hashed:Nuevo123!", reopened.passwordHash());
+
+        CustomerRecord unchanged = customerRecords.findById(recordId).orElseThrow();
+        assertEquals(original.billingFirstName(), unchanged.billingFirstName());
+        assertEquals(original.billingLastName(), unchanged.billingLastName());
+        assertEquals(original.documentNumber(), unchanged.documentNumber());
+        assertEquals(original.createdAt(), unchanged.createdAt());
+    }
+
+    @Test
+    void shouldAllowReusingEmailFromDeletedUser() {
+        RegisteredCustomer first = useCase.execute(validCommand().email("reuse@example.com").build());
+        User closed = users.findById(first.id()).orElseThrow();
+        users.save(User.create(
+                closed.id(),
+                closed.documentType(),
+                closed.documentNumber(),
+                closed.firstName(),
+                closed.lastName(),
+                closed.email(),
+                closed.phone(),
+                closed.passwordHash(),
+                closed.role(),
+                UserStatus.INACTIVE,
+                closed.customerRecordId(),
+                NOW,
+                closed.createdAt(),
+                NOW));
+
+        RegisteredCustomer second = useCase.execute(validCommand()
+                .email("reuse@example.com")
+                .documentNumber("87654321")
+                .build());
+
+        assertEquals("reuse@example.com", second.email());
+        assertNotEquals(first.id(), second.id());
+        assertEquals("reuse@example.com", users.findById(first.id()).orElseThrow().email());
+    }
+
+    @Test
+    void shouldNotInheritOperationalIdentityOfDeletedUserBeyondCommercialRecord() {
+        RegisteredCustomer first = useCase.execute(validCommand().build());
+        User closed = users.findById(first.id()).orElseThrow();
+        users.save(User.create(
+                closed.id(),
+                closed.documentType(),
+                closed.documentNumber(),
+                closed.firstName(),
+                closed.lastName(),
+                closed.email(),
+                closed.phone(),
+                "hashed:OldPass1!",
+                closed.role(),
+                UserStatus.INACTIVE,
+                closed.customerRecordId(),
+                NOW,
+                closed.createdAt(),
+                NOW));
+
+        RegisteredCustomer second =
+                useCase.execute(validCommand().email("fresh@example.com").password("Fresh123!").build());
+
+        User reopened = users.findById(second.id()).orElseThrow();
+        assertNotEquals(closed.id(), reopened.id());
+        assertNotEquals(closed.passwordHash(), reopened.passwordHash());
+        assertNotEquals(closed.email(), reopened.email());
+        assertEquals(closed.customerRecordId(), reopened.customerRecordId());
     }
 
     @ParameterizedTest

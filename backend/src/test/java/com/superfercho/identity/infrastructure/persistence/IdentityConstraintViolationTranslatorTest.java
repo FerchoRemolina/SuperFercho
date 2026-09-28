@@ -32,6 +32,16 @@ class IdentityConstraintViolationTranslatorTest {
     }
 
     @Test
+    void shouldTranslateOneLiveCustomerRecordConstraint() {
+        DataIntegrityViolationException violation = violation("uk_identity_users_one_live_customer_record");
+
+        RuntimeException translated = IdentityConstraintViolationTranslator.translate(violation);
+
+        assertTrue(translated instanceof DocumentAlreadyExistsException);
+        assertSame(violation, translated.getCause());
+    }
+
+    @Test
     void shouldTranslateDuplicateDefaultAddressConstraint() {
         DataIntegrityViolationException violation = violation("uk_identity_addresses_one_active_default");
 

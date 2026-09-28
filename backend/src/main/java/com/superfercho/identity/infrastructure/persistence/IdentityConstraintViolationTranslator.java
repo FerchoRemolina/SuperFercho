@@ -9,6 +9,7 @@ final class IdentityConstraintViolationTranslator {
 
     private static final String EMAIL_CONSTRAINT = "uk_identity_users_email";
     private static final String CUSTOMER_RECORD_DOCUMENT_CONSTRAINT = "uk_identity_customer_records_document";
+    private static final String LIVE_CUSTOMER_RECORD_CONSTRAINT = "uk_identity_users_one_live_customer_record";
     private static final String DEFAULT_ADDRESS_CONSTRAINT = "uk_identity_addresses_one_active_default";
 
     private IdentityConstraintViolationTranslator() {
@@ -19,7 +20,8 @@ final class IdentityConstraintViolationTranslator {
         if (detail.contains(EMAIL_CONSTRAINT)) {
             return withCause(new UserAlreadyExistsException(), exception);
         }
-        if (detail.contains(CUSTOMER_RECORD_DOCUMENT_CONSTRAINT)) {
+        if (detail.contains(CUSTOMER_RECORD_DOCUMENT_CONSTRAINT)
+                || detail.contains(LIVE_CUSTOMER_RECORD_CONSTRAINT)) {
             return withCause(new DocumentAlreadyExistsException(), exception);
         }
         if (detail.contains(DEFAULT_ADDRESS_CONSTRAINT)) {
