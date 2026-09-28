@@ -1,6 +1,7 @@
 package com.superfercho.identity.infrastructure.persistence.repository;
 
 import com.superfercho.identity.infrastructure.persistence.entity.UserJpaEntity;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,4 +17,6 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
     Optional<UserJpaEntity> findByDocumentTypeAndDocumentNumber(String documentType, String documentNumber);
 
     Optional<UserJpaEntity> findByCustomerRecordIdAndDeletedAtIsNull(UUID customerRecordId);
+
+    List<UserJpaEntity> findAllByCustomerRecordIdOrderByCreatedAtDescIdAsc(UUID customerRecordId);
 }

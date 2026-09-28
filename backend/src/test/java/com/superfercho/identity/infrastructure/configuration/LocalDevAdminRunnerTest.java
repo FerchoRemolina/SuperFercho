@@ -23,6 +23,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -267,6 +268,11 @@ class LocalDevAdminRunnerTest {
         @Override
         public Optional<User> findLiveByCustomerRecordId(UUID customerRecordId) {
             return delegate.findLiveByCustomerRecordId(customerRecordId);
+        }
+
+        @Override
+        public List<User> findAllByCustomerRecordId(UUID customerRecordId) {
+            return delegate.findAllByCustomerRecordId(customerRecordId);
         }
 
         @Override

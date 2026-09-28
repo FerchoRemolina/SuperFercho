@@ -8,6 +8,7 @@ import com.superfercho.orders.domain.model.OrderStatus;
 import com.superfercho.orders.infrastructure.persistence.entity.OrderJpaEntity;
 import com.superfercho.orders.infrastructure.persistence.mapper.OrderPersistenceMapper;
 import com.superfercho.orders.infrastructure.persistence.repository.OrderJpaRepository;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -64,6 +65,27 @@ public class OrderPersistenceAdapter implements OrderRepository {
     @Override
     public PagedResult<Order> findByCustomerId(UUID customerId, PageRequest pageRequest) {
         return toPagedResult(orderJpaRepository.findAllByCustomerId(customerId, toSpringPage(pageRequest)), pageRequest);
+    }
+
+    @Override
+    public PagedResult<Order> findByCustomerIds(Collection<UUID> customerIds, PageRequest pageRequest) {
+        if (customerIds == null || customerIds.isEmpty()) {
+            return new PagedResult<>(List.of(), pageRequest.page(), pageRequest.size(), 0);
+        }
+        return toPagedResult(
+                orderJpaRepository.findAllByCustomerIdIn(customerIds, toSpringPage(pageRequest)), pageRequest);
+    }
+
+    @Override
+    public PagedResult<Order> findOrdersWithPaymentByCustomerIds(
+            Collection<UUID> customerIds, PageRequest pageRequest) {
+        if (customerIds == null || customerIds.isEmpty()) {
+            return new PagedResult<>(List.of(), pageRequest.page(), pageRequest.size(), 0);
+        }
+        return toPagedResult(
+                orderJpaRepository.findAllByCustomerIdInAndPaymentIdIsNotNull(
+                        customerIds, toSpringPage(pageRequest)),
+                pageRequest);
     }
 
     @Override

@@ -4,6 +4,7 @@ import com.superfercho.identity.application.port.UserRepository;
 import com.superfercho.identity.domain.model.User;
 import com.superfercho.identity.infrastructure.persistence.mapper.UserPersistenceMapper;
 import com.superfercho.identity.infrastructure.persistence.repository.UserJpaRepository;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
@@ -65,6 +66,13 @@ public class UserPersistenceAdapter implements UserRepository {
         return userJpaRepository
                 .findByCustomerRecordIdAndDeletedAtIsNull(customerRecordId)
                 .map(userPersistenceMapper::toDomain);
+    }
+
+    @Override
+    public List<User> findAllByCustomerRecordId(UUID customerRecordId) {
+        return userJpaRepository.findAllByCustomerRecordIdOrderByCreatedAtDescIdAsc(customerRecordId).stream()
+                .map(userPersistenceMapper::toDomain)
+                .toList();
     }
 
     @Override

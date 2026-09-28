@@ -19,15 +19,24 @@ import com.superfercho.catalog.application.usecase.ListCategoriesUseCase;
 import com.superfercho.catalog.application.usecase.UpdateCategoryUseCase;
 import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.infrastructure.rest.CategoryController;
+import com.superfercho.identity.application.dto.AdminCustomerAccountResult;
+import com.superfercho.identity.application.dto.AdminCustomerRecordResult;
+import com.superfercho.identity.application.dto.AdminPagedResult;
 import com.superfercho.identity.application.dto.AuthenticationResult;
 import com.superfercho.identity.application.dto.PasswordRecoveryRequestResult;
 import com.superfercho.identity.application.dto.RegisteredCustomer;
 import com.superfercho.identity.application.port.CustomerAccountAccessPort;
+import com.superfercho.identity.application.usecase.ActivateAdminCustomerAccountUseCase;
 import com.superfercho.identity.application.usecase.AddAddressUseCase;
 import com.superfercho.identity.application.usecase.AuthenticateUserUseCase;
 import com.superfercho.identity.application.usecase.CloseCustomerAccountUseCase;
 import com.superfercho.identity.application.usecase.DeactivateAddressUseCase;
+import com.superfercho.identity.application.usecase.DeactivateAdminCustomerAccountUseCase;
+import com.superfercho.identity.application.usecase.FindAdminCustomerByDocumentUseCase;
+import com.superfercho.identity.application.usecase.GetAdminCustomerRecordUseCase;
 import com.superfercho.identity.application.usecase.ListAddressesUseCase;
+import com.superfercho.identity.application.usecase.ListAdminCustomerOrdersUseCase;
+import com.superfercho.identity.application.usecase.ListAdminCustomerPaymentsUseCase;
 import com.superfercho.identity.application.usecase.RegisterCustomerUseCase;
 import com.superfercho.identity.application.usecase.RequestPasswordRecoveryByDocumentUseCase;
 import com.superfercho.identity.application.usecase.RequestPasswordRecoveryUseCase;
@@ -37,6 +46,7 @@ import com.superfercho.identity.application.usecase.UpdateAddressUseCase;
 import com.superfercho.identity.domain.model.Role;
 import com.superfercho.identity.domain.model.UserStatus;
 import com.superfercho.identity.infrastructure.rest.AddressController;
+import com.superfercho.identity.infrastructure.rest.AdminCustomerController;
 import com.superfercho.identity.infrastructure.rest.AuthController;
 import com.superfercho.identity.infrastructure.rest.CustomerController;
 import com.superfercho.identity.infrastructure.rest.PasswordRecoveryController;
@@ -81,7 +91,8 @@ import org.springframework.test.web.servlet.ResultMatcher;
             AddressController.class,
             CategoryController.class,
             OrderController.class,
-            AdminOrderController.class
+            AdminOrderController.class,
+            AdminCustomerController.class
         })
 @Import({IdentitySecurityConfiguration.class, ClockConfiguration.class})
 @TestPropertySource(
@@ -97,6 +108,8 @@ class HttpAuthorizationSecurityTest {
     private static final UUID CATEGORY_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
     private static final UUID PAYMENT_ID = UUID.fromString("55555555-5555-5555-5555-555555555555");
     private static final UUID DOCUMENT_ID = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
+    private static final UUID CUSTOMER_RECORD_ID = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
+    private static final UUID ACCOUNT_ID = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff");
 
     @Autowired
     private MockMvc mockMvc;
@@ -176,6 +189,24 @@ class HttpAuthorizationSecurityTest {
     @MockitoBean
     private ListAdminOrdersUseCase listAdminOrdersUseCase;
 
+    @MockitoBean
+    private FindAdminCustomerByDocumentUseCase findAdminCustomerByDocumentUseCase;
+
+    @MockitoBean
+    private GetAdminCustomerRecordUseCase getAdminCustomerRecordUseCase;
+
+    @MockitoBean
+    private ListAdminCustomerOrdersUseCase listAdminCustomerOrdersUseCase;
+
+    @MockitoBean
+    private ListAdminCustomerPaymentsUseCase listAdminCustomerPaymentsUseCase;
+
+    @MockitoBean
+    private ActivateAdminCustomerAccountUseCase activateAdminCustomerAccountUseCase;
+
+    @MockitoBean
+    private DeactivateAdminCustomerAccountUseCase deactivateAdminCustomerAccountUseCase;
+
     @BeforeEach
     void stubUseCases() {
         when(customerAccountAccessPort.allowsCustomerAccess(any())).thenReturn(true);
@@ -195,6 +226,14 @@ class HttpAuthorizationSecurityTest {
         when(getAdminOrderUseCase.execute(any())).thenReturn(orderResult());
         when(transactionalCheckoutUseCase.execute(any())).thenReturn(checkoutResult());
         when(transactionalCancelOrderUseCase.execute(any())).thenReturn(orderResult());
+        when(findAdminCustomerByDocumentUseCase.execute(any())).thenReturn(adminCustomerRecordResult());
+        when(getAdminCustomerRecordUseCase.execute(any())).thenReturn(adminCustomerRecordResult());
+        when(listAdminCustomerOrdersUseCase.execute(any()))
+                .thenReturn(new AdminPagedResult<>(List.of(), 0, 20, 0));
+        when(listAdminCustomerPaymentsUseCase.execute(any()))
+                .thenReturn(new AdminPagedResult<>(List.of(), 0, 20, 0));
+        when(activateAdminCustomerAccountUseCase.execute(any())).thenReturn(adminCustomerAccountResult());
+        when(deactivateAdminCustomerAccountUseCase.execute(any())).thenReturn(adminCustomerAccountResult());
     }
 
     @Test
@@ -452,6 +491,89 @@ class HttpAuthorizationSecurityTest {
                 .andExpect(accessDenied());
         mockMvc.perform(get("/api/v1/admin").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
                 .andExpect(accessDenied());
+    }
+
+    @Test
+    void shouldRejectAdminCustomersWithoutJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/customers/by-document")
+                        .param("documentType", "CC")
+                        .param("documentNumber", "100200300"))
+                .andExpect(unauthenticated());
+        mockMvc.perform(get("/api/v1/admin/customers/{id}", CUSTOMER_RECORD_ID)).andExpect(unauthenticated());
+        mockMvc.perform(get("/api/v1/admin/customers/{id}/orders", CUSTOMER_RECORD_ID))
+                .andExpect(unauthenticated());
+        mockMvc.perform(get("/api/v1/admin/customers/{id}/payments", CUSTOMER_RECORD_ID))
+                .andExpect(unauthenticated());
+        mockMvc.perform(post(
+                        "/api/v1/admin/customers/{id}/accounts/{userId}/activate",
+                        CUSTOMER_RECORD_ID,
+                        ACCOUNT_ID))
+                .andExpect(unauthenticated());
+        mockMvc.perform(post(
+                        "/api/v1/admin/customers/{id}/accounts/{userId}/deactivate",
+                        CUSTOMER_RECORD_ID,
+                        ACCOUNT_ID))
+                .andExpect(unauthenticated());
+    }
+
+    @Test
+    void shouldRejectAdminCustomersWithCustomerJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/customers/by-document")
+                        .param("documentType", "CC")
+                        .param("documentNumber", "100200300")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(accessDenied());
+        mockMvc.perform(get("/api/v1/admin/customers/{id}", CUSTOMER_RECORD_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(accessDenied());
+        mockMvc.perform(get("/api/v1/admin/customers/{id}/orders", CUSTOMER_RECORD_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(accessDenied());
+        mockMvc.perform(get("/api/v1/admin/customers/{id}/payments", CUSTOMER_RECORD_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(accessDenied());
+        mockMvc.perform(post(
+                                "/api/v1/admin/customers/{id}/accounts/{userId}/activate",
+                                CUSTOMER_RECORD_ID,
+                                ACCOUNT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(accessDenied());
+        mockMvc.perform(post(
+                                "/api/v1/admin/customers/{id}/accounts/{userId}/deactivate",
+                                CUSTOMER_RECORD_ID,
+                                ACCOUNT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(accessDenied());
+    }
+
+    @Test
+    void shouldAllowAdminCustomersWithAdminJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/customers/by-document")
+                        .param("documentType", "CC")
+                        .param("documentNumber", "100200300")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/customers/{id}", CUSTOMER_RECORD_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/customers/{id}/orders", CUSTOMER_RECORD_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/customers/{id}/payments", CUSTOMER_RECORD_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(
+                                "/api/v1/admin/customers/{id}/accounts/{userId}/activate",
+                                CUSTOMER_RECORD_ID,
+                                ACCOUNT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(
+                                "/api/v1/admin/customers/{id}/accounts/{userId}/deactivate",
+                                CUSTOMER_RECORD_ID,
+                                ACCOUNT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -726,6 +848,29 @@ class HttpAuthorizationSecurityTest {
                 Role.CUSTOMER,
                 UserStatus.ACTIVE,
                 NOW);
+    }
+
+    private static AdminCustomerRecordResult adminCustomerRecordResult() {
+        return new AdminCustomerRecordResult(
+                CUSTOMER_RECORD_ID,
+                "CC",
+                "100200300",
+                "Ada",
+                "Lovelace",
+                NOW,
+                NOW,
+                List.of(adminCustomerAccountResult()));
+    }
+
+    private static AdminCustomerAccountResult adminCustomerAccountResult() {
+        return new AdminCustomerAccountResult(
+                ACCOUNT_ID,
+                "ada@identity.test",
+                "3001234567",
+                UserStatus.ACTIVE,
+                NOW,
+                null,
+                CUSTOMER_RECORD_ID);
     }
 
     private static CategoryResult categoryResult() {

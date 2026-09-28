@@ -4,10 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.superfercho.identity.application.exception.AddressNotFoundException;
 import com.superfercho.identity.application.exception.AddressOwnershipException;
+import com.superfercho.identity.application.exception.CustomerRecordNotFoundException;
 import com.superfercho.identity.application.exception.DocumentAlreadyExistsException;
 import com.superfercho.identity.application.exception.DuplicateDefaultAddressException;
 import com.superfercho.identity.application.exception.InactiveAddressException;
 import com.superfercho.identity.application.exception.InactiveUserException;
+import com.superfercho.identity.application.exception.InvalidAdminCustomerQueryException;
 import com.superfercho.identity.application.exception.InvalidCredentialsException;
 import com.superfercho.identity.application.exception.InvalidRegistrationException;
 import com.superfercho.identity.application.exception.UnauthenticatedUserException;
@@ -104,6 +106,23 @@ class IdentityExceptionHandlerTest {
     @Test
     void shouldMapUserNotFoundTo404() {
         assertProblem(handler.handleUserNotFound(new UserNotFoundException(USER_ID)), HttpStatus.NOT_FOUND, "USER_NOT_FOUND");
+    }
+
+    @Test
+    void shouldMapCustomerRecordNotFoundTo404() {
+        assertProblem(
+                handler.handleCustomerRecordNotFound(new CustomerRecordNotFoundException(USER_ID)),
+                HttpStatus.NOT_FOUND,
+                "CUSTOMER_RECORD_NOT_FOUND");
+    }
+
+    @Test
+    void shouldMapInvalidAdminCustomerQueryTo400() {
+        assertProblem(
+                handler.handleInvalidAdminCustomerQuery(
+                        new InvalidAdminCustomerQueryException("accountStatus must be ALL, ACTIVE, INACTIVE, or DELETED")),
+                HttpStatus.BAD_REQUEST,
+                "INVALID_ADMIN_CUSTOMER_QUERY");
     }
 
     @Test

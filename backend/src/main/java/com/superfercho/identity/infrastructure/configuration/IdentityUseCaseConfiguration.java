@@ -11,6 +11,7 @@ import com.superfercho.identity.application.port.CurrentUserProvider;
 import com.superfercho.identity.application.port.CustomerAccountAssistantCleanupPort;
 import com.superfercho.identity.application.port.CustomerAccountCheckoutCleanupPort;
 import com.superfercho.identity.application.port.CustomerAccountShoppingCleanupPort;
+import com.superfercho.identity.application.port.CustomerCommercialHistoryPort;
 import com.superfercho.identity.application.port.CustomerPreviewRepository;
 import com.superfercho.identity.application.port.CustomerRecordRepository;
 import com.superfercho.identity.application.port.PasswordHasher;
@@ -19,15 +20,21 @@ import com.superfercho.identity.application.port.PreviewAssistantCleanupPort;
 import com.superfercho.identity.application.port.PreviewOrdersCleanupPort;
 import com.superfercho.identity.application.port.PreviewShoppingCleanupPort;
 import com.superfercho.identity.application.port.UserRepository;
+import com.superfercho.identity.application.usecase.ActivateAdminCustomerAccountUseCase;
 import com.superfercho.identity.application.usecase.AddAddressUseCase;
 import com.superfercho.identity.application.usecase.AuthenticateUserUseCase;
 import com.superfercho.identity.application.usecase.CloseCustomerAccountUseCase;
 import com.superfercho.identity.application.usecase.DeactivateAddressUseCase;
+import com.superfercho.identity.application.usecase.DeactivateAdminCustomerAccountUseCase;
 import com.superfercho.identity.application.usecase.ExitStorefrontPreviewUseCase;
 import com.superfercho.identity.application.usecase.ExpireStorefrontPreviewsUseCase;
 import com.superfercho.identity.application.usecase.FinalizeStorefrontPreviewUseCase;
+import com.superfercho.identity.application.usecase.FindAdminCustomerByDocumentUseCase;
+import com.superfercho.identity.application.usecase.GetAdminCustomerRecordUseCase;
 import com.superfercho.identity.application.usecase.GetStorefrontPreviewUseCase;
 import com.superfercho.identity.application.usecase.ListAddressesUseCase;
+import com.superfercho.identity.application.usecase.ListAdminCustomerOrdersUseCase;
+import com.superfercho.identity.application.usecase.ListAdminCustomerPaymentsUseCase;
 import com.superfercho.identity.application.usecase.RegisterCustomerUseCase;
 import com.superfercho.identity.application.usecase.SetDefaultAddressUseCase;
 import com.superfercho.identity.application.usecase.StartStorefrontPreviewUseCase;
@@ -121,6 +128,54 @@ public class IdentityUseCaseConfiguration {
                 transaction.executeWithoutResult(status -> useCase.execute());
             }
         };
+    }
+
+    @Bean
+    @ConditionalOnBean(CustomerRecordRepository.class)
+    FindAdminCustomerByDocumentUseCase findAdminCustomerByDocumentUseCase(
+            CustomerRecordRepository customerRecordRepository, UserRepository userRepository) {
+        return new FindAdminCustomerByDocumentUseCase(customerRecordRepository, userRepository);
+    }
+
+    @Bean
+    @ConditionalOnBean(CustomerRecordRepository.class)
+    GetAdminCustomerRecordUseCase getAdminCustomerRecordUseCase(
+            CustomerRecordRepository customerRecordRepository, UserRepository userRepository) {
+        return new GetAdminCustomerRecordUseCase(customerRecordRepository, userRepository);
+    }
+
+    @Bean
+    @ConditionalOnBean(CustomerRecordRepository.class)
+    ActivateAdminCustomerAccountUseCase activateAdminCustomerAccountUseCase(
+            CustomerRecordRepository customerRecordRepository, UserRepository userRepository, Clock clock) {
+        return new ActivateAdminCustomerAccountUseCase(customerRecordRepository, userRepository, clock);
+    }
+
+    @Bean
+    @ConditionalOnBean(CustomerRecordRepository.class)
+    DeactivateAdminCustomerAccountUseCase deactivateAdminCustomerAccountUseCase(
+            CustomerRecordRepository customerRecordRepository, UserRepository userRepository, Clock clock) {
+        return new DeactivateAdminCustomerAccountUseCase(customerRecordRepository, userRepository, clock);
+    }
+
+    @Bean
+    @ConditionalOnBean({CustomerRecordRepository.class, CustomerCommercialHistoryPort.class})
+    ListAdminCustomerOrdersUseCase listAdminCustomerOrdersUseCase(
+            CustomerRecordRepository customerRecordRepository,
+            UserRepository userRepository,
+            CustomerCommercialHistoryPort commercialHistoryPort) {
+        return new ListAdminCustomerOrdersUseCase(
+                customerRecordRepository, userRepository, commercialHistoryPort);
+    }
+
+    @Bean
+    @ConditionalOnBean({CustomerRecordRepository.class, CustomerCommercialHistoryPort.class})
+    ListAdminCustomerPaymentsUseCase listAdminCustomerPaymentsUseCase(
+            CustomerRecordRepository customerRecordRepository,
+            UserRepository userRepository,
+            CustomerCommercialHistoryPort commercialHistoryPort) {
+        return new ListAdminCustomerPaymentsUseCase(
+                customerRecordRepository, userRepository, commercialHistoryPort);
     }
 
     @Bean

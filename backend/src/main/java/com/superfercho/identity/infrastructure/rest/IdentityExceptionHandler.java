@@ -3,10 +3,12 @@ package com.superfercho.identity.infrastructure.rest;
 import com.superfercho.identity.application.exception.AddressNotFoundException;
 import com.superfercho.identity.application.exception.AddressOwnershipException;
 import com.superfercho.identity.application.exception.CloseCustomerAccountForbiddenException;
+import com.superfercho.identity.application.exception.CustomerRecordNotFoundException;
 import com.superfercho.identity.application.exception.DocumentAlreadyExistsException;
 import com.superfercho.identity.application.exception.DuplicateDefaultAddressException;
 import com.superfercho.identity.application.exception.InactiveAddressException;
 import com.superfercho.identity.application.exception.InactiveUserException;
+import com.superfercho.identity.application.exception.InvalidAdminCustomerQueryException;
 import com.superfercho.identity.application.exception.InvalidCredentialsException;
 import com.superfercho.identity.application.exception.InvalidPasswordRecoveryException;
 import com.superfercho.identity.application.exception.InvalidRegistrationException;
@@ -100,6 +102,16 @@ public class IdentityExceptionHandler {
     @ExceptionHandler(UserNotFoundException.class)
     ProblemDetail handleUserNotFound(UserNotFoundException exception) {
         return problem(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", exception.getMessage());
+    }
+
+    @ExceptionHandler(CustomerRecordNotFoundException.class)
+    ProblemDetail handleCustomerRecordNotFound(CustomerRecordNotFoundException exception) {
+        return problem(HttpStatus.NOT_FOUND, "CUSTOMER_RECORD_NOT_FOUND", exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidAdminCustomerQueryException.class)
+    ProblemDetail handleInvalidAdminCustomerQuery(InvalidAdminCustomerQueryException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "INVALID_ADMIN_CUSTOMER_QUERY", exception.getMessage());
     }
 
     @ExceptionHandler({AddressNotFoundException.class, AddressOwnershipException.class})

@@ -3,6 +3,7 @@ package com.superfercho.orders.infrastructure.persistence.repository;
 import com.superfercho.orders.domain.model.OrderStatus;
 import com.superfercho.orders.infrastructure.persistence.entity.OrderJpaEntity;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,6 +20,11 @@ public interface OrderJpaRepository extends JpaRepository<OrderJpaEntity, UUID> 
     Optional<OrderJpaEntity> findByOrderNumber(String orderNumber);
 
     Page<OrderJpaEntity> findAllByCustomerId(UUID customerId, Pageable pageable);
+
+    Page<OrderJpaEntity> findAllByCustomerIdIn(Collection<UUID> customerIds, Pageable pageable);
+
+    Page<OrderJpaEntity> findAllByCustomerIdInAndPaymentIdIsNotNull(
+            Collection<UUID> customerIds, Pageable pageable);
 
     Page<OrderJpaEntity> findAllByStatusIn(List<OrderStatus> statuses, Pageable pageable);
 

@@ -4,6 +4,7 @@ import com.superfercho.orders.application.dto.PageRequest;
 import com.superfercho.orders.application.dto.PagedResult;
 import com.superfercho.orders.domain.model.Order;
 import com.superfercho.orders.domain.model.OrderStatus;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,6 +23,14 @@ public interface OrderRepository {
     Optional<Order> findById(UUID orderId);
 
     PagedResult<Order> findByCustomerId(UUID customerId, PageRequest pageRequest);
+
+    PagedResult<Order> findByCustomerIds(Collection<UUID> customerIds, PageRequest pageRequest);
+
+    /**
+     * Orders that already have a payment id, for the given operational customer ids (newest first).
+     */
+    PagedResult<Order> findOrdersWithPaymentByCustomerIds(
+            Collection<UUID> customerIds, PageRequest pageRequest);
 
     PagedResult<Order> findAll(PageRequest pageRequest);
 

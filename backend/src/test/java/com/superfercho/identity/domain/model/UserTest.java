@@ -195,6 +195,106 @@ class UserTest {
     }
 
     @Test
+    void shouldActivateLiveInactiveCustomer() {
+        UUID recordId = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        Instant activatedAt = Instant.parse("2026-03-01T00:00:00Z");
+        User inactive = User.create(
+                ID,
+                "CC",
+                "12345678",
+                "Ada",
+                "Lovelace",
+                "ada@example.com",
+                "3001234567",
+                "hashed-password",
+                Role.CUSTOMER,
+                UserStatus.INACTIVE,
+                recordId,
+                null,
+                CREATED_AT,
+                UPDATED_AT);
+
+        User activated = inactive.activate(activatedAt);
+
+        assertEquals(UserStatus.ACTIVE, activated.status());
+        assertEquals(null, activated.deletedAt());
+        assertEquals(recordId, activated.customerRecordId());
+        assertEquals(activatedAt, activated.updatedAt());
+    }
+
+    @Test
+    void shouldDeactivateLiveActiveCustomer() {
+        UUID recordId = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        Instant deactivatedAt = Instant.parse("2026-03-01T00:00:00Z");
+        User active = User.create(
+                ID,
+                "CC",
+                "12345678",
+                "Ada",
+                "Lovelace",
+                "ada@example.com",
+                "3001234567",
+                "hashed-password",
+                Role.CUSTOMER,
+                UserStatus.ACTIVE,
+                recordId,
+                null,
+                CREATED_AT,
+                UPDATED_AT);
+
+        User deactivated = active.deactivate(deactivatedAt);
+
+        assertEquals(UserStatus.INACTIVE, deactivated.status());
+        assertEquals(null, deactivated.deletedAt());
+        assertEquals(recordId, deactivated.customerRecordId());
+        assertEquals(deactivatedAt, deactivated.updatedAt());
+    }
+
+    @Test
+    void shouldRejectActivateForDeletedAccount() {
+        UUID recordId = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        Instant deletedAt = Instant.parse("2026-02-01T00:00:00Z");
+        User deleted = User.create(
+                ID,
+                "CC",
+                "12345678",
+                "Ada",
+                "Lovelace",
+                "ada@example.com",
+                "3001234567",
+                "hashed-password",
+                Role.CUSTOMER,
+                UserStatus.INACTIVE,
+                recordId,
+                deletedAt,
+                CREATED_AT,
+                deletedAt);
+
+        assertThrows(
+                InvalidUserException.class, () -> deleted.activate(Instant.parse("2026-03-01T00:00:00Z")));
+    }
+
+    @Test
+    void shouldRejectActivateForAdmin() {
+        assertThrows(
+                InvalidUserException.class,
+                () -> User.create(
+                                ID,
+                                "CC",
+                                "12345678",
+                                "Admin",
+                                "Local",
+                                "admin@example.com",
+                                "3000000000",
+                                "hashed-password",
+                                Role.ADMIN,
+                                UserStatus.INACTIVE,
+                                CREATED_AT,
+                                UPDATED_AT)
+                        .activate(Instant.parse("2026-03-01T00:00:00Z")));
+    }
+
+    @Test
     void shouldRejectCloseAccountForAdmin() {
         assertThrows(
                 InvalidUserException.class,

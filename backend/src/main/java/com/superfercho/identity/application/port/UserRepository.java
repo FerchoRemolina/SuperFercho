@@ -1,6 +1,7 @@
 package com.superfercho.identity.application.port;
 
 import com.superfercho.identity.domain.model.User;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -28,6 +29,11 @@ public interface UserRepository {
      * Finds the non-deleted user linked to the given customer record, if any.
      */
     Optional<User> findLiveByCustomerRecordId(UUID customerRecordId);
+
+    /**
+     * All operational accounts (live and soft-deleted) historically linked to the customer record.
+     */
+    List<User> findAllByCustomerRecordId(UUID customerRecordId);
 
     void deleteById(UUID id);
 }

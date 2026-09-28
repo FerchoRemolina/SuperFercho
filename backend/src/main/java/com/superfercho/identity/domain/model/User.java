@@ -167,6 +167,71 @@ public final class User {
                 closedAt);
     }
 
+    /**
+     * Admin reactivation of a LIVE CUSTOMER account ({@code deletedAt == null}). Deleted accounts
+     * cannot be restored.
+     */
+    public User activate(Instant updatedAt) {
+        requireNonNull(updatedAt, "updatedAt");
+        requireLiveCustomerAccount("activated");
+        if (status != UserStatus.INACTIVE) {
+            throw new InvalidUserException("account can only be activated when INACTIVE");
+        }
+        return create(
+                id,
+                documentType,
+                documentNumber,
+                firstName,
+                lastName,
+                email,
+                phone,
+                passwordHash,
+                role,
+                UserStatus.ACTIVE,
+                customerRecordId,
+                null,
+                createdAt,
+                updatedAt);
+    }
+
+    /**
+     * Admin deactivation of a LIVE CUSTOMER account ({@code deletedAt == null}). Does not soft-delete.
+     */
+    public User deactivate(Instant updatedAt) {
+        requireNonNull(updatedAt, "updatedAt");
+        requireLiveCustomerAccount("deactivated");
+        if (status != UserStatus.ACTIVE) {
+            throw new InvalidUserException("account can only be deactivated when ACTIVE");
+        }
+        return create(
+                id,
+                documentType,
+                documentNumber,
+                firstName,
+                lastName,
+                email,
+                phone,
+                passwordHash,
+                role,
+                UserStatus.INACTIVE,
+                customerRecordId,
+                null,
+                createdAt,
+                updatedAt);
+    }
+
+    private void requireLiveCustomerAccount(String action) {
+        if (role != Role.CUSTOMER) {
+            throw new InvalidUserException("Only CUSTOMER accounts can be " + action);
+        }
+        if (customerRecordId == null) {
+            throw new InvalidUserException("CUSTOMER account without CustomerRecord cannot be " + action);
+        }
+        if (deletedAt != null) {
+            throw new InvalidUserException("Deleted accounts cannot be " + action);
+        }
+    }
+
     /** Visible Customer name (first name). */
     public String displayFirstName() {
         return firstName;

@@ -454,6 +454,23 @@ class LocalHistoricalCustomersDemoRunnerTest {
         }
 
         @Override
+        public PagedResult<Order> findByCustomerIds(Collection<UUID> customerIds, PageRequest pageRequest) {
+            List<Order> items = orders.values().stream()
+                    .filter(order -> customerIds.contains(order.customerId()))
+                    .toList();
+            return page(items, pageRequest);
+        }
+
+        @Override
+        public PagedResult<Order> findOrdersWithPaymentByCustomerIds(
+                Collection<UUID> customerIds, PageRequest pageRequest) {
+            List<Order> items = orders.values().stream()
+                    .filter(order -> customerIds.contains(order.customerId()) && order.paymentId() != null)
+                    .toList();
+            return page(items, pageRequest);
+        }
+
+        @Override
         public PagedResult<Order> findAll(PageRequest pageRequest) {
             return page(List.copyOf(orders.values()), pageRequest);
         }

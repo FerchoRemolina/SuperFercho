@@ -3,6 +3,7 @@ package com.superfercho.identity.application.fakes;
 import com.superfercho.identity.application.port.UserRepository;
 import com.superfercho.identity.domain.model.User;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -58,6 +59,13 @@ public final class InMemoryUserRepository implements UserRepository {
                 .filter(user -> user.deletedAt() == null
                         && customerRecordId.equals(user.customerRecordId()))
                 .findFirst();
+    }
+
+    @Override
+    public List<User> findAllByCustomerRecordId(UUID customerRecordId) {
+        return users.values().stream()
+                .filter(user -> customerRecordId.equals(user.customerRecordId()))
+                .toList();
     }
 
     @Override
