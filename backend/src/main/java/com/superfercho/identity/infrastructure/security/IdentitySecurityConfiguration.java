@@ -2,6 +2,7 @@ package com.superfercho.identity.infrastructure.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.superfercho.identity.application.port.CurrentUserProvider;
+import com.superfercho.identity.application.port.CustomerAccountAccessPort;
 import com.superfercho.identity.application.port.CustomerPreviewRepository;
 import com.superfercho.identity.application.port.PasswordHasher;
 import java.time.Clock;
@@ -48,6 +49,7 @@ public class IdentitySecurityConfiguration {
             JwtAccessTokenService jwtAccessTokenService,
             ObjectMapper objectMapper,
             ObjectProvider<CustomerPreviewRepository> customerPreviewRepository,
+            ObjectProvider<CustomerAccountAccessPort> customerAccountAccessPort,
             Clock clock)
             throws Exception {
         SecurityProblemDetailResponses problemResponses = new SecurityProblemDetailResponses(objectMapper);
@@ -152,6 +154,12 @@ public class IdentitySecurityConfiguration {
         if (previewRepository != null) {
             http.addFilterAfter(
                     new StorefrontPreviewGateFilter(previewRepository, clock, problemResponses),
+                    JwtAuthenticationFilter.class);
+        }
+        CustomerAccountAccessPort accountAccess = customerAccountAccessPort.getIfAvailable();
+        if (accountAccess != null) {
+            http.addFilterAfter(
+                    new DeletedCustomerAccountGateFilter(accountAccess, problemResponses),
                     JwtAuthenticationFilter.class);
         }
         return http.build();

@@ -115,6 +115,37 @@ class PasswordRecoveryUseCasesTest {
     }
 
     @Test
+    void requestForDeletedUserDoesNotGenerateTokenOrEmail() {
+        UUID deletedId = UUID.randomUUID();
+        users.save(deletedCustomer(deletedId, "deleted@example.com"));
+
+        PasswordRecoveryRequestResult result =
+                request.execute(new RequestPasswordRecoveryCommand("deleted@example.com", "127.0.0.1"));
+
+        assertThat(result.message()).isEqualTo(PasswordRecoveryRequestResult.GENERIC_MESSAGE);
+        assertThat(emails.messages).isEmpty();
+        assertThat(tokens.all()).isEmpty();
+    }
+
+    @Test
+    void resetRejectsTokenWhenUserIsDeleted() {
+        UUID deletedId = UUID.randomUUID();
+        users.save(deletedCustomer(deletedId, "deleted-reset@example.com"));
+        tokens.save(PasswordRecoveryToken.create(
+                UUID.randomUUID(),
+                deletedId,
+                tokenGenerator.hash("leftover-token"),
+                "127.0.0.1",
+                NOW,
+                NOW.plus(Duration.ofMinutes(15))));
+
+        assertThatThrownBy(() -> reset.execute(new ResetPasswordCommand(
+                        "leftover-token", VALID_PASSWORD, VALID_PASSWORD)))
+                .isInstanceOf(InvalidPasswordRecoveryException.class);
+        assertThat(users.findById(deletedId).orElseThrow().passwordHash()).isEqualTo("hash:old");
+    }
+
+    @Test
     void secondRequestInvalidatesPreviousToken() {
         request.execute(new RequestPasswordRecoveryCommand(EMAIL, "127.0.0.1"));
         request.execute(new RequestPasswordRecoveryCommand(EMAIL, "127.0.0.1"));
@@ -275,6 +306,24 @@ class PasswordRecoveryUseCasesTest {
                 "hash:old",
                 Role.CUSTOMER,
                 UserStatus.INACTIVE,
+                NOW,
+                NOW);
+    }
+
+    private static User deletedCustomer(UUID id, String email) {
+        return User.create(
+                id,
+                "CC",
+                "100200302",
+                "Deleted",
+                "User",
+                email,
+                "3001234569",
+                "hash:old",
+                Role.CUSTOMER,
+                UserStatus.INACTIVE,
+                UUID.randomUUID(),
+                NOW,
                 NOW,
                 NOW);
     }

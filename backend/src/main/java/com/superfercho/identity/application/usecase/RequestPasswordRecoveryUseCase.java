@@ -69,7 +69,9 @@ public final class RequestPasswordRecoveryUseCase {
         }
 
         Optional<User> user = userRepository.findByEmail(email);
-        if (user.isEmpty() || user.get().status() != UserStatus.ACTIVE) {
+        if (user.isEmpty()
+                || user.get().deletedAt() != null
+                || user.get().status() != UserStatus.ACTIVE) {
             return PasswordRecoveryRequestResult.generic();
         }
 

@@ -22,6 +22,7 @@ import com.superfercho.catalog.infrastructure.rest.CategoryController;
 import com.superfercho.identity.application.dto.AuthenticationResult;
 import com.superfercho.identity.application.dto.PasswordRecoveryRequestResult;
 import com.superfercho.identity.application.dto.RegisteredCustomer;
+import com.superfercho.identity.application.port.CustomerAccountAccessPort;
 import com.superfercho.identity.application.usecase.AddAddressUseCase;
 import com.superfercho.identity.application.usecase.AuthenticateUserUseCase;
 import com.superfercho.identity.application.usecase.CloseCustomerAccountUseCase;
@@ -118,6 +119,9 @@ class HttpAuthorizationSecurityTest {
     private CloseCustomerAccountUseCase closeCustomerAccountUseCase;
 
     @MockitoBean
+    private CustomerAccountAccessPort customerAccountAccessPort;
+
+    @MockitoBean
     private AddAddressUseCase addAddressUseCase;
 
     @MockitoBean
@@ -170,6 +174,7 @@ class HttpAuthorizationSecurityTest {
 
     @BeforeEach
     void stubUseCases() {
+        when(customerAccountAccessPort.allowsCustomerAccess(any())).thenReturn(true);
         when(authenticateUserUseCase.execute(any()))
                 .thenReturn(new AuthenticationResult(USER_ID, Role.CUSTOMER, "Ada", "Lovelace", "token", NOW));
         when(requestPasswordRecoveryUseCase.execute(any()))
@@ -272,6 +277,14 @@ class HttpAuthorizationSecurityTest {
     void shouldAllowCustomerRouteWithCustomerJwt() throws Exception {
         mockMvc.perform(get("/api/v1/addresses").header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
                 .andExpect(notBlockedBySecurity());
+    }
+
+    @Test
+    void shouldRejectCustomerRouteWhenAccountIsClosed() throws Exception {
+        when(customerAccountAccessPort.allowsCustomerAccess(USER_ID)).thenReturn(false);
+
+        mockMvc.perform(get("/api/v1/addresses").header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(unauthenticated());
     }
 
     @Test

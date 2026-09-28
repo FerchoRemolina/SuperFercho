@@ -62,7 +62,7 @@ public final class ResetPasswordUseCase {
         User user = userRepository
                 .findById(token.userId())
                 .orElseThrow(InvalidPasswordRecoveryException::invalidToken);
-        if (user.status() != UserStatus.ACTIVE) {
+        if (user.deletedAt() != null || user.status() != UserStatus.ACTIVE) {
             throw InvalidPasswordRecoveryException.invalidToken();
         }
 

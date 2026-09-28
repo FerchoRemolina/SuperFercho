@@ -81,6 +81,30 @@ class AuthenticateUserUseCaseTest {
     }
 
     @Test
+    void shouldRejectAuthenticationWhenUserIsDeleted() {
+        UUID deletedId = UUID.fromString("33333333-3333-3333-3333-333333333333");
+        users.save(User.create(
+                deletedId,
+                "CC",
+                "33333333",
+                "Ada",
+                "Lovelace",
+                "deleted@example.com",
+                "3001234567",
+                "hashed:secret",
+                Role.CUSTOMER,
+                UserStatus.INACTIVE,
+                UUID.randomUUID(),
+                CREATED_AT,
+                CREATED_AT,
+                CREATED_AT));
+
+        assertThrows(
+                InvalidCredentialsException.class,
+                () -> useCase.execute(new AuthenticateUserCommand("deleted@example.com", "secret")));
+    }
+
+    @Test
     void shouldAuthenticateWhenEmailDiffersOnlyByCase() {
         AuthenticationResult result =
                 useCase.execute(new AuthenticateUserCommand("  Ada@Example.COM  ", "secret"));

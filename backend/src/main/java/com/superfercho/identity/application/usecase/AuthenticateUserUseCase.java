@@ -35,6 +35,9 @@ public final class AuthenticateUserUseCase {
 
         String email = User.normalizeEmail(command.email());
         User user = userRepository.findByEmail(email).orElseThrow(InvalidCredentialsException::new);
+        if (user.deletedAt() != null) {
+            throw new InvalidCredentialsException();
+        }
         if (user.status() != UserStatus.ACTIVE) {
             throw new InactiveUserException();
         }
