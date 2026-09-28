@@ -19,10 +19,10 @@ public class UserJpaEntity {
     @Column(name = "id", nullable = false)
     private UUID id;
 
-    @Column(name = "document_type", nullable = false)
+    @Column(name = "document_type")
     private String documentType;
 
-    @Column(name = "document_number", nullable = false)
+    @Column(name = "document_number")
     private String documentNumber;
 
     @Column(name = "first_name", nullable = false)
@@ -48,6 +48,12 @@ public class UserJpaEntity {
     @Column(name = "status", nullable = false)
     private UserStatus status;
 
+    @Column(name = "customer_record_id")
+    private UUID customerRecordId;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -67,6 +73,8 @@ public class UserJpaEntity {
             String passwordHash,
             Role role,
             UserStatus status,
+            UUID customerRecordId,
+            Instant deletedAt,
             Instant createdAt,
             Instant updatedAt) {
         this.id = id;
@@ -79,6 +87,8 @@ public class UserJpaEntity {
         this.passwordHash = passwordHash;
         this.role = role;
         this.status = status;
+        this.customerRecordId = customerRecordId;
+        this.deletedAt = deletedAt;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -121,6 +131,14 @@ public class UserJpaEntity {
 
     public UserStatus getStatus() {
         return status;
+    }
+
+    public UUID getCustomerRecordId() {
+        return customerRecordId;
+    }
+
+    public Instant getDeletedAt() {
+        return deletedAt;
     }
 
     public Instant getCreatedAt() {

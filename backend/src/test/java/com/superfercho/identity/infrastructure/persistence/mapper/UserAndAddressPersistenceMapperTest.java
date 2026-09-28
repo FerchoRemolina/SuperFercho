@@ -48,8 +48,36 @@ class UserAndAddressPersistenceMapperTest {
         assertEquals(user.passwordHash(), mapped.passwordHash());
         assertEquals(user.role(), mapped.role());
         assertEquals(user.status(), mapped.status());
+        assertEquals(user.customerRecordId(), mapped.customerRecordId());
+        assertEquals(user.deletedAt(), mapped.deletedAt());
         assertEquals(user.createdAt(), mapped.createdAt());
         assertEquals(user.updatedAt(), mapped.updatedAt());
+    }
+
+    @Test
+    void shouldMapUserCustomerRecordIdAndDeletedAtRoundTrip() {
+        UUID customerRecordId = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        Instant deletedAt = Instant.parse("2026-03-01T00:00:00Z");
+        User user = User.create(
+                UUID.fromString("11111111-1111-1111-1111-111111111111"),
+                "CC",
+                "12345678",
+                "Ada",
+                "Lovelace",
+                "ada@example.com",
+                "3001234567",
+                "hashed-password",
+                Role.CUSTOMER,
+                UserStatus.INACTIVE,
+                customerRecordId,
+                deletedAt,
+                Instant.parse("2026-01-01T00:00:00Z"),
+                deletedAt);
+
+        User mapped = userMapper.toDomain(userMapper.toEntity(user));
+
+        assertEquals(customerRecordId, mapped.customerRecordId());
+        assertEquals(deletedAt, mapped.deletedAt());
     }
 
     @Test

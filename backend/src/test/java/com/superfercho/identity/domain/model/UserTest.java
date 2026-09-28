@@ -30,8 +30,35 @@ class UserTest {
         assertEquals("hashed-password", user.passwordHash());
         assertEquals(Role.CUSTOMER, user.role());
         assertEquals(UserStatus.ACTIVE, user.status());
+        assertEquals(null, user.customerRecordId());
+        assertEquals(null, user.deletedAt());
         assertEquals(CREATED_AT, user.createdAt());
         assertEquals(UPDATED_AT, user.updatedAt());
+    }
+
+    @Test
+    void shouldAcceptNullableCustomerRecordIdAndDeletedAt() {
+        UUID customerRecordId = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        Instant deletedAt = Instant.parse("2026-02-01T00:00:00Z");
+
+        User user = User.create(
+                ID,
+                "CC",
+                "12345678",
+                "Ada",
+                "Lovelace",
+                "ada@example.com",
+                "3001234567",
+                "hashed-password",
+                Role.CUSTOMER,
+                UserStatus.INACTIVE,
+                customerRecordId,
+                deletedAt,
+                CREATED_AT,
+                deletedAt);
+
+        assertEquals(customerRecordId, user.customerRecordId());
+        assertEquals(deletedAt, user.deletedAt());
     }
 
     @Test

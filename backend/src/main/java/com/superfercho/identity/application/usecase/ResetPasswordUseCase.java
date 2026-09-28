@@ -78,6 +78,8 @@ public final class ResetPasswordUseCase {
                 passwordHash,
                 user.role(),
                 user.status(),
+                user.customerRecordId(),
+                user.deletedAt(),
                 user.createdAt(),
                 now);
         userRepository.save(updated);

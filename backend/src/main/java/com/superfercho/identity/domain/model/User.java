@@ -17,6 +17,8 @@ public final class User {
     private final String passwordHash;
     private final Role role;
     private final UserStatus status;
+    private final UUID customerRecordId;
+    private final Instant deletedAt;
     private final Instant createdAt;
     private final Instant updatedAt;
 
@@ -31,6 +33,8 @@ public final class User {
             String passwordHash,
             Role role,
             UserStatus status,
+            UUID customerRecordId,
+            Instant deletedAt,
             Instant createdAt,
             Instant updatedAt) {
         this.id = id;
@@ -43,6 +47,8 @@ public final class User {
         this.passwordHash = passwordHash;
         this.role = role;
         this.status = status;
+        this.customerRecordId = customerRecordId;
+        this.deletedAt = deletedAt;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -58,6 +64,38 @@ public final class User {
             String passwordHash,
             Role role,
             UserStatus status,
+            Instant createdAt,
+            Instant updatedAt) {
+        return create(
+                id,
+                documentType,
+                documentNumber,
+                firstName,
+                lastName,
+                email,
+                phone,
+                passwordHash,
+                role,
+                status,
+                null,
+                null,
+                createdAt,
+                updatedAt);
+    }
+
+    public static User create(
+            UUID id,
+            String documentType,
+            String documentNumber,
+            String firstName,
+            String lastName,
+            String email,
+            String phone,
+            String passwordHash,
+            Role role,
+            UserStatus status,
+            UUID customerRecordId,
+            Instant deletedAt,
             Instant createdAt,
             Instant updatedAt) {
         requireNonNull(id, "id");
@@ -87,6 +125,8 @@ public final class User {
                 passwordHash,
                 role,
                 status,
+                customerRecordId,
+                deletedAt,
                 createdAt,
                 updatedAt);
     }
@@ -146,6 +186,14 @@ public final class User {
 
     public UserStatus status() {
         return status;
+    }
+
+    public UUID customerRecordId() {
+        return customerRecordId;
+    }
+
+    public Instant deletedAt() {
+        return deletedAt;
     }
 
     public Instant createdAt() {

@@ -22,8 +22,8 @@ class IdentityConstraintViolationTranslatorTest {
     }
 
     @Test
-    void shouldTranslateDuplicateDocumentConstraint() {
-        DataIntegrityViolationException violation = violation("uk_identity_users_document");
+    void shouldTranslateDuplicateCustomerRecordDocumentConstraint() {
+        DataIntegrityViolationException violation = violation("uk_identity_customer_records_document");
 
         RuntimeException translated = IdentityConstraintViolationTranslator.translate(violation);
 

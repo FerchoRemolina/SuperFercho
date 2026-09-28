@@ -19,6 +19,8 @@ public class UserPersistenceMapper {
                 user.passwordHash(),
                 user.role(),
                 user.status(),
+                user.customerRecordId(),
+                user.deletedAt(),
                 user.createdAt(),
                 user.updatedAt());
     }
@@ -35,6 +37,8 @@ public class UserPersistenceMapper {
                 entity.getPasswordHash(),
                 entity.getRole(),
                 entity.getStatus(),
+                entity.getCustomerRecordId(),
+                entity.getDeletedAt(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt());
     }

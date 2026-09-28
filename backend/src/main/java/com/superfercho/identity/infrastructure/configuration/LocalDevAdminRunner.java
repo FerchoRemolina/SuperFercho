@@ -91,6 +91,8 @@ public class LocalDevAdminRunner implements ApplicationRunner {
                 passwordHash,
                 Role.ADMIN,
                 UserStatus.ACTIVE,
+                existing.customerRecordId(),
+                existing.deletedAt(),
                 existing.createdAt(),
                 clock.instant());
         userRepository.save(updated);
