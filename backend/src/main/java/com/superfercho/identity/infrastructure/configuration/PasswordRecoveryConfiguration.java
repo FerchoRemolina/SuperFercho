@@ -1,11 +1,14 @@
 package com.superfercho.identity.infrastructure.configuration;
 
+import com.superfercho.identity.application.port.CustomerRecordRepository;
 import com.superfercho.identity.application.port.EmailSender;
 import com.superfercho.identity.application.port.PasswordHasher;
 import com.superfercho.identity.application.port.PasswordRecoveryAbuseGuard;
 import com.superfercho.identity.application.port.PasswordRecoveryTokenRepository;
 import com.superfercho.identity.application.port.SecureTokenGenerator;
 import com.superfercho.identity.application.port.UserRepository;
+import com.superfercho.identity.application.service.PasswordRecoveryIssuer;
+import com.superfercho.identity.application.usecase.RequestPasswordRecoveryByDocumentUseCase;
 import com.superfercho.identity.application.usecase.RequestPasswordRecoveryUseCase;
 import com.superfercho.identity.application.usecase.ResetPasswordUseCase;
 import com.superfercho.identity.infrastructure.mail.ConsoleEmailSender;
@@ -54,26 +57,42 @@ public class PasswordRecoveryConfiguration {
 
     @Bean
     @ConditionalOnBean(PasswordRecoveryTokenRepository.class)
-    RequestPasswordRecoveryUseCase requestPasswordRecoveryUseCase(
-            UserRepository userRepository,
+    PasswordRecoveryIssuer passwordRecoveryIssuer(
             PasswordRecoveryTokenRepository tokenRepository,
             SecureTokenGenerator tokenGenerator,
             EmailSender emailSender,
-            PasswordRecoveryAbuseGuard abuseGuard,
             Clock clock,
             PasswordRecoveryProperties recoveryProperties,
             EmailProperties emailProperties) {
-        return new RequestPasswordRecoveryUseCase(
-                userRepository,
+        return new PasswordRecoveryIssuer(
                 tokenRepository,
                 tokenGenerator,
                 emailSender,
-                abuseGuard,
                 clock,
                 recoveryProperties.tokenTtl(),
                 recoveryProperties.maxRequestsPerWindow(),
                 recoveryProperties.requestWindow(),
                 emailProperties.recoveryBaseUrl());
+    }
+
+    @Bean
+    @ConditionalOnBean(PasswordRecoveryIssuer.class)
+    RequestPasswordRecoveryUseCase requestPasswordRecoveryUseCase(
+            UserRepository userRepository,
+            PasswordRecoveryIssuer passwordRecoveryIssuer,
+            PasswordRecoveryAbuseGuard abuseGuard) {
+        return new RequestPasswordRecoveryUseCase(userRepository, passwordRecoveryIssuer, abuseGuard);
+    }
+
+    @Bean
+    @ConditionalOnBean({PasswordRecoveryIssuer.class, CustomerRecordRepository.class})
+    RequestPasswordRecoveryByDocumentUseCase requestPasswordRecoveryByDocumentUseCase(
+            CustomerRecordRepository customerRecordRepository,
+            UserRepository userRepository,
+            PasswordRecoveryIssuer passwordRecoveryIssuer,
+            PasswordRecoveryAbuseGuard abuseGuard) {
+        return new RequestPasswordRecoveryByDocumentUseCase(
+                customerRecordRepository, userRepository, passwordRecoveryIssuer, abuseGuard);
     }
 
     @Bean

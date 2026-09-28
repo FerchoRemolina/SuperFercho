@@ -29,6 +29,7 @@ import com.superfercho.identity.application.usecase.CloseCustomerAccountUseCase;
 import com.superfercho.identity.application.usecase.DeactivateAddressUseCase;
 import com.superfercho.identity.application.usecase.ListAddressesUseCase;
 import com.superfercho.identity.application.usecase.RegisterCustomerUseCase;
+import com.superfercho.identity.application.usecase.RequestPasswordRecoveryByDocumentUseCase;
 import com.superfercho.identity.application.usecase.RequestPasswordRecoveryUseCase;
 import com.superfercho.identity.application.usecase.ResetPasswordUseCase;
 import com.superfercho.identity.application.usecase.SetDefaultAddressUseCase;
@@ -110,6 +111,9 @@ class HttpAuthorizationSecurityTest {
     private RequestPasswordRecoveryUseCase requestPasswordRecoveryUseCase;
 
     @MockitoBean
+    private RequestPasswordRecoveryByDocumentUseCase requestPasswordRecoveryByDocumentUseCase;
+
+    @MockitoBean
     private ResetPasswordUseCase resetPasswordUseCase;
 
     @MockitoBean
@@ -179,6 +183,8 @@ class HttpAuthorizationSecurityTest {
                 .thenReturn(new AuthenticationResult(USER_ID, Role.CUSTOMER, "Ada", "Lovelace", "token", NOW));
         when(requestPasswordRecoveryUseCase.execute(any()))
                 .thenReturn(PasswordRecoveryRequestResult.generic());
+        when(requestPasswordRecoveryByDocumentUseCase.execute(any()))
+                .thenReturn(PasswordRecoveryRequestResult.genericForDocument());
         when(registerCustomerUseCase.execute(any())).thenReturn(registeredCustomer());
         when(listAddressesUseCase.execute()).thenReturn(List.of());
         when(listCategoriesUseCase.execute(any())).thenReturn(List.of());
@@ -217,6 +223,12 @@ class HttpAuthorizationSecurityTest {
                                   "newPassword": "Luis123!",
                                   "confirmPassword": "Luis123!"
                                 }
+                                """))
+                .andExpect(notBlockedBySecurity());
+        mockMvc.perform(post("/api/v1/auth/password-recovery/by-document")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"documentType": "CC", "documentNumber": "12345678"}
                                 """))
                 .andExpect(notBlockedBySecurity());
     }

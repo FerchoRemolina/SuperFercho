@@ -16,6 +16,7 @@ import com.superfercho.identity.application.port.EmailSender;
 import com.superfercho.identity.application.port.PasswordHasher;
 import com.superfercho.identity.application.port.PasswordRecoveryAbuseGuard;
 import com.superfercho.identity.application.port.SecureTokenGenerator;
+import com.superfercho.identity.application.service.PasswordRecoveryIssuer;
 import com.superfercho.identity.domain.model.PasswordRecoveryToken;
 import com.superfercho.identity.domain.model.Role;
 import com.superfercho.identity.domain.model.User;
@@ -63,17 +64,16 @@ class PasswordRecoveryUseCasesTest {
         userId = UUID.randomUUID();
         users.save(activeCustomer(userId, EMAIL));
 
-        request = new RequestPasswordRecoveryUseCase(
-                users,
+        PasswordRecoveryIssuer issuer = new PasswordRecoveryIssuer(
                 tokens,
                 tokenGenerator,
                 emails,
-                abuseGuard,
                 clock,
                 Duration.ofMinutes(15),
                 2,
                 Duration.ofHours(24),
                 "http://localhost:3000");
+        request = new RequestPasswordRecoveryUseCase(users, issuer, abuseGuard);
         reset = new ResetPasswordUseCase(tokens, users, tokenGenerator, passwordHasher, clock);
     }
 
@@ -239,17 +239,17 @@ class PasswordRecoveryUseCasesTest {
     void ipAbuseGuardBlocksExcessiveRequests() {
         PasswordRecoveryAbuseGuard strict =
                 new InMemoryPasswordRecoveryAbuseGuard(clock, 1, Duration.ofHours(1));
-        RequestPasswordRecoveryUseCase limited = new RequestPasswordRecoveryUseCase(
-                users,
+        PasswordRecoveryIssuer issuer = new PasswordRecoveryIssuer(
                 tokens,
                 tokenGenerator,
                 emails,
-                strict,
                 clock,
                 Duration.ofMinutes(15),
                 2,
                 Duration.ofHours(24),
                 "http://localhost:3000");
+        RequestPasswordRecoveryUseCase limited =
+                new RequestPasswordRecoveryUseCase(users, issuer, strict);
 
         limited.execute(new RequestPasswordRecoveryCommand(EMAIL, "10.0.0.1"));
         assertThatThrownBy(() -> limited.execute(new RequestPasswordRecoveryCommand(EMAIL, "10.0.0.1")))

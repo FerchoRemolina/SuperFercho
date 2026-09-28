@@ -68,6 +68,8 @@ public class IdentitySecurityConfiguration {
                         .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/password-recovery")
                         .permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/password-recovery/by-document")
+                        .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/password-recovery/reset")
                         .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/customers")

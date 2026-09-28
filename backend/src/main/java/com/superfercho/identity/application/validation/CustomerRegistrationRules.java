@@ -64,6 +64,12 @@ public final class CustomerRegistrationRules {
                 command.password());
     }
 
+    /** Shared document validation for registration and document-based password recovery. */
+    public static void requireDocument(String documentType, String documentNumber) {
+        requireDocumentType(documentType);
+        requireDocumentNumber(documentNumber);
+    }
+
     private static void requireDocumentType(String value) {
         if (value == null || value.isBlank() || !DOCUMENT_TYPES.contains(value)) {
             throw new InvalidRegistrationException("Selecciona un tipo de documento.");
