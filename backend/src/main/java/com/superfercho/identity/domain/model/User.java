@@ -135,6 +135,38 @@ public final class User {
         return email.trim().toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * Soft-closes the operational CUSTOMER account. Idempotent when already closed. Does not remove
+     * the commercial {@code customerRecordId} link or mutate historical identity fields.
+     */
+    public User closeAccount(Instant closedAt) {
+        requireNonNull(closedAt, "closedAt");
+        if (role != Role.CUSTOMER) {
+            throw new InvalidUserException("Only CUSTOMER accounts can be closed");
+        }
+        if (customerRecordId == null) {
+            throw new InvalidUserException("CUSTOMER account without CustomerRecord cannot be closed");
+        }
+        if (deletedAt != null) {
+            return this;
+        }
+        return create(
+                id,
+                documentType,
+                documentNumber,
+                firstName,
+                lastName,
+                email,
+                phone,
+                passwordHash,
+                role,
+                UserStatus.INACTIVE,
+                customerRecordId,
+                closedAt,
+                createdAt,
+                closedAt);
+    }
+
     /** Visible Customer name (first name). */
     public String displayFirstName() {
         return firstName;

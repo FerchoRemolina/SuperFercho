@@ -70,6 +70,8 @@ public class IdentitySecurityConfiguration {
                         .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/customers")
                         .permitAll()
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/customers/me")
+                        .hasRole("CUSTOMER")
                         .requestMatchers("/error")
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/products/barcode-lookup/**")

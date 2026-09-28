@@ -8,6 +8,9 @@ import com.superfercho.identity.application.dto.SetDefaultAddressCommand;
 import com.superfercho.identity.application.port.AccessTokenIssuer;
 import com.superfercho.identity.application.port.AddressRepository;
 import com.superfercho.identity.application.port.CurrentUserProvider;
+import com.superfercho.identity.application.port.CustomerAccountAssistantCleanupPort;
+import com.superfercho.identity.application.port.CustomerAccountCheckoutCleanupPort;
+import com.superfercho.identity.application.port.CustomerAccountShoppingCleanupPort;
 import com.superfercho.identity.application.port.CustomerPreviewRepository;
 import com.superfercho.identity.application.port.CustomerRecordRepository;
 import com.superfercho.identity.application.port.PasswordHasher;
@@ -18,6 +21,7 @@ import com.superfercho.identity.application.port.PreviewShoppingCleanupPort;
 import com.superfercho.identity.application.port.UserRepository;
 import com.superfercho.identity.application.usecase.AddAddressUseCase;
 import com.superfercho.identity.application.usecase.AuthenticateUserUseCase;
+import com.superfercho.identity.application.usecase.CloseCustomerAccountUseCase;
 import com.superfercho.identity.application.usecase.DeactivateAddressUseCase;
 import com.superfercho.identity.application.usecase.ExitStorefrontPreviewUseCase;
 import com.superfercho.identity.application.usecase.ExpireStorefrontPreviewsUseCase;
@@ -30,6 +34,7 @@ import com.superfercho.identity.application.usecase.StartStorefrontPreviewUseCas
 import com.superfercho.identity.application.usecase.UpdateAddressUseCase;
 import java.time.Clock;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -56,6 +61,64 @@ public class IdentityUseCaseConfiguration {
             @Override
             public RegisteredCustomer execute(RegisterCustomerCommand command) {
                 return transaction.execute(status -> useCase.execute(command));
+            }
+        };
+    }
+
+    @Bean
+    @ConditionalOnBean({
+        AddressRepository.class,
+        PasswordRecoveryTokenRepository.class,
+        CustomerAccountShoppingCleanupPort.class,
+        CustomerAccountCheckoutCleanupPort.class,
+        CustomerAccountAssistantCleanupPort.class
+    })
+    CloseCustomerAccountUseCase closeCustomerAccountUseCase(
+            CurrentUserProvider currentUserProvider,
+            UserRepository userRepository,
+            AddressRepository addressRepository,
+            PasswordRecoveryTokenRepository passwordRecoveryTokenRepository,
+            CustomerAccountShoppingCleanupPort shoppingCleanupPort,
+            CustomerAccountCheckoutCleanupPort checkoutCleanupPort,
+            CustomerAccountAssistantCleanupPort assistantCleanupPort,
+            ObjectProvider<CustomerPreviewRepository> customerPreviewRepository,
+            Clock clock,
+            PlatformTransactionManager transactionManager) {
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        CustomerPreviewRepository previewRepository = customerPreviewRepository.getIfAvailable();
+        CloseCustomerAccountUseCase useCase = previewRepository == null
+                ? new CloseCustomerAccountUseCase(
+                        currentUserProvider,
+                        userRepository,
+                        addressRepository,
+                        passwordRecoveryTokenRepository,
+                        shoppingCleanupPort,
+                        checkoutCleanupPort,
+                        assistantCleanupPort,
+                        clock)
+                : new CloseCustomerAccountUseCase(
+                        currentUserProvider,
+                        userRepository,
+                        addressRepository,
+                        passwordRecoveryTokenRepository,
+                        shoppingCleanupPort,
+                        checkoutCleanupPort,
+                        assistantCleanupPort,
+                        previewRepository,
+                        clock);
+        return new CloseCustomerAccountUseCase(
+                currentUserProvider,
+                userRepository,
+                addressRepository,
+                passwordRecoveryTokenRepository,
+                shoppingCleanupPort,
+                checkoutCleanupPort,
+                assistantCleanupPort,
+                previewRepository,
+                clock) {
+            @Override
+            public void execute() {
+                transaction.executeWithoutResult(status -> useCase.execute());
             }
         };
     }

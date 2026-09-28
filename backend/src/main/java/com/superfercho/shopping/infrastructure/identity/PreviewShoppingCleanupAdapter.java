@@ -1,5 +1,6 @@
 package com.superfercho.shopping.infrastructure.identity;
 
+import com.superfercho.identity.application.port.CustomerAccountShoppingCleanupPort;
 import com.superfercho.identity.application.port.PreviewShoppingCleanupPort;
 import com.superfercho.shopping.application.port.out.CartRepositoryPort;
 import com.superfercho.shopping.application.port.out.FavoriteRepositoryPort;
@@ -10,7 +11,8 @@ import org.springframework.stereotype.Component;
 
 @Component
 @Profile("!test")
-public class PreviewShoppingCleanupAdapter implements PreviewShoppingCleanupPort {
+public class PreviewShoppingCleanupAdapter
+        implements PreviewShoppingCleanupPort, CustomerAccountShoppingCleanupPort {
 
     private final CartRepositoryPort cartRepository;
     private final FavoriteRepositoryPort favoriteRepository;

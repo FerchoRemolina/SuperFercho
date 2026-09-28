@@ -1,8 +1,10 @@
 package com.superfercho.identity.infrastructure.rest;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -10,9 +12,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.superfercho.identity.application.dto.RegisterCustomerCommand;
 import com.superfercho.identity.application.dto.RegisteredCustomer;
+import com.superfercho.identity.application.exception.CloseCustomerAccountForbiddenException;
 import com.superfercho.identity.application.exception.DocumentAlreadyExistsException;
 import com.superfercho.identity.application.exception.InvalidRegistrationException;
 import com.superfercho.identity.application.exception.UserAlreadyExistsException;
+import com.superfercho.identity.application.usecase.CloseCustomerAccountUseCase;
 import com.superfercho.identity.application.usecase.RegisterCustomerUseCase;
 import com.superfercho.identity.domain.exception.InvalidUserException;
 import com.superfercho.identity.domain.model.Role;
@@ -42,6 +46,9 @@ class CustomerControllerTest {
 
     @MockitoBean
     private RegisterCustomerUseCase registerCustomerUseCase;
+
+    @MockitoBean
+    private CloseCustomerAccountUseCase closeCustomerAccountUseCase;
 
     @Test
     void shouldRegisterCustomer() throws Exception {
@@ -74,6 +81,25 @@ class CustomerControllerTest {
                         "ada@identity.test",
                         "3001234567",
                         "secret-password"));
+    }
+
+    @Test
+    void shouldCloseMyAccount() throws Exception {
+        mockMvc.perform(delete("/api/v1/customers/me"))
+                .andExpect(status().isNoContent());
+
+        verify(closeCustomerAccountUseCase).execute();
+    }
+
+    @Test
+    void shouldMapCloseAccountForbiddenToForbidden() throws Exception {
+        doThrow(new CloseCustomerAccountForbiddenException("Only CUSTOMER accounts can close themselves"))
+                .when(closeCustomerAccountUseCase)
+                .execute();
+
+        mockMvc.perform(delete("/api/v1/customers/me"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("CLOSE_CUSTOMER_ACCOUNT_FORBIDDEN"));
     }
 
     @Test

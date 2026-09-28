@@ -24,6 +24,7 @@ import com.superfercho.identity.application.dto.PasswordRecoveryRequestResult;
 import com.superfercho.identity.application.dto.RegisteredCustomer;
 import com.superfercho.identity.application.usecase.AddAddressUseCase;
 import com.superfercho.identity.application.usecase.AuthenticateUserUseCase;
+import com.superfercho.identity.application.usecase.CloseCustomerAccountUseCase;
 import com.superfercho.identity.application.usecase.DeactivateAddressUseCase;
 import com.superfercho.identity.application.usecase.ListAddressesUseCase;
 import com.superfercho.identity.application.usecase.RegisterCustomerUseCase;
@@ -112,6 +113,9 @@ class HttpAuthorizationSecurityTest {
 
     @MockitoBean
     private RegisterCustomerUseCase registerCustomerUseCase;
+
+    @MockitoBean
+    private CloseCustomerAccountUseCase closeCustomerAccountUseCase;
 
     @MockitoBean
     private AddAddressUseCase addAddressUseCase;
@@ -228,6 +232,23 @@ class HttpAuthorizationSecurityTest {
                                 }
                                 """))
                 .andExpect(notBlockedBySecurity());
+    }
+
+    @Test
+    void shouldRejectCloseCustomerAccountWithoutJwt() throws Exception {
+        mockMvc.perform(delete("/api/v1/customers/me")).andExpect(unauthenticated());
+    }
+
+    @Test
+    void shouldAllowCloseCustomerAccountWithCustomerJwt() throws Exception {
+        mockMvc.perform(delete("/api/v1/customers/me").header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(notBlockedBySecurity());
+    }
+
+    @Test
+    void shouldRejectCloseCustomerAccountWithAdminJwt() throws Exception {
+        mockMvc.perform(delete("/api/v1/customers/me").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(accessDenied());
     }
 
     @Test

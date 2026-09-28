@@ -137,6 +137,90 @@ class UserTest {
                         .build());
     }
 
+    @Test
+    void shouldCloseAccountForCustomerWithCustomerRecord() {
+        UUID recordId = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        Instant closedAt = Instant.parse("2026-03-01T00:00:00Z");
+
+        User closed = User.create(
+                        ID,
+                        "CC",
+                        "12345678",
+                        "Ada",
+                        "Lovelace",
+                        "ada@example.com",
+                        "3001234567",
+                        "hashed-password",
+                        Role.CUSTOMER,
+                        UserStatus.ACTIVE,
+                        recordId,
+                        null,
+                        CREATED_AT,
+                        UPDATED_AT)
+                .closeAccount(closedAt);
+
+        assertEquals(UserStatus.INACTIVE, closed.status());
+        assertEquals(closedAt, closed.deletedAt());
+        assertEquals(recordId, closed.customerRecordId());
+        assertEquals(closedAt, closed.updatedAt());
+        assertEquals(CREATED_AT, closed.createdAt());
+        assertEquals("ada@example.com", closed.email());
+    }
+
+    @Test
+    void closeAccountIsIdempotentWhenAlreadyClosed() {
+        UUID recordId = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        Instant firstClose = Instant.parse("2026-02-01T00:00:00Z");
+        Instant secondClose = Instant.parse("2026-03-01T00:00:00Z");
+        User alreadyClosed = User.create(
+                ID,
+                "CC",
+                "12345678",
+                "Ada",
+                "Lovelace",
+                "ada@example.com",
+                "3001234567",
+                "hashed-password",
+                Role.CUSTOMER,
+                UserStatus.INACTIVE,
+                recordId,
+                firstClose,
+                CREATED_AT,
+                firstClose);
+
+        User result = alreadyClosed.closeAccount(secondClose);
+
+        assertEquals(alreadyClosed, result);
+        assertEquals(firstClose, result.deletedAt());
+    }
+
+    @Test
+    void shouldRejectCloseAccountForAdmin() {
+        assertThrows(
+                InvalidUserException.class,
+                () -> User.create(
+                                ID,
+                                "CC",
+                                "12345678",
+                                "Admin",
+                                "Local",
+                                "admin@example.com",
+                                "3000000000",
+                                "hashed-password",
+                                Role.ADMIN,
+                                UserStatus.ACTIVE,
+                                CREATED_AT,
+                                UPDATED_AT)
+                        .closeAccount(Instant.parse("2026-03-01T00:00:00Z")));
+    }
+
+    @Test
+    void shouldRejectCloseAccountWithoutCustomerRecord() {
+        assertThrows(
+                InvalidUserException.class,
+                () -> validUser().build().closeAccount(Instant.parse("2026-03-01T00:00:00Z")));
+    }
+
     private static UserBuilder validUser() {
         return new UserBuilder();
     }
