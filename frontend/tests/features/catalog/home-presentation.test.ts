@@ -86,4 +86,17 @@ describe("home branding assets", () => {
     expect(image).toContain("brandingAssets.mark");
     expect(image).toContain("Sin imagen");
   });
+
+  it("keeps ProductImage in a fixed square slot that ignores intrinsic image size", () => {
+    const image = source("features/catalog/components/product-image.tsx");
+    expect(image).toContain("aspect-square");
+    expect(image).toContain("w-full");
+    expect(image).toContain("shrink-0");
+    expect(image).toContain("overflow-hidden");
+    expect(image).toContain("absolute inset-0");
+    expect(image).toContain("object-contain");
+    expect(image).not.toContain("object-cover");
+    expect(image).not.toMatch(/<img[^>]*className="[^"]*\bh-auto\b/);
+    expect(image).not.toMatch(/<img[^>]*className="[^"]*\bw-auto\b/);
+  });
 });

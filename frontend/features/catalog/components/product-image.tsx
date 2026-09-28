@@ -4,6 +4,10 @@ import { useState, type ReactNode } from "react";
 import { brandingAssets } from "@/shared/branding/assets";
 import { cx } from "@/shared/utils/cx";
 
+/**
+ * Fixed square media slot for product cards and related surfaces.
+ * Intrinsic image dimensions must never grow the slot or the surrounding card.
+ */
 export function ProductImage({
   src,
   alt,
@@ -19,11 +23,18 @@ export function ProductImage({
   const hasImage = Boolean(src && src.trim() && !failed);
 
   return (
-    <div className={cx("relative aspect-square", className)}>
+    <div
+      className={cx(
+        "relative aspect-square w-full shrink-0 overflow-hidden",
+        className,
+      )}
+    >
       <div
         className={cx(
-          "flex h-full w-full items-center justify-center overflow-hidden rounded-xl",
-          hasImage ? "bg-sf-bg" : "bg-gradient-to-br from-sf-bg via-sf-yellow-soft/40 to-sf-bg",
+          "absolute inset-0 flex items-center justify-center overflow-hidden rounded-xl",
+          hasImage
+            ? "bg-sf-bg"
+            : "bg-gradient-to-br from-sf-bg via-sf-yellow-soft/40 to-sf-bg",
         )}
       >
         {hasImage ? (
