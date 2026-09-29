@@ -4,6 +4,7 @@ import com.superfercho.orders.application.dto.PageRequest;
 import com.superfercho.orders.application.dto.PagedResult;
 import com.superfercho.orders.domain.model.Order;
 import com.superfercho.orders.domain.model.OrderStatus;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -38,6 +39,13 @@ public interface OrderRepository {
 
     /** In-progress orders eligible for automatic lifecycle progression. */
     List<Order> findInProgressForLifecycle();
+
+    /**
+     * Orders created in {@code [fromInclusive, toExclusive)} whose status is not
+     * {@code excludedStatus}. Used by Admin Hub period summaries.
+     */
+    List<Order> findCreatedBetweenExcludingStatus(
+            Instant fromInclusive, Instant toExclusive, OrderStatus excludedStatus);
 
     void deleteAllByCustomerId(UUID customerId);
 }

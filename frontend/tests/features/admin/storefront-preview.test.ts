@@ -170,10 +170,10 @@ describe("storefront-preview API", () => {
 });
 
 describe("storefront-preview composition", () => {
-  it("wires Ver tienda, banner, dual-session APIs and cache clears", () => {
+  it("wires Ver tienda, admin logout menu, banner and dual-session APIs", () => {
     const provider = source("shared/session/session-provider.tsx");
     const header = source("shared/ui/site-header.tsx");
-    const nav = source("features/admin/components/admin-section-nav.tsx");
+    const adminHeader = source("features/admin/components/admin-header.tsx");
     const banner = source("shared/session/storefront-preview-banner.tsx");
     const enter = source(
       "features/admin/components/storefront-preview-enter-button.tsx",
@@ -181,9 +181,21 @@ describe("storefront-preview composition", () => {
     const customerCountdown = source(
       "shared/session/customer-session-countdown.tsx",
     );
+    const rootLayout = source("app/layout.tsx");
+    const storefrontLayout = source("app/(storefront)/layout.tsx");
+    const adminShell = source("features/admin/components/admin-shell.tsx");
+    const sidebar = source("features/admin/components/admin-sidebar.tsx");
 
     expect(enter).toContain("Ver tienda");
-    expect(nav).toContain("StorefrontPreviewEnterButton");
+    expect(adminHeader).toContain("StorefrontPreviewEnterButton");
+    expect(adminHeader).toContain("Cerrar sesión");
+    expect(adminHeader).toContain("logout()");
+    expect(adminShell).toContain("AdminSidebar");
+    expect(adminShell).toContain("AdminHeader");
+    expect(sidebar).toContain("ADMIN_NAV_TREE");
+    expect(sidebar).toContain("aria-expanded");
+    expect(rootLayout).not.toContain("SiteHeader");
+    expect(storefrontLayout).toContain("SiteHeader");
     expect(header).toContain("StorefrontPreviewBanner");
     expect(header).toContain("CustomerSessionCountdown");
     expect(header).toContain("Volver a administración");
@@ -210,6 +222,7 @@ describe("storefront-preview composition", () => {
     expect(provider).not.toContain("resolvePreviewIdleAction");
   });
 
+
   it("keeps RequireRole unchanged and hides Admin nav during Customer preview", () => {
     const requireRole = source("shared/auth/require-role.tsx");
     const header = source("shared/ui/site-header.tsx");
@@ -220,7 +233,7 @@ describe("storefront-preview composition", () => {
     expect(header).toContain("isPreview");
   });
 
-  it("does not redesign Home or Admin hub in this phase", () => {
+  it("does not place Ver tienda inside the Admin hub", () => {
     const hub = source("features/admin/components/admin-hub.tsx");
     expect(hub).not.toContain("Ver tienda");
     expect(hub).not.toContain("StorefrontPreview");

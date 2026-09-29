@@ -30,6 +30,9 @@ public interface OrderJpaRepository extends JpaRepository<OrderJpaEntity, UUID> 
 
     List<OrderJpaEntity> findByStatusInAndConfirmedAtIsNotNull(List<OrderStatus> statuses);
 
+    List<OrderJpaEntity> findByCreatedAtGreaterThanEqualAndCreatedAtLessThanAndStatusNotOrderByCreatedAtAsc(
+            Instant fromInclusive, Instant toExclusive, OrderStatus excludedStatus);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional
     @Query(

@@ -8,6 +8,7 @@ import com.superfercho.orders.domain.model.OrderStatus;
 import com.superfercho.orders.infrastructure.persistence.entity.OrderJpaEntity;
 import com.superfercho.orders.infrastructure.persistence.mapper.OrderPersistenceMapper;
 import com.superfercho.orders.infrastructure.persistence.repository.OrderJpaRepository;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -102,6 +103,17 @@ public class OrderPersistenceAdapter implements OrderRepository {
     @Override
     public List<Order> findInProgressForLifecycle() {
         return orderJpaRepository.findByStatusInAndConfirmedAtIsNotNull(IN_PROGRESS).stream()
+                .map(orderPersistenceMapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<Order> findCreatedBetweenExcludingStatus(
+            Instant fromInclusive, Instant toExclusive, OrderStatus excludedStatus) {
+        return orderJpaRepository
+                .findByCreatedAtGreaterThanEqualAndCreatedAtLessThanAndStatusNotOrderByCreatedAtAsc(
+                        fromInclusive, toExclusive, excludedStatus)
+                .stream()
                 .map(orderPersistenceMapper::toDomain)
                 .toList();
     }

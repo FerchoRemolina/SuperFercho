@@ -4,12 +4,14 @@ import { cx } from "@/shared/utils/cx";
 
 export function BrandLogo({
   className,
+  href = "/",
 }: {
   className?: string;
+  href?: string;
 }) {
   return (
     <Link
-      href="/"
+      href={href}
       className={cx(
         "inline-flex shrink-0 items-center min-h-11",
         className,

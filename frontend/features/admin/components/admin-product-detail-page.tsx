@@ -19,7 +19,7 @@ import {
   updateAdminProductRequestFromValues,
   validateUpdateAdminProduct,
 } from "@/features/admin/payloads";
-import { formatAdminInstant } from "@/features/admin/presentation";
+import { formatAdminInstant, adminProductsListHrefFromSearchParams } from "@/features/admin/presentation";
 import { productAvailabilityLabel } from "@/features/catalog/quantity";
 import { ProductImage } from "@/features/catalog/components/product-image";
 import { isApiError } from "@/shared/errors/api-problem";
@@ -40,6 +40,11 @@ export function AdminProductDetailPageContent({
   const router = useRouter();
   const searchParams = useSearchParams();
   const created = searchParams.get("created") === "1";
+  const listHref = adminProductsListHrefFromSearchParams({
+    text: searchParams.get("text"),
+    categoryId: searchParams.get("categoryId"),
+    status: searchParams.get("status"),
+  });
   const productQuery = useAdminProductQuery(productId);
   const categoriesQuery = useAdminCategoriesQuery();
   const updateMutation = useUpdateAdminProductMutation();
@@ -89,7 +94,7 @@ export function AdminProductDetailPageContent({
             title="No encontramos este producto"
             description="Puede que el identificador no exista en el catálogo."
             action={
-              <Link href="/admin/products" className={buttonClassName("secondary")}>
+              <Link href={listHref} className={buttonClassName("secondary")}>
                 Volver al listado
               </Link>
             }
@@ -119,7 +124,7 @@ export function AdminProductDetailPageContent({
   return (
     <Container as="main" className="py-10 md:py-16">
       <Link
-        href="/admin/products"
+        href={listHref}
         className={`${buttonClassName("ghost")} mb-4 px-0`}
       >
         Volver al listado
@@ -243,7 +248,7 @@ export function AdminProductDetailPageContent({
         <Button
           type="button"
           variant="secondary"
-          onClick={() => router.push("/admin/products")}
+          onClick={() => router.push(listHref)}
         >
           Volver al listado
         </Button>

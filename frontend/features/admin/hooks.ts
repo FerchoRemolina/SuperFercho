@@ -27,12 +27,14 @@ import {
   getAdminProduct,
   getAdminProductType,
   getAdminProductVariant,
+  getAdminSalesPeriodSummary,
   listAdminCategories,
   listAdminKnowledgeDocuments,
   listAdminOrders,
   listAdminProducts,
   listAdminProductTypes,
   listAdminProductVariants,
+  listAdminRecentBuyers,
   processAdminKnowledgeDocument,
   reactivateAdminKnowledgeDocument,
   restoreAdminProduct,
@@ -53,6 +55,7 @@ import {
   type ListAdminOrdersQuery,
   type ListAdminProductsQuery,
   type ReplaceAdminKnowledgeDocumentContentRequest,
+  type SalesPeriodGranularity,
   type SearchAdminKnowledgeQuery,
   type UpdateAdminCategoryRequest,
   type UpdateAdminProductRequest,
@@ -477,6 +480,28 @@ export function useAdminOrdersQuery(query: ListAdminOrdersQuery) {
   return useQuery({
     queryKey: keys.orders(query),
     queryFn: () => listAdminOrders(query),
+    enabled: isAdminRole(session?.role),
+  });
+}
+
+export function useAdminSalesPeriodSummaryQuery(
+  granularity: SalesPeriodGranularity,
+) {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.salesPeriod(granularity),
+    queryFn: () => getAdminSalesPeriodSummary(granularity),
+    enabled: isAdminRole(session?.role),
+  });
+}
+
+export function useAdminRecentBuyersQuery(limit = 8) {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.recentBuyers(limit),
+    queryFn: () => listAdminRecentBuyers(limit),
     enabled: isAdminRole(session?.role),
   });
 }

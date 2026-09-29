@@ -9,7 +9,6 @@ import com.superfercho.platform.demo.LocalDemoDataRunner.DatasetProduct;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -48,7 +47,8 @@ public final class HistoricalDemoProductIndex {
                 throw new IllegalStateException("Historical demo references unknown dataset product: " + code);
             }
             List<Product> matches = products.stream()
-                    .filter(product -> matches(expected, product, variantNames.get(product.productVariantId())))
+                    .filter(product -> LocalDemoDataRunner.matchesDatasetProduct(
+                            expected, product, variantNames.get(product.productVariantId())))
                     .toList();
             if (matches.size() != 1) {
                 throw new IllegalStateException(
@@ -86,40 +86,6 @@ public final class HistoricalDemoProductIndex {
                 .distinct()
                 .sorted()
                 .toList();
-    }
-
-    private static boolean matches(DatasetProduct expected, Product actual, String variantName) {
-        if (hasText(expected.barcode())) {
-            return expected.barcode().equals(actual.barcode());
-        }
-        if (!normalize(expected.name()).equals(normalize(actual.name()))) {
-            return false;
-        }
-        if (!normalizeNullable(expected.brand()).equals(normalizeNullable(actual.brand()))) {
-            return false;
-        }
-        if (expected.price().compareTo(actual.price().amount()) != 0) {
-            return false;
-        }
-        if (hasText(expected.description()) || hasText(actual.description())) {
-            return normalizeNullable(expected.description()).equals(normalizeNullable(actual.description()));
-        }
-        if (hasText(expected.variant())) {
-            return normalize(expected.variant()).equals(normalizeNullable(variantName));
-        }
-        return !hasText(variantName);
-    }
-
-    private static boolean hasText(String value) {
-        return value != null && !value.isBlank();
-    }
-
-    private static String normalize(String value) {
-        return value.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private static String normalizeNullable(String value) {
-        return value == null || value.isBlank() ? "" : normalize(value);
     }
 
     /** Package-visible for tests verifying BigDecimal equality helpers. */

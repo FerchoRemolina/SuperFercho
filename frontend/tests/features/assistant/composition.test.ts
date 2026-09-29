@@ -11,7 +11,7 @@ function source(relativePath: string): string {
 
 describe("assistant composition", () => {
   it("replaces the assistant placeholder with the real chat UI", () => {
-    const page = source("app/(customer)/assistant/page.tsx");
+    const page = source("app/(storefront)/(customer)/assistant/page.tsx");
     expect(page).toContain("AssistantChat");
     expect(page).not.toContain("PlaceholderScreen");
     expect(page).not.toContain("aún no está disponible");
@@ -62,7 +62,7 @@ describe("assistant composition", () => {
 
   it("exposes Fercho in customer navigation and home without unavailable copy", () => {
     const header = source("shared/ui/site-header.tsx");
-    const home = source("app/page.tsx");
+    const home = source("app/(storefront)/page.tsx");
     expect(header).toContain('href="/assistant"');
     expect(header).toContain("Fercho");
     expect(home).toContain('href="/assistant"');

@@ -118,8 +118,44 @@ function formatPresentationQuantityDisplay(quantity: number): string {
   return String(quantity);
 }
 
-export function adminProductDetailHref(productId: string): string {
-  return `/admin/products/${encodeURIComponent(productId)}`;
+export function adminProductDetailHref(
+  productId: string,
+  listQuery?: {
+    text?: string;
+    categoryId?: string;
+    status?: ProductStatus | "";
+  },
+): string {
+  const base = `/admin/products/${encodeURIComponent(productId)}`;
+  if (!listQuery) {
+    return base;
+  }
+  const listHref = adminProductsHref(listQuery);
+  const queryIndex = listHref.indexOf("?");
+  if (queryIndex === -1) {
+    return base;
+  }
+  return `${base}${listHref.slice(queryIndex)}`;
+}
+
+/**
+ * Rebuilds the products list URL from detail-page (or list) search params.
+ * Ignores unrelated params such as {@code created}.
+ */
+export function adminProductsListHrefFromSearchParams(params: {
+  text?: string | null;
+  categoryId?: string | null;
+  status?: string | null;
+}): string {
+  const listQuery = listQueryFromSearchParams({
+    categoryId: params.categoryId ?? undefined,
+    status: params.status ?? undefined,
+  });
+  return adminProductsHref({
+    text: params.text ?? "",
+    categoryId: listQuery.categoryId,
+    status: listQuery.status ?? "",
+  });
 }
 
 export function categoryStatusLabel(status: CategoryStatus): string {
@@ -546,14 +582,271 @@ export const ADMIN_NAV_LINKS = [
   { href: "/admin", label: "Inicio", match: "exact" as const },
   { href: "/admin/products", label: "Productos", match: "prefix" as const },
   { href: "/admin/categories", label: "Categorías", match: "prefix" as const },
+  {
+    href: "/admin/inventory",
+    label: "Control de inventario",
+    match: "prefix" as const,
+  },
   { href: "/admin/orders", label: "Pedidos", match: "prefix" as const },
   {
+    href: "/admin/customers",
+    label: "Gestión de clientes",
+    match: "prefix" as const,
+  },
+  {
     href: "/admin/knowledge",
-    label: "Base de conocimiento",
+    label: "Fercho",
     match: "prefix" as const,
   },
 ];
 
+export type AdminNavLeaf = {
+  kind: "leaf";
+  href: string;
+  label: string;
+  match: "exact" | "prefix";
+};
+
+export type AdminNavGroup = {
+  kind: "group";
+  id: string;
+  label: string;
+  /** Optional badge count (e.g. inventory attention). */
+  badgeKey?: "inventoryAttention";
+  children: AdminNavNode[];
+};
+
+export type AdminNavNode = AdminNavLeaf | AdminNavGroup;
+
+/**
+ * Vertical Admin Hub navigation. Labels are user-facing; routes reuse existing
+ * capabilities (except structural /admin/customers and /admin/inventory).
+ */
+export const ADMIN_NAV_TREE: AdminNavNode[] = [
+  { kind: "leaf", href: "/admin", label: "Inicio", match: "exact" },
+  {
+    kind: "group",
+    id: "inventory",
+    label: "Inventario",
+    badgeKey: "inventoryAttention",
+    children: [
+      {
+        kind: "leaf",
+        href: "/admin/products",
+        label: "Productos",
+        match: "prefix",
+      },
+      {
+        kind: "leaf",
+        href: "/admin/categories",
+        label: "Categorías",
+        match: "prefix",
+      },
+      {
+        kind: "group",
+        id: "inventory-control",
+        label: "Control de inventario",
+        children: [
+          {
+            kind: "leaf",
+            href: "/admin/inventory/out",
+            label: "Agotados",
+            match: "exact",
+          },
+          {
+            kind: "leaf",
+            href: "/admin/inventory/low",
+            label: "Próximos a agotarse",
+            match: "exact",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    kind: "group",
+    id: "sales",
+    label: "Ventas",
+    children: [
+      {
+        kind: "leaf",
+        href: "/admin/orders",
+        label: "Pedidos",
+        match: "prefix",
+      },
+    ],
+  },
+  {
+    kind: "group",
+    id: "customers",
+    label: "Clientes",
+    children: [
+      {
+        kind: "leaf",
+        href: "/admin/customers",
+        label: "Gestión de clientes",
+        match: "prefix",
+      },
+    ],
+  },
+  {
+    kind: "group",
+    id: "fercho",
+    label: "Fercho",
+    children: [
+      {
+        kind: "leaf",
+        href: "/admin/knowledge",
+        label: "Gestión del conocimiento",
+        match: "prefix",
+      },
+    ],
+  },
+];
+
+export function adminInventoryHref(
+  focus?: "out" | "low" | "all",
+): string {
+  if (focus === "out") {
+    return "/admin/inventory/out";
+  }
+  if (focus === "low") {
+    return "/admin/inventory/low";
+  }
+  return "/admin/inventory";
+}
+
+export function adminCustomersHref(): string {
+  return "/admin/customers";
+}
+
+export function countAdminInventoryAttention(
+  buckets: AdminStockAttentionBuckets,
+): number {
+  return buckets.lowStock.length + buckets.outOfStock.length;
+}
+
+export type RecentlySoldProductRow = {
+  productId: string;
+  productName: string;
+  quantity: number;
+};
+
+/**
+ * Aggregates sold quantities from a sample of recent orders only.
+ * Not a global ranking — use the label “Productos más vendidos recientemente”.
+ */
+export function aggregateRecentlySoldProducts(
+  orders: readonly {
+    items: readonly {
+      productId: string;
+      productName: string;
+      quantity: number;
+    }[];
+  }[],
+  limit = 5,
+): RecentlySoldProductRow[] {
+  const byProduct = new Map<string, RecentlySoldProductRow>();
+  for (const order of orders) {
+    for (const item of order.items) {
+      if (item.quantity <= 0) {
+        continue;
+      }
+      const existing = byProduct.get(item.productId);
+      if (existing) {
+        existing.quantity += item.quantity;
+      } else {
+        byProduct.set(item.productId, {
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+        });
+      }
+    }
+  }
+  return [...byProduct.values()]
+    .sort(
+      (a, b) =>
+        b.quantity - a.quantity ||
+        a.productName.localeCompare(b.productName, "es"),
+    )
+    .slice(0, limit);
+}
+
+/** Joins real catalog fields with middots; omits blank parts. */
+export function formatRecentlySoldProductLabel(args: {
+  name: string;
+  brand?: string | null;
+  variantName?: string | null;
+  presentation?: Presentation | null;
+}): string {
+  const parts: string[] = [args.name.trim()];
+  const brand = args.brand?.trim();
+  if (brand) {
+    parts.push(brand);
+  }
+  const variantName = args.variantName?.trim();
+  if (variantName) {
+    parts.push(variantName);
+  }
+  if (args.presentation) {
+    parts.push(formatAdminPresentation(args.presentation));
+  }
+  return parts.join(" · ");
+}
+
+/**
+ * Ensures products that share a display name are distinguishable using catalog
+ * brand, variant name and presentation when available.
+ */
+export function withDisambiguatedRecentlySoldLabels(
+  rows: readonly RecentlySoldProductRow[],
+  catalogById: ReadonlyMap<string, AdminProduct>,
+  variantNameById: ReadonlyMap<string, string>,
+): RecentlySoldProductRow[] {
+  const resolvedNames = rows.map((row) => {
+    const product = catalogById.get(row.productId);
+    return product?.name?.trim() || row.productName;
+  });
+  const nameCounts = new Map<string, number>();
+  for (const name of resolvedNames) {
+    nameCounts.set(name, (nameCounts.get(name) ?? 0) + 1);
+  }
+
+  return rows.map((row, index) => {
+    const product = catalogById.get(row.productId);
+    const baseName = resolvedNames[index] ?? row.productName;
+    if ((nameCounts.get(baseName) ?? 0) <= 1) {
+      return { ...row, productName: baseName };
+    }
+    return {
+      ...row,
+      productName: formatRecentlySoldProductLabel({
+        name: baseName,
+        brand: product?.brand ?? null,
+        variantName: product?.productVariantId
+          ? (variantNameById.get(product.productVariantId) ?? null)
+          : null,
+        presentation: product?.presentation ?? null,
+      }),
+    };
+  });
+}
+
+export function salesPeriodGranularityLabel(
+  granularity: "DAY" | "WEEK" | "MONTH" | "YEAR",
+): string {
+  switch (granularity) {
+    case "DAY":
+      return "Día";
+    case "WEEK":
+      return "Semana";
+    case "MONTH":
+      return "Mes";
+    case "YEAR":
+      return "Año";
+  }
+}
 
 export function isAdminNavActive(
   href: string,
@@ -564,4 +857,89 @@ export function isAdminNavActive(
     return pathname === href;
   }
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+export function isAdminNavNodeActive(
+  node: AdminNavNode,
+  pathname: string,
+): boolean {
+  if (node.kind === "leaf") {
+    return isAdminNavActive(node.href, pathname, node.match);
+  }
+  if (node.id === "inventory-control") {
+    return pathname.startsWith("/admin/inventory");
+  }
+  if (node.id === "inventory") {
+    return (
+      pathname.startsWith("/admin/products") ||
+      pathname.startsWith("/admin/categories") ||
+      pathname.startsWith("/admin/inventory")
+    );
+  }
+  return node.children.some((child) => isAdminNavNodeActive(child, pathname));
+}
+
+export type AdminBreadcrumbItem = {
+  label: string;
+  href?: string;
+};
+
+export function adminBreadcrumbsForPath(pathname: string): AdminBreadcrumbItem[] {
+  if (pathname === "/admin" || pathname === "/admin/") {
+    return [{ label: "Inicio" }];
+  }
+  if (pathname.startsWith("/admin/products")) {
+    return [
+      { label: "Inventario", href: "/admin/products" },
+      { label: "Productos" },
+    ];
+  }
+  if (pathname.startsWith("/admin/categories")) {
+    return [
+      { label: "Inventario", href: "/admin/categories" },
+      { label: "Categorías" },
+    ];
+  }
+  if (pathname === "/admin/inventory/out") {
+    return [
+      { label: "Inventario", href: "/admin/inventory" },
+      { label: "Control de inventario", href: "/admin/inventory" },
+      { label: "Agotados" },
+    ];
+  }
+  if (pathname === "/admin/inventory/low") {
+    return [
+      { label: "Inventario", href: "/admin/inventory" },
+      { label: "Control de inventario", href: "/admin/inventory" },
+      { label: "Próximos a agotarse" },
+    ];
+  }
+  if (pathname.startsWith("/admin/inventory")) {
+    return [
+      { label: "Inventario", href: "/admin/inventory" },
+      { label: "Control de inventario" },
+    ];
+  }
+  if (pathname.startsWith("/admin/orders")) {
+    return [
+      { label: "Ventas", href: "/admin/orders" },
+      { label: "Pedidos" },
+    ];
+  }
+  if (pathname.startsWith("/admin/customers")) {
+    return [
+      { label: "Clientes", href: "/admin/customers" },
+      { label: "Gestión de clientes" },
+    ];
+  }
+  if (pathname.startsWith("/admin/knowledge")) {
+    return [
+      { label: "Fercho", href: "/admin/knowledge" },
+      { label: "Gestión del conocimiento" },
+    ];
+  }
+  if (pathname.startsWith("/admin/payments")) {
+    return [{ label: "Pagos" }];
+  }
+  return [{ label: "Administración" }];
 }

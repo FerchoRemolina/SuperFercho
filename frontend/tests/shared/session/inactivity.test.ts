@@ -179,7 +179,7 @@ describe("inactivity composition", () => {
   it("mounts the detector once in SessionProvider for Admin only", () => {
     const provider = source("shared/session/session-provider.tsx");
     const hook = source("shared/session/use-inactivity-session.ts");
-    const customerLayout = source("app/(customer)/layout.tsx");
+    const customerLayout = source("app/(storefront)/(customer)/layout.tsx");
     const adminLayout = source("app/(admin)/layout.tsx");
 
     expect(provider).toContain("useInactivitySession");

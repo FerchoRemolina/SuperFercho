@@ -15,8 +15,10 @@ import com.superfercho.orders.application.usecase.CancelAndDeletePreviewOrdersUs
 import com.superfercho.orders.application.usecase.CancelOrderUseCase;
 import com.superfercho.orders.application.usecase.CheckoutUseCase;
 import com.superfercho.orders.application.usecase.GetAdminOrderUseCase;
+import com.superfercho.orders.application.usecase.GetAdminSalesPeriodSummaryUseCase;
 import com.superfercho.orders.application.usecase.GetOrderUseCase;
 import com.superfercho.orders.application.usecase.ListAdminOrdersUseCase;
+import com.superfercho.orders.application.usecase.ListAdminRecentBuyersUseCase;
 import com.superfercho.orders.application.usecase.ListOrdersUseCase;
 import com.superfercho.orders.infrastructure.clock.SystemClockAdapter;
 import java.time.Clock;
@@ -102,6 +104,18 @@ public class OrdersUseCaseConfiguration {
     @Bean
     ListAdminOrdersUseCase listAdminOrdersUseCase(OrderRepository orderRepository) {
         return new ListAdminOrdersUseCase(orderRepository);
+    }
+
+    @Bean
+    GetAdminSalesPeriodSummaryUseCase getAdminSalesPeriodSummaryUseCase(
+            OrderRepository orderRepository, ClockProvider ordersClockProvider) {
+        return new GetAdminSalesPeriodSummaryUseCase(orderRepository, ordersClockProvider);
+    }
+
+    @Bean
+    ListAdminRecentBuyersUseCase listAdminRecentBuyersUseCase(
+            OrderRepository orderRepository, ClockProvider ordersClockProvider) {
+        return new ListAdminRecentBuyersUseCase(orderRepository, ordersClockProvider);
     }
 
     @Bean

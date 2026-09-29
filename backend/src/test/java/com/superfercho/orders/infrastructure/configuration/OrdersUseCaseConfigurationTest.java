@@ -16,8 +16,10 @@ import com.superfercho.orders.application.port.in.CancelOrderUseCase;
 import com.superfercho.orders.application.port.in.CheckoutUseCase;
 import com.superfercho.orders.application.usecase.AdvanceOrderLifecycleUseCase;
 import com.superfercho.orders.application.usecase.GetAdminOrderUseCase;
+import com.superfercho.orders.application.usecase.GetAdminSalesPeriodSummaryUseCase;
 import com.superfercho.orders.application.usecase.GetOrderUseCase;
 import com.superfercho.orders.application.usecase.ListAdminOrdersUseCase;
+import com.superfercho.orders.application.usecase.ListAdminRecentBuyersUseCase;
 import com.superfercho.orders.application.usecase.ListOrdersUseCase;
 import com.superfercho.orders.infrastructure.clock.SystemClockAdapter;
 import com.superfercho.platform.time.ClockConfiguration;
@@ -121,6 +123,12 @@ class OrdersUseCaseConfigurationTest {
     private ListAdminOrdersUseCase listAdminOrdersUseCase;
 
     @Autowired
+    private GetAdminSalesPeriodSummaryUseCase getAdminSalesPeriodSummaryUseCase;
+
+    @Autowired
+    private ListAdminRecentBuyersUseCase listAdminRecentBuyersUseCase;
+
+    @Autowired
     private AdvanceOrderLifecycleUseCase advanceOrderLifecycleUseCase;
 
     @Test
@@ -136,6 +144,8 @@ class OrdersUseCaseConfigurationTest {
         assertThat(listOrdersUseCase).isNotNull();
         assertThat(getAdminOrderUseCase).isNotNull();
         assertThat(listAdminOrdersUseCase).isNotNull();
+        assertThat(getAdminSalesPeriodSummaryUseCase).isNotNull();
+        assertThat(listAdminRecentBuyersUseCase).isNotNull();
         assertThat(advanceOrderLifecycleUseCase).isNotNull();
         assertThat(applicationContext.getBeanNamesForType(
                         com.superfercho.orders.application.usecase.CheckoutUseCase.class))

@@ -18,6 +18,7 @@ import {
   adminPaymentDetailErrorKind,
   adminPaymentHref,
   adminProductsHref,
+  adminProductsListHrefFromSearchParams,
   canActivateProduct,
   canArchiveProduct,
   canDeactivateKnowledgeDocument,
@@ -101,6 +102,18 @@ describe("admin presentation", () => {
     );
   });
 
+  it("builds clean list href when there are no filters", () => {
+    expect(adminProductsHref({})).toBe("/admin/products");
+    expect(adminProductsHref({ text: "   " })).toBe("/admin/products");
+    expect(
+      adminProductsListHrefFromSearchParams({
+        text: null,
+        categoryId: null,
+        status: null,
+      }),
+    ).toBe("/admin/products");
+  });
+
   it("builds search href without category or status filters", () => {
     expect(
       adminProductsHref({
@@ -125,6 +138,48 @@ describe("admin presentation", () => {
       status: "ARCHIVED",
     });
     expect(listQueryFromSearchParams({ status: "UNKNOWN" })).toEqual({});
+  });
+
+  it("preserves list filters on product detail href and back link", () => {
+    const productId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+    const categoryId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+
+    expect(
+      adminProductDetailHref(productId, {
+        categoryId,
+        status: "ACTIVE",
+      }),
+    ).toBe(
+      `/admin/products/${productId}?categoryId=${categoryId}&status=ACTIVE`,
+    );
+
+    expect(
+      adminProductDetailHref(productId, {
+        text: "detergente",
+        categoryId,
+        status: "ACTIVE",
+      }),
+    ).toBe(`/admin/products/${productId}?text=detergente`);
+
+    expect(adminProductDetailHref(productId)).toBe(
+      `/admin/products/${productId}`,
+    );
+
+    expect(
+      adminProductsListHrefFromSearchParams({
+        text: null,
+        categoryId,
+        status: "ACTIVE",
+      }),
+    ).toBe(`/admin/products?categoryId=${categoryId}&status=ACTIVE`);
+
+    expect(
+      adminProductsListHrefFromSearchParams({
+        text: "detergente",
+        categoryId,
+        status: "ACTIVE",
+      }),
+    ).toBe("/admin/products?text=detergente");
   });
 
   it("labels and tones product statuses", () => {
@@ -518,10 +573,10 @@ describe("admin knowledge presentation", () => {
     expect(paymentStatusTone("DECLINED")).toBe("danger");
   });
 
-  it("labels the knowledge nav as Base de conocimiento", () => {
+  it("labels the knowledge nav as Fercho", () => {
     const knowledge = ADMIN_NAV_LINKS.find(
       (link) => link.href === "/admin/knowledge",
     );
-    expect(knowledge?.label).toBe("Base de conocimiento");
+    expect(knowledge?.label).toBe("Fercho");
   });
 });

@@ -10,6 +10,7 @@ import {
   useAdminProductsQuery,
 } from "@/features/admin/hooks";
 import {
+  adminProductDetailHref,
   adminProductsHref,
   listQueryFromSearchParams,
   shouldSearchAdminProducts,
@@ -229,7 +230,11 @@ export function AdminProductsPageContent() {
                   </p>
                   <div className="grid gap-2">
                     <Link
-                      href={`/admin/products/${product.id}`}
+                      href={adminProductDetailHref(product.id, {
+                        text,
+                        categoryId: listQuery.categoryId,
+                        status: listQuery.status,
+                      })}
                       className={buttonClassName("secondary")}
                     >
                       Ver y editar
@@ -284,7 +289,11 @@ export function AdminProductsPageContent() {
                     <td className="px-3 py-4">
                       <div className="grid max-w-56 gap-2">
                         <Link
-                          href={`/admin/products/${product.id}`}
+                          href={adminProductDetailHref(product.id, {
+                            text,
+                            categoryId: listQuery.categoryId,
+                            status: listQuery.status,
+                          })}
                           className={buttonClassName("secondary")}
                         >
                           Ver y editar

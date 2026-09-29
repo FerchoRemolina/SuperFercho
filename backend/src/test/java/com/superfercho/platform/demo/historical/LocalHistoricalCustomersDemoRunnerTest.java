@@ -48,6 +48,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -486,6 +487,17 @@ class LocalHistoricalCustomersDemoRunnerTest {
         @Override
         public List<Order> findInProgressForLifecycle() {
             return List.of();
+        }
+
+        @Override
+        public List<Order> findCreatedBetweenExcludingStatus(
+                Instant fromInclusive, Instant toExclusive, OrderStatus excludedStatus) {
+            return orders.values().stream()
+                    .filter(order -> !order.createdAt().isBefore(fromInclusive))
+                    .filter(order -> order.createdAt().isBefore(toExclusive))
+                    .filter(order -> order.status() != excludedStatus)
+                    .sorted(Comparator.comparing(Order::createdAt))
+                    .toList();
         }
 
         @Override

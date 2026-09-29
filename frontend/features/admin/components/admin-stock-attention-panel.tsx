@@ -30,8 +30,17 @@ import { Skeleton } from "@/shared/ui/skeleton";
 import { cx } from "@/shared/utils/cx";
 
 type StockSectionKind = "low" | "out";
+export type AdminStockFocus = "all" | "low" | "out";
 
-export function AdminStockAttentionPanel() {
+export function AdminStockAttentionPanel({
+  focus = "all",
+  showHeading = true,
+  className,
+}: {
+  focus?: AdminStockFocus;
+  showHeading?: boolean;
+  className?: string;
+}) {
   const productsQuery = useAdminProductsQuery({ status: "ACTIVE" });
   const categoriesQuery = useAdminCategoriesQuery();
 
@@ -50,11 +59,15 @@ export function AdminStockAttentionPanel() {
 
   const loading = productsQuery.isPending || categoriesQuery.isPending;
   const failed = productsQuery.isError;
+  const showLow = focus === "all" || focus === "low";
+  const showOut = focus === "all" || focus === "out";
+  const lowTitle =
+    focus === "low" ? "Próximos a agotarse" : "Quedan pocas unidades";
 
   return (
     <section
-      className="mt-10 md:mt-12"
-      aria-labelledby="admin-stock-heading"
+      className={cx(className ?? "mt-10 md:mt-12")}
+      aria-labelledby={showHeading ? "admin-stock-heading" : undefined}
     >
       <div
         className={cx(
@@ -62,20 +75,22 @@ export function AdminStockAttentionPanel() {
           "shadow-[0_2px_10px_rgba(23,33,27,0.04)] md:p-6",
         )}
       >
-        <div className="mb-5 flex items-center gap-3 px-1">
-          <span
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-800 ring-1 ring-amber-200/80"
-            aria-hidden="true"
-          >
-            <PackageIcon className="h-6 w-6" />
-          </span>
-          <h2
-            id="admin-stock-heading"
-            className="text-xl font-bold tracking-tight text-sf-ink md:text-2xl"
-          >
-            Control de inventario
-          </h2>
-        </div>
+        {showHeading ? (
+          <div className="mb-5 flex items-center gap-3 px-1">
+            <span
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-800 ring-1 ring-amber-200/80"
+              aria-hidden="true"
+            >
+              <PackageIcon className="h-6 w-6" />
+            </span>
+            <h2
+              id="admin-stock-heading"
+              className="text-xl font-bold tracking-tight text-sf-ink md:text-2xl"
+            >
+              Control de inventario
+            </h2>
+          </div>
+        ) : null}
 
         {loading ? <StockPanelSkeleton /> : null}
 
@@ -88,23 +103,32 @@ export function AdminStockAttentionPanel() {
         ) : null}
 
         {!loading && !failed ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            <StockAttentionSection
-              kind="low"
-              title="Quedan pocas unidades"
-              emptyTitle="¡Todo bajo control!"
-              emptyMessage={ADMIN_STOCK_LOW_EMPTY_MESSAGE}
-              products={buckets.lowStock}
-              categoriesById={categoriesById}
-            />
-            <StockAttentionSection
-              kind="out"
-              title="Agotados"
-              emptyTitle="Sin productos agotados"
-              emptyMessage={ADMIN_STOCK_OUT_EMPTY_MESSAGE}
-              products={buckets.outOfStock}
-              categoriesById={categoriesById}
-            />
+          <div
+            className={cx(
+              "grid gap-4",
+              showLow && showOut ? "md:grid-cols-2" : "md:grid-cols-1",
+            )}
+          >
+            {showLow ? (
+              <StockAttentionSection
+                kind="low"
+                title={lowTitle}
+                emptyTitle="¡Todo bajo control!"
+                emptyMessage={ADMIN_STOCK_LOW_EMPTY_MESSAGE}
+                products={buckets.lowStock}
+                categoriesById={categoriesById}
+              />
+            ) : null}
+            {showOut ? (
+              <StockAttentionSection
+                kind="out"
+                title="Agotados"
+                emptyTitle="Sin productos agotados"
+                emptyMessage={ADMIN_STOCK_OUT_EMPTY_MESSAGE}
+                products={buckets.outOfStock}
+                categoriesById={categoriesById}
+              />
+            ) : null}
           </div>
         ) : null}
       </div>

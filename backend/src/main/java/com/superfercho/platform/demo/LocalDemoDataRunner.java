@@ -10,17 +10,22 @@ import com.superfercho.catalog.application.dto.CreateProductVariantCommand;
 import com.superfercho.catalog.application.dto.DeactivateProductCommand;
 import com.superfercho.catalog.application.dto.ProductResult;
 import com.superfercho.catalog.application.dto.ProductVariantResult;
+import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.application.port.ProductRepository;
 import com.superfercho.catalog.application.port.ProductTypeRepository;
+import com.superfercho.catalog.application.port.ProductVariantRepository;
 import com.superfercho.catalog.application.usecase.ArchiveProductUseCase;
 import com.superfercho.catalog.application.usecase.CreateCategoryUseCase;
 import com.superfercho.catalog.application.usecase.CreateProductUseCase;
 import com.superfercho.catalog.application.usecase.CreateProductVariantUseCase;
 import com.superfercho.catalog.application.usecase.DeactivateProductUseCase;
+import com.superfercho.catalog.domain.model.Category;
 import com.superfercho.catalog.domain.model.Presentation;
 import com.superfercho.catalog.domain.model.PresentationUnit;
+import com.superfercho.catalog.domain.model.Product;
 import com.superfercho.catalog.domain.model.ProductType;
 import com.superfercho.catalog.domain.model.ProductTypeStatus;
+import com.superfercho.catalog.domain.model.ProductVariant;
 import com.superfercho.knowledge.application.dto.CreateDocumentCommand;
 import com.superfercho.knowledge.application.dto.DocumentResult;
 import com.superfercho.knowledge.application.dto.ListDocumentsCommand;
@@ -47,6 +52,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -58,7 +64,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Local-profile base catalog and knowledge documents. Separate from Flyway schema
- * migrations. Idempotent: skips when catalog products or knowledge documents already
+ * migrations. Idempotent: seeds only missing dataset product identities; skips when all
+ * loadable products are already present. Knowledge seed skips when documents already
  * exist. Document processing is best-effort (requires OpenAI when configured).
  *
  * <p>Catalog seed reads {@code docs/dataset/superfercho-dataset-156.json}. Products whose
@@ -89,6 +96,8 @@ public class LocalDemoDataRunner implements ApplicationRunner {
 
     private final ProductRepository productRepository;
     private final ProductTypeRepository productTypeRepository;
+    private final CategoryRepository categoryRepository;
+    private final ProductVariantRepository productVariantRepository;
     private final KnowledgeDocumentRepository documentRepository;
     private final CreateCategoryUseCase createCategoryUseCase;
     private final CreateProductUseCase createProductUseCase;
@@ -104,6 +113,8 @@ public class LocalDemoDataRunner implements ApplicationRunner {
     public LocalDemoDataRunner(
             ProductRepository productRepository,
             ProductTypeRepository productTypeRepository,
+            CategoryRepository categoryRepository,
+            ProductVariantRepository productVariantRepository,
             KnowledgeDocumentRepository documentRepository,
             CreateCategoryUseCase createCategoryUseCase,
             CreateProductUseCase createProductUseCase,
@@ -117,6 +128,8 @@ public class LocalDemoDataRunner implements ApplicationRunner {
             @Value("${superfercho.dev.demo-seed.enabled:true}") boolean enabled) {
         this.productRepository = productRepository;
         this.productTypeRepository = productTypeRepository;
+        this.categoryRepository = categoryRepository;
+        this.productVariantRepository = productVariantRepository;
         this.documentRepository = documentRepository;
         this.createCategoryUseCase = createCategoryUseCase;
         this.createProductUseCase = createProductUseCase;
@@ -141,11 +154,6 @@ public class LocalDemoDataRunner implements ApplicationRunner {
     }
 
     void seedCatalogIfEmpty() {
-        if (!productRepository.findAll().isEmpty()) {
-            LOGGER.info("Local base catalog already present; skipping catalog seed");
-            return;
-        }
-
         List<DatasetProduct> dataset = loadDatasetProducts();
         if (dataset.size() != DATASET_DEFINED_COUNT) {
             throw new IllegalStateException(
@@ -160,21 +168,40 @@ public class LocalDemoDataRunner implements ApplicationRunner {
                             + loadable.size() + " / " + pending.size());
         }
 
+        List<Product> existing = productRepository.findAll();
+        Map<UUID, String> variantNames = loadVariantNames(existing);
+        List<DatasetProduct> missing = loadable.stream()
+                .filter(expected -> existing.stream()
+                        .noneMatch(product -> matchesDatasetProduct(
+                                expected, product, variantNames.get(product.productVariantId()))))
+                .toList();
+
+        if (missing.isEmpty()) {
+            LOGGER.info("Local base catalog already present; skipping catalog seed");
+            return;
+        }
+
+        if (!existing.isEmpty()) {
+            LOGGER.info(
+                    "Local base catalog incomplete ({} present, {} missing dataset identities); seeding missing products",
+                    existing.size(),
+                    missing.size());
+        }
+
         Map<String, List<DatasetProduct>> byCategory = new LinkedHashMap<>();
-        for (DatasetProduct product : loadable) {
+        for (DatasetProduct product : missing) {
             byCategory.computeIfAbsent(product.category(), ignored -> new ArrayList<>()).add(product);
         }
 
+        Map<String, CategoryTypeIds> categoryTypeCache = new HashMap<>();
         Map<String, UUID> variantCache = new HashMap<>();
         int productCount = 0;
         int inactiveCount = 0;
         int archivedCount = 0;
         for (Map.Entry<String, List<DatasetProduct>> entry : byCategory.entrySet()) {
-            String categoryName = entry.getKey();
-            UUID categoryId = createCategory(categoryName, null);
-            UUID productTypeId = createProductType(categoryId, categoryName);
+            CategoryTypeIds categoryType = resolveCategoryAndType(entry.getKey(), categoryTypeCache);
             for (DatasetProduct product : entry.getValue()) {
-                ProductResult created = createProduct(productTypeId, product, variantCache);
+                ProductResult created = createProduct(categoryType.productTypeId(), product, variantCache);
                 applyStatus(created.id(), product.status());
                 if ("INACTIVE".equals(product.status())) {
                     inactiveCount++;
@@ -186,7 +213,7 @@ public class LocalDemoDataRunner implements ApplicationRunner {
         }
 
         LOGGER.info(
-                "Local base catalog seeded ({} categories, {} products; {} inactive, {} archived). Pending non-representable presentations ({}): {}",
+                "Local base catalog seeded ({} categories touched, {} products; {} inactive, {} archived). Pending non-representable presentations ({}): {}",
                 byCategory.size(),
                 productCount,
                 inactiveCount,
@@ -258,6 +285,39 @@ public class LocalDemoDataRunner implements ApplicationRunner {
         return created.id();
     }
 
+    private CategoryTypeIds resolveCategoryAndType(String categoryName, Map<String, CategoryTypeIds> cache) {
+        CategoryTypeIds cached = cache.get(categoryName);
+        if (cached != null) {
+            return cached;
+        }
+
+        Category existingCategory = categoryRepository.findAll().stream()
+                .filter(category -> category.name().equalsIgnoreCase(categoryName))
+                .findFirst()
+                .orElse(null);
+
+        UUID categoryId;
+        UUID productTypeId;
+        if (existingCategory != null) {
+            categoryId = existingCategory.id();
+            List<ProductType> types = productTypeRepository.findByCategoryId(categoryId);
+            productTypeId = types.stream()
+                    .filter(type -> type.name().equalsIgnoreCase(categoryName))
+                    .map(ProductType::id)
+                    .findFirst()
+                    .orElseGet(() -> types.isEmpty()
+                            ? createProductType(categoryId, categoryName)
+                            : types.getFirst().id());
+        } else {
+            categoryId = createCategory(categoryName, null);
+            productTypeId = createProductType(categoryId, categoryName);
+        }
+
+        CategoryTypeIds resolved = new CategoryTypeIds(categoryId, productTypeId);
+        cache.put(categoryName, resolved);
+        return resolved;
+    }
+
     private UUID createProductType(UUID categoryId, String categoryName) {
         Instant now = clock.instant();
         ProductType saved = productTypeRepository.save(ProductType.create(
@@ -296,10 +356,30 @@ public class LocalDemoDataRunner implements ApplicationRunner {
         if (cached != null) {
             return cached;
         }
+        UUID existingId = productVariantRepository.findByProductTypeId(productTypeId).stream()
+                .filter(variant -> normalize(variant.name()).equals(normalize(variantName)))
+                .map(ProductVariant::id)
+                .findFirst()
+                .orElse(null);
+        if (existingId != null) {
+            variantCache.put(cacheKey, existingId);
+            return existingId;
+        }
         ProductVariantResult created = createProductVariantUseCase.execute(
                 new CreateProductVariantCommand(productTypeId, variantName, null));
         variantCache.put(cacheKey, created.id());
         return created.id();
+    }
+
+    private Map<UUID, String> loadVariantNames(List<Product> products) {
+        return productVariantRepository
+                .findByIds(products.stream()
+                        .map(Product::productVariantId)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .toList())
+                .stream()
+                .collect(Collectors.toMap(ProductVariant::id, ProductVariant::name));
     }
 
     private void applyStatus(UUID productId, String status) {
@@ -336,6 +416,44 @@ public class LocalDemoDataRunner implements ApplicationRunner {
 
     static List<DatasetProduct> loadableProducts(List<DatasetProduct> dataset) {
         return dataset.stream().filter(LocalDemoDataRunner::isLoadable).toList();
+    }
+
+    /**
+     * Same identity rules as {@code HistoricalDemoProductIndex}: barcode when present,
+     * otherwise name + brand + price + description/variant.
+     */
+    public static boolean matchesDatasetProduct(DatasetProduct expected, Product actual, String variantName) {
+        if (hasText(expected.barcode())) {
+            return expected.barcode().equals(actual.barcode());
+        }
+        if (!normalize(expected.name()).equals(normalize(actual.name()))) {
+            return false;
+        }
+        if (!normalizeNullable(expected.brand()).equals(normalizeNullable(actual.brand()))) {
+            return false;
+        }
+        if (expected.price().compareTo(actual.price().amount()) != 0) {
+            return false;
+        }
+        if (hasText(expected.description()) || hasText(actual.description())) {
+            return normalizeNullable(expected.description()).equals(normalizeNullable(actual.description()));
+        }
+        if (hasText(expected.variant())) {
+            return normalize(expected.variant()).equals(normalizeNullable(variantName));
+        }
+        return !hasText(variantName);
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private static String normalize(String value) {
+        return value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static String normalizeNullable(String value) {
+        return value == null || value.isBlank() ? "" : normalize(value);
     }
 
     public static List<DatasetProduct> loadDatasetProducts() {
@@ -401,6 +519,9 @@ public class LocalDemoDataRunner implements ApplicationRunner {
         }
 
         throw new IllegalArgumentException("unsupported presentation: " + value);
+    }
+
+    private record CategoryTypeIds(UUID categoryId, UUID productTypeId) {
     }
 
     public record DatasetProduct(

@@ -19,18 +19,23 @@ import com.superfercho.catalog.application.dto.CreateProductVariantCommand;
 import com.superfercho.catalog.application.dto.DeactivateProductCommand;
 import com.superfercho.catalog.application.dto.ProductResult;
 import com.superfercho.catalog.application.dto.ProductVariantResult;
+import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.application.port.ProductRepository;
 import com.superfercho.catalog.application.port.ProductTypeRepository;
+import com.superfercho.catalog.application.port.ProductVariantRepository;
 import com.superfercho.catalog.application.usecase.ArchiveProductUseCase;
 import com.superfercho.catalog.application.usecase.CreateCategoryUseCase;
 import com.superfercho.catalog.application.usecase.CreateProductUseCase;
 import com.superfercho.catalog.application.usecase.CreateProductVariantUseCase;
 import com.superfercho.catalog.application.usecase.DeactivateProductUseCase;
+import com.superfercho.catalog.domain.model.Category;
+import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.domain.model.Presentation;
 import com.superfercho.catalog.domain.model.PresentationUnit;
 import com.superfercho.catalog.domain.model.Product;
 import com.superfercho.catalog.domain.model.ProductStatus;
 import com.superfercho.catalog.domain.model.ProductType;
+import com.superfercho.catalog.domain.model.ProductVariant;
 import com.superfercho.catalog.domain.model.ProductVariantStatus;
 import com.superfercho.knowledge.application.port.KnowledgeDocumentRepository;
 import com.superfercho.knowledge.application.usecase.CreateDocumentUseCase;
@@ -77,6 +82,12 @@ class LocalDemoDataRunnerTest {
     private ProductTypeRepository productTypeRepository;
 
     @Mock
+    private CategoryRepository categoryRepository;
+
+    @Mock
+    private ProductVariantRepository productVariantRepository;
+
+    @Mock
     private KnowledgeDocumentRepository documentRepository;
 
     @Mock
@@ -107,9 +118,15 @@ class LocalDemoDataRunnerTest {
 
     @BeforeEach
     void setUp() {
-        runner = new LocalDemoDataRunner(
+        runner = newRunner(true);
+    }
+
+    private LocalDemoDataRunner newRunner(boolean enabled) {
+        return new LocalDemoDataRunner(
                 productRepository,
                 productTypeRepository,
+                categoryRepository,
+                productVariantRepository,
                 documentRepository,
                 createCategoryUseCase,
                 createProductUseCase,
@@ -120,7 +137,7 @@ class LocalDemoDataRunnerTest {
                 listDocumentsUseCase,
                 processDocumentUseCase,
                 CLOCK,
-                true);
+                enabled);
     }
 
     @Test
@@ -133,20 +150,7 @@ class LocalDemoDataRunnerTest {
 
     @Test
     void skipsWhenDisabled() {
-        runner = new LocalDemoDataRunner(
-                productRepository,
-                productTypeRepository,
-                documentRepository,
-                createCategoryUseCase,
-                createProductUseCase,
-                createProductVariantUseCase,
-                deactivateProductUseCase,
-                archiveProductUseCase,
-                createDocumentUseCase,
-                listDocumentsUseCase,
-                processDocumentUseCase,
-                CLOCK,
-                false);
+        runner = newRunner(false);
 
         runner.run(new DefaultApplicationArguments());
 
@@ -158,7 +162,9 @@ class LocalDemoDataRunnerTest {
 
     @Test
     void skipsCatalogAndKnowledgeWhenAlreadyPresent() {
-        when(productRepository.findAll()).thenReturn(List.of(sampleProduct()));
+        CatalogFixture complete = catalogMatchingAllLoadableExcept(null);
+        when(productRepository.findAll()).thenReturn(complete.products());
+        when(productVariantRepository.findByIds(any())).thenReturn(complete.variants());
         when(documentRepository.findAll()).thenReturn(List.of(mock(KnowledgeDocument.class)));
 
         runner.run(new DefaultApplicationArguments());
@@ -169,6 +175,79 @@ class LocalDemoDataRunnerTest {
         verify(deactivateProductUseCase, never()).execute(any());
         verify(archiveProductUseCase, never()).execute(any());
         verify(createDocumentUseCase, never()).execute(any());
+    }
+
+    @Test
+    void seedsOnlyMissingDatasetIdentitiesWhenCatalogIncomplete() {
+        List<DatasetProduct> loadable =
+                LocalDemoDataRunner.loadableProducts(LocalDemoDataRunner.loadDatasetProducts());
+        DatasetProduct sf127 = loadable.stream()
+                .filter(product -> "SF-127".equals(product.id()))
+                .findFirst()
+                .orElseThrow();
+        CatalogFixture almostComplete = catalogMatchingAllLoadableExcept("SF-127");
+
+        UUID categoryId = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        UUID productTypeId = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        when(productRepository.findAll()).thenReturn(almostComplete.products());
+        when(productVariantRepository.findByIds(any())).thenReturn(almostComplete.variants());
+        when(categoryRepository.findAll())
+                .thenReturn(List.of(Category.create(
+                        categoryId, sf127.category(), null, CategoryStatus.ACTIVE, NOW, NOW)));
+        when(productTypeRepository.findByCategoryId(categoryId))
+                .thenReturn(List.of(ProductType.create(
+                        productTypeId,
+                        categoryId,
+                        sf127.category(),
+                        null,
+                        com.superfercho.catalog.domain.model.ProductTypeStatus.ACTIVE,
+                        NOW,
+                        NOW)));
+        when(productVariantRepository.findByProductTypeId(productTypeId)).thenReturn(List.of());
+        when(createProductVariantUseCase.execute(any(CreateProductVariantCommand.class)))
+                .thenAnswer(invocation -> {
+                    CreateProductVariantCommand command = invocation.getArgument(0);
+                    return new ProductVariantResult(
+                            UUID.randomUUID(),
+                            command.productTypeId(),
+                            command.name(),
+                            null,
+                            ProductVariantStatus.ACTIVE,
+                            NOW,
+                            NOW);
+                });
+        when(createProductUseCase.execute(any(CreateProductCommand.class)))
+                .thenAnswer(invocation -> {
+                    CreateProductCommand command = invocation.getArgument(0);
+                    return new ProductResult(
+                            UUID.randomUUID(),
+                            categoryId,
+                            command.productTypeId(),
+                            command.productVariantId(),
+                            command.presentation(),
+                            command.barcode(),
+                            command.name(),
+                            command.brand(),
+                            command.description(),
+                            command.price(),
+                            command.stock(),
+                            command.imageUrl(),
+                            ProductStatus.ACTIVE,
+                            NOW,
+                            NOW);
+                });
+
+        runner.seedCatalogIfEmpty();
+
+        ArgumentCaptor<CreateProductCommand> productCaptor = ArgumentCaptor.forClass(CreateProductCommand.class);
+        verify(createProductUseCase, times(1)).execute(productCaptor.capture());
+        verify(createCategoryUseCase, never()).execute(any());
+        CreateProductCommand created = productCaptor.getValue();
+        assertEquals(sf127.name(), created.name());
+        assertEquals(sf127.brand(), created.brand());
+        assertEquals(sf127.description(), created.description());
+        assertEquals(0, sf127.price().compareTo(created.price().amount()));
+        assertEquals(sf127.stock(), created.stock());
     }
 
     @Test
@@ -238,6 +317,9 @@ class LocalDemoDataRunnerTest {
     @Test
     void seedsSixCategoriesAndOneHundredFiftySixLoadableProductsWhenCatalogEmpty() {
         when(productRepository.findAll()).thenReturn(List.of());
+        when(productVariantRepository.findByIds(any())).thenReturn(List.of());
+        when(categoryRepository.findAll()).thenReturn(List.of());
+        when(productVariantRepository.findByProductTypeId(any())).thenReturn(List.of());
         when(documentRepository.findAll()).thenReturn(List.of(mock(KnowledgeDocument.class)));
         when(createCategoryUseCase.execute(any()))
                 .thenAnswer(invocation -> new CategoryResult(
@@ -323,6 +405,9 @@ class LocalDemoDataRunnerTest {
     @Test
     void seedDoesNotDuplicateVariantsWithinProductType() {
         when(productRepository.findAll()).thenReturn(List.of());
+        when(productVariantRepository.findByIds(any())).thenReturn(List.of());
+        when(categoryRepository.findAll()).thenReturn(List.of());
+        when(productVariantRepository.findByProductTypeId(any())).thenReturn(List.of());
         when(createCategoryUseCase.execute(any()))
                 .thenAnswer(invocation -> new CategoryResult(
                         UUID.randomUUID(),
@@ -389,6 +474,9 @@ class LocalDemoDataRunnerTest {
     @Test
     void seedPreservesImageUrlBarcodeAndAppliesStatuses() {
         when(productRepository.findAll()).thenReturn(List.of());
+        when(productVariantRepository.findByIds(any())).thenReturn(List.of());
+        when(categoryRepository.findAll()).thenReturn(List.of());
+        when(productVariantRepository.findByProductTypeId(any())).thenReturn(List.of());
         when(createCategoryUseCase.execute(any()))
                 .thenAnswer(invocation -> new CategoryResult(
                         UUID.randomUUID(),
@@ -503,22 +591,55 @@ class LocalDemoDataRunnerTest {
                 NOW);
     }
 
-    private static Product sampleProduct() {
+    private static CatalogFixture catalogMatchingAllLoadableExcept(String excludedId) {
+        List<Product> products = new java.util.ArrayList<>();
+        List<ProductVariant> variants = new java.util.ArrayList<>();
+        for (DatasetProduct dataset :
+                LocalDemoDataRunner.loadableProducts(LocalDemoDataRunner.loadDatasetProducts())) {
+            if (excludedId != null && excludedId.equals(dataset.id())) {
+                continue;
+            }
+            UUID variantId = null;
+            boolean needsVariantForMatch = (dataset.description() == null || dataset.description().isBlank())
+                    && dataset.variant() != null
+                    && (dataset.barcode() == null || dataset.barcode().isBlank());
+            if (needsVariantForMatch) {
+                variantId = UUID.randomUUID();
+                variants.add(ProductVariant.create(
+                        variantId,
+                        TYPE_ID,
+                        dataset.variant(),
+                        null,
+                        ProductVariantStatus.ACTIVE,
+                        NOW,
+                        NOW));
+            }
+            products.add(productMatchingDataset(dataset, variantId));
+        }
+        return new CatalogFixture(List.copyOf(products), List.copyOf(variants));
+    }
+
+    private static Product productMatchingDataset(DatasetProduct dataset, UUID variantId) {
+        ProductStatus status = ProductStatus.valueOf(dataset.status());
+        int stock = status == ProductStatus.ARCHIVED ? 0 : dataset.stock();
         return Product.create(
-                UUID.fromString("11111111-1111-1111-1111-111111111111"),
-                UUID.fromString("22222222-2222-2222-2222-222222222222"),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
                 TYPE_ID,
-                null,
-                UNIT,
-                "7700000000001",
-                "Leche",
-                "Colanta",
-                "Descripción",
-                Money.cop(new BigDecimal("1000.00")),
-                1,
-                null,
-                ProductStatus.ACTIVE,
+                variantId,
+                LocalDemoDataRunner.parsePresentation(dataset.presentation()),
+                dataset.barcode(),
+                dataset.name(),
+                dataset.brand(),
+                dataset.description(),
+                Money.cop(dataset.price()),
+                stock,
+                dataset.imageUrl(),
+                status,
                 NOW,
                 NOW);
+    }
+
+    private record CatalogFixture(List<Product> products, List<ProductVariant> variants) {
     }
 }

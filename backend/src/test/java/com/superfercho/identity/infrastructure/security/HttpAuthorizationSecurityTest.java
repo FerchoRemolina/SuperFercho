@@ -57,8 +57,10 @@ import com.superfercho.orders.application.dto.PagedResult;
 import com.superfercho.orders.application.dto.PaymentStatus;
 import com.superfercho.orders.application.dto.ShippingAddressResult;
 import com.superfercho.orders.application.usecase.GetAdminOrderUseCase;
+import com.superfercho.orders.application.usecase.GetAdminSalesPeriodSummaryUseCase;
 import com.superfercho.orders.application.usecase.GetOrderUseCase;
 import com.superfercho.orders.application.usecase.ListAdminOrdersUseCase;
+import com.superfercho.orders.application.usecase.ListAdminRecentBuyersUseCase;
 import com.superfercho.orders.application.usecase.ListOrdersUseCase;
 import com.superfercho.orders.domain.model.OrderStatus;
 import com.superfercho.orders.infrastructure.configuration.TransactionalCancelOrderUseCase;
@@ -188,6 +190,12 @@ class HttpAuthorizationSecurityTest {
 
     @MockitoBean
     private ListAdminOrdersUseCase listAdminOrdersUseCase;
+
+    @MockitoBean
+    private GetAdminSalesPeriodSummaryUseCase getAdminSalesPeriodSummaryUseCase;
+
+    @MockitoBean
+    private ListAdminRecentBuyersUseCase listAdminRecentBuyersUseCase;
 
     @MockitoBean
     private FindAdminCustomerByDocumentUseCase findAdminCustomerByDocumentUseCase;

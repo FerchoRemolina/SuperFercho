@@ -74,9 +74,9 @@ describe("shopping lists composition", () => {
   });
 
   it("keeps list pages on customer routes without placeholders", () => {
-    const indexPage = source("app/(customer)/lists/page.tsx");
+    const indexPage = source("app/(storefront)/(customer)/lists/page.tsx");
     const detailPage = source(
-      "app/(customer)/lists/[shoppingListId]/page.tsx",
+      "app/(storefront)/(customer)/lists/[shoppingListId]/page.tsx",
     );
     expect(indexPage).toContain("ListsPageContent");
     expect(indexPage).not.toContain("PlaceholderScreen");

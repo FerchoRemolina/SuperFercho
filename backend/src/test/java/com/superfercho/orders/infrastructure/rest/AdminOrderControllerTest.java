@@ -9,8 +9,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.superfercho.orders.application.dto.AdminRecentBuyerResult;
+import com.superfercho.orders.application.dto.AdminSalesBucketResult;
+import com.superfercho.orders.application.dto.AdminSalesPeriodSummaryResult;
+import com.superfercho.orders.application.dto.GetAdminSalesPeriodSummaryCommand;
 import com.superfercho.orders.application.dto.GetOrderCommand;
 import com.superfercho.orders.application.dto.ListAdminOrdersCommand;
+import com.superfercho.orders.application.dto.ListAdminRecentBuyersCommand;
 import com.superfercho.orders.application.dto.OrderItemResult;
 import com.superfercho.orders.application.dto.OrderResult;
 import com.superfercho.orders.application.dto.PagedResult;
@@ -20,8 +25,11 @@ import com.superfercho.orders.application.dto.PaymentStatus;
 import com.superfercho.orders.application.dto.ShippingAddressResult;
 import com.superfercho.orders.application.exception.OrderNotFoundException;
 import com.superfercho.orders.application.usecase.GetAdminOrderUseCase;
+import com.superfercho.orders.application.usecase.GetAdminSalesPeriodSummaryUseCase;
 import com.superfercho.orders.application.usecase.ListAdminOrdersUseCase;
+import com.superfercho.orders.application.usecase.ListAdminRecentBuyersUseCase;
 import com.superfercho.orders.domain.model.OrderStatus;
+import com.superfercho.orders.domain.model.SalesPeriodGranularity;
 import com.superfercho.platform.error.ApiExceptionHandler;
 import com.superfercho.platform.money.Money;
 import java.math.BigDecimal;
@@ -59,6 +67,12 @@ class AdminOrderControllerTest {
 
     @MockitoBean
     private GetAdminOrderUseCase getAdminOrderUseCase;
+
+    @MockitoBean
+    private GetAdminSalesPeriodSummaryUseCase getAdminSalesPeriodSummaryUseCase;
+
+    @MockitoBean
+    private ListAdminRecentBuyersUseCase listAdminRecentBuyersUseCase;
 
     @Test
     void shouldGetOrderByIdForAnyCustomer() throws Exception {
@@ -172,6 +186,67 @@ class AdminOrderControllerTest {
                 .andExpect(jsonPath("$.code").value("INVALID_ORDER"));
 
         verifyNoInteractions(listAdminOrdersUseCase, getAdminOrderUseCase);
+    }
+
+    @Test
+    void shouldReturnSalesPeriodSummaryForGranularity() throws Exception {
+        when(getAdminSalesPeriodSummaryUseCase.execute(
+                        new GetAdminSalesPeriodSummaryCommand(SalesPeriodGranularity.MONTH)))
+                .thenReturn(new AdminSalesPeriodSummaryResult(
+                        SalesPeriodGranularity.MONTH,
+                        List.of(new AdminSalesBucketResult(
+                                Instant.parse("2026-03-01T00:00:00Z"), "01 mar.", TOTAL, 2))));
+
+        mockMvc.perform(get("/api/v1/admin/orders/dashboard/sales").param("granularity", "MONTH"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.granularity").value("MONTH"))
+                .andExpect(jsonPath("$.buckets[0].label").value("01 mar."))
+                .andExpect(jsonPath("$.buckets[0].orderCount").value(2))
+                .andExpect(jsonPath("$.buckets[0].total.amount").value(21.00))
+                .andExpect(jsonPath("$.buckets[0].total.currency").value("COP"));
+
+        verify(getAdminSalesPeriodSummaryUseCase)
+                .execute(new GetAdminSalesPeriodSummaryCommand(SalesPeriodGranularity.MONTH));
+        verifyNoInteractions(listAdminOrdersUseCase, getAdminOrderUseCase, listAdminRecentBuyersUseCase);
+    }
+
+    @Test
+    void shouldDefaultSalesGranularityToWeek() throws Exception {
+        when(getAdminSalesPeriodSummaryUseCase.execute(GetAdminSalesPeriodSummaryCommand.of(null)))
+                .thenReturn(new AdminSalesPeriodSummaryResult(SalesPeriodGranularity.WEEK, List.of()));
+
+        mockMvc.perform(get("/api/v1/admin/orders/dashboard/sales"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.granularity").value("WEEK"))
+                .andExpect(jsonPath("$.buckets").isEmpty());
+
+        verify(getAdminSalesPeriodSummaryUseCase).execute(GetAdminSalesPeriodSummaryCommand.of(null));
+    }
+
+    @Test
+    void shouldRejectUnsupportedSalesGranularity() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/orders/dashboard/sales").param("granularity", "QUARTER"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ORDER"));
+
+        verifyNoInteractions(getAdminSalesPeriodSummaryUseCase);
+    }
+
+    @Test
+    void shouldReturnRecentBuyers() throws Exception {
+        when(listAdminRecentBuyersUseCase.execute(ListAdminRecentBuyersCommand.of(5)))
+                .thenReturn(List.of(new AdminRecentBuyerResult(
+                        CUSTOMER_ID, "Ada Lovelace", CREATED_AT, 3, TOTAL)));
+
+        mockMvc.perform(get("/api/v1/admin/orders/dashboard/recent-buyers").param("limit", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].customerId").value(CUSTOMER_ID.toString()))
+                .andExpect(jsonPath("$.items[0].displayName").value("Ada Lovelace"))
+                .andExpect(jsonPath("$.items[0].orderCount").value(3))
+                .andExpect(jsonPath("$.items[0].lastOrderTotal.amount").value(21.00));
+
+        verify(listAdminRecentBuyersUseCase).execute(ListAdminRecentBuyersCommand.of(5));
+        verifyNoInteractions(listAdminOrdersUseCase, getAdminOrderUseCase, getAdminSalesPeriodSummaryUseCase);
     }
 
     private static OrderResult orderResult(PaymentResult payment) {

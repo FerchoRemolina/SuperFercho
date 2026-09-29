@@ -295,6 +295,10 @@ export function adminKeys() {
         adminOrdersStatusQueryKey(query.status),
       ] as const,
     order: (orderId: string) => ["admin", "order", orderId] as const,
+    salesPeriod: (granularity: SalesPeriodGranularity) =>
+      ["admin", "orders", "dashboard", "sales", granularity] as const,
+    recentBuyers: (limit: number) =>
+      ["admin", "orders", "dashboard", "recent-buyers", limit] as const,
     knowledgeRoot: () => ["admin", "knowledge"] as const,
     knowledgeDocuments: () => ["admin", "knowledge", "documents"] as const,
     knowledgeDocument: (documentId: string) =>
@@ -585,6 +589,59 @@ export async function listAdminOrders(
 /** GET /api/v1/admin/orders/{orderId} — ADMIN; no reutilizar GET /api/v1/orders/{orderId}. */
 export async function getAdminOrder(orderId: string): Promise<Order> {
   return request<Order>(`/admin/orders/${encodeURIComponent(orderId)}`);
+}
+
+export type SalesPeriodGranularity = "DAY" | "WEEK" | "MONTH" | "YEAR";
+
+export const SALES_PERIOD_GRANULARITIES: readonly SalesPeriodGranularity[] = [
+  "DAY",
+  "WEEK",
+  "MONTH",
+  "YEAR",
+] as const;
+
+/** Mirrors AdminSalesPeriodSummaryRestResponse. */
+export type AdminSalesBucket = {
+  periodStart: string;
+  label: string;
+  total: Money;
+  orderCount: number;
+};
+
+export type AdminSalesPeriodSummary = {
+  granularity: SalesPeriodGranularity;
+  buckets: AdminSalesBucket[];
+};
+
+/** Mirrors AdminRecentBuyersRestResponse item. */
+export type AdminRecentBuyer = {
+  customerId: string;
+  displayName: string;
+  lastOrderAt: string;
+  orderCount: number;
+  lastOrderTotal: Money;
+};
+
+export type AdminRecentBuyers = {
+  items: AdminRecentBuyer[];
+};
+
+/** GET /api/v1/admin/orders/dashboard/sales — ADMIN Hub period sales. */
+export async function getAdminSalesPeriodSummary(
+  granularity: SalesPeriodGranularity = "WEEK",
+): Promise<AdminSalesPeriodSummary> {
+  return request<AdminSalesPeriodSummary>(
+    `/admin/orders/dashboard/sales${toQuery({ granularity })}`,
+  );
+}
+
+/** GET /api/v1/admin/orders/dashboard/recent-buyers — ADMIN Hub. */
+export async function listAdminRecentBuyers(
+  limit = 8,
+): Promise<AdminRecentBuyers> {
+  return request<AdminRecentBuyers>(
+    `/admin/orders/dashboard/recent-buyers${toQuery({ limit: String(limit) })}`,
+  );
 }
 
 /** Mirrors DocumentStatus. */

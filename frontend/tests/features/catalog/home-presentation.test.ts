@@ -15,7 +15,7 @@ describe("home customer presentation", () => {
     const preview = source(
       "features/catalog/components/home-product-preview.tsx",
     );
-    const page = source("app/page.tsx");
+    const page = source("app/(storefront)/page.tsx");
 
     expect(preview).toContain("HomeProductCard");
     expect(preview).not.toContain('from "@/features/catalog/components/product-card"');

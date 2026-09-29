@@ -25,10 +25,12 @@ export function StorefrontPreviewEnterButton({
         type="button"
         disabled={pending}
         className={cx(
-          "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold",
-          "bg-indigo-700 text-white transition-colors duration-150 hover:bg-indigo-800",
-          "disabled:cursor-not-allowed disabled:bg-indigo-200 disabled:text-white/80",
-          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-700",
+          "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold",
+          "border border-sf-primary/25 bg-sf-primary/5 text-sf-primary",
+          "shadow-[0_1px_2px_rgba(8,116,67,0.08)]",
+          "transition-all duration-150 hover:-translate-y-px hover:border-sf-primary/45 hover:bg-sf-primary/10",
+          "disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0",
+          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sf-primary",
         )}
         onClick={() => {
           setPending(true);
