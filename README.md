@@ -92,6 +92,75 @@ La fundación técnica ya está creada. Login, catálogo, carrito, checkout, ped
 
 Detalle: [`frontend/README.md`](frontend/README.md). Blueprint: [`docs/architecture/frontend-technical-blueprint.md`](docs/architecture/frontend-technical-blueprint.md).
 
+## Fercho
+
+Fercho es el asistente conversacional de SuperFercho. Permite interactuar con el catálogo, carrito, listas, pedidos, direcciones y checkout desde `/assistant`.
+
+El asistente utiliza las herramientas disponibles del backend para consultar y ejecutar las operaciones correspondientes.
+
+### Quick Start (sin IA)
+
+La aplicación completa funciona sin configurar ningún modelo:
+
+```powershell
+.\scripts\dev.ps1        # Windows: Postgres + backend :8080 + frontend :3000
+```
+
+### Habilitar Fercho AI (100% local, gratis)
+
+```powershell
+.\scripts\setup-fercho.ps1                    # Windows
+./scripts/setup-fercho.sh                     # macOS / Linux
+.\scripts\setup-fercho.ps1 -Model qwen3.6:27b # override manual de modelo
+```
+
+El script es idempotente y no destructivo: verifica prerequisitos, detecta (o arranca) Ollama, elige modelo según tu RAM, lo descarga, crea un modelo derivado `fercho` con contexto ampliado (`num_ctx 16384`), configura `.env` (respaldando el anterior y sin pisar valores tuyos) y ejecuta un **probe obligatorio de tool calling**. Si el modelo no pasa el probe, el setup termina con error y te dice cómo cambiar de modelo — no se declara "Fercho AI ✓" sin evidencia.
+
+En modo local, `OPENAI_API_KEY=ollama` en tu `.env` es un **valor dummy** requerido por el adapter actual: los endpoints locales lo ignoran. No es una credencial de OpenAI ni genera cobros. El script lo escribe por ti.
+
+### Hardware y modelos
+
+| RAM | Candidato | Notas |
+|---|---|---|
+| ≥ 16 GB | `gpt-oss:20b` | Apache 2.0, tool calling nativo, 128K contexto |
+| < 16 GB | `granite4.1:8b` | Apache 2.0, multilingüe; menor calidad/velocidad |
+| Override | `-Model <tag>` | Cualquier tag de Ollama con soporte de tools |
+
+Ningún modelo está aprobado de antemano: el benchmark (`scripts/fercho-bench.*`) verifica tool calling, checkout seguro y no-alucinación contra el estado real del backend. Con hardware insuficiente la app sigue funcionando completa; Fercho simplemente queda "not configured".
+
+### Proveedor cloud opcional
+
+Si prefieres tu propio proveedor (OpenAI, Z.AI u otro endpoint compatible con Chat Completions), pon **tu propia** base URL y **tu propia** API key en tu `.env` local:
+
+```env
+SUPERFERCHO_OPENAI_CHAT_URL=https://<endpoint-del-proveedor>/chat/completions
+SUPERFERCHO_OPENAI_CHAT_MODEL=<modelo>
+OPENAI_API_KEY=<tu key personal, nunca se commitea>
+```
+
+Nunca es requisito: sin key, nada se envía a ningún proveedor de pago.
+
+### Arquitectura
+
+```text
+LLMPort (Application)
+   ↓
+OpenAI-compatible Chat Adapter (Infrastructure)
+   ↓
+Ollama local (localhost:11434)  ·  o proveedor cloud del usuario
+```
+
+"OpenAI-compatible" describe el **protocolo de cable** (Chat Completions), no una dependencia de OpenAI: el mismo adapter habla con Ollama, OpenAI, Z.AI u otro endpoint compatible. El dominio no conoce ningún proveedor.
+
+### Costos
+
+- **Local AI**: el modelo corre en el equipo de quien ejecuta el proyecto → no hay API billing → **el dueño del repositorio no paga por las conversaciones de terceros**.
+- **Cloud**: cada usuario configura **su propia** key y paga **su propio** proveedor.
+
+### Seguridad
+
+OpenCode es exclusivamente una herramienta de desarrollo de este repositorio: nunca es dependencia de ejecución y sus credenciales no se leen ni se reutilizan. El repositorio no contiene ninguna API key (`.env` está ignorado por Git); `git clone + setup-fercho` no provee ninguna ruta hacia cuentas o credenciales del autor.
+
 ## Stack tecnológico
 
 | Tecnología | Uso en SuperFercho |

@@ -125,7 +125,8 @@ public final class ChatApplicationService implements ChatUseCase {
         SensitiveActionType confirmationType = null;
         Conversation current = conversation;
         for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
-            LlmResponse response = llmPort.complete(new LlmRequest(toLlmMessages(current), tools));
+            LlmResponse response =
+                    llmPort.complete(new LlmRequest(toLlmMessages(current), tools, FerchoSystemPrompt.TEXT));
             if (!response.hasToolCalls()) {
                 String text = response.text().isBlank() ? "I could not produce a response." : response.text();
                 current = conversationStore.save(

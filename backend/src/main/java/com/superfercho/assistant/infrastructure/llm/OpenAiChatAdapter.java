@@ -68,6 +68,9 @@ public final class OpenAiChatAdapter implements LLMPort {
 
     private OpenAiChatRequest toProviderRequest(LlmRequest request) {
         List<OpenAiChatMessage> messages = new ArrayList<>();
+        if (request.systemPrompt() != null) {
+            messages.add(new OpenAiChatMessage("system", request.systemPrompt(), null, null, null));
+        }
         for (LlmMessage message : request.messages()) {
             messages.add(toProviderMessage(message));
         }

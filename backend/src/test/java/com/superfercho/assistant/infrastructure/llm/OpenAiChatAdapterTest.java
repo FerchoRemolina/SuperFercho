@@ -86,6 +86,19 @@ class OpenAiChatAdapterTest {
     }
 
     @Test
+    void shouldSendSystemPromptAsFirstProviderMessage() {
+        server.expect(requestTo(CHAT_URL))
+                .andExpect(content().json(systemPromptRequestJson(), true))
+                .andRespond(withSuccess(textResponseJson("Hola"), MediaType.APPLICATION_JSON));
+
+        LlmResponse response = adapter.complete(new LlmRequest(
+                List.of(LlmMessage.user("hola")), List.of(), "Eres Fercho, asistente de SuperFercho."));
+
+        server.verify();
+        assertEquals("Hola", response.text());
+    }
+
+    @Test
     void shouldMapSingleToolCallFromProvider() {
         server.expect(requestTo(CHAT_URL))
                 .andRespond(withSuccess(toolCallsResponseJson(toolCallJson("c1", "get_cart", "{}")), MediaType.APPLICATION_JSON));
@@ -236,6 +249,18 @@ class OpenAiChatAdapterTest {
                 LlmProviderException.class,
                 () -> withoutKey.complete(new LlmRequest(List.of(LlmMessage.user("hola")), List.of())));
         assertEquals("OpenAI API key is not configured", exception.getMessage());
+    }
+
+    private static String systemPromptRequestJson() {
+        return """
+                {
+                  "model": "gpt-4o-mini",
+                  "messages": [
+                    {"role":"system","content":"Eres Fercho, asistente de SuperFercho."},
+                    {"role":"user","content":"hola"}
+                  ]
+                }
+                """;
     }
 
     private static String userSearchRequestJson() {

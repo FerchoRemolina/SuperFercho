@@ -15,7 +15,9 @@ import com.superfercho.assistant.application.dto.chat.ChatCommand;
 import com.superfercho.assistant.application.dto.chat.ChatResponse;
 import com.superfercho.assistant.application.dto.chat.ExplicitConfirmation;
 import com.superfercho.assistant.application.dto.llm.LlmMessage;
+import com.superfercho.assistant.application.dto.llm.LlmRequest;
 import com.superfercho.assistant.application.dto.llm.LlmResponse;
+import com.superfercho.assistant.application.exception.ConversationNotFoundException;
 import com.superfercho.assistant.application.exception.InvalidConfirmationException;
 import com.superfercho.assistant.application.port.out.ClockPort;
 import com.superfercho.assistant.application.port.out.CurrentUserProvider;
@@ -27,6 +29,8 @@ import com.superfercho.assistant.application.tool.knowledge.SearchKnowledgeTool;
 import com.superfercho.assistant.application.tool.orders.CancelOrderTool;
 import com.superfercho.assistant.application.tool.orders.CheckoutTool;
 import com.superfercho.assistant.application.tool.shopping.GetCartTool;
+import com.superfercho.assistant.domain.model.Conversation;
+import com.superfercho.assistant.domain.model.Message;
 import com.superfercho.assistant.domain.model.MessageRole;
 import com.superfercho.assistant.infrastructure.confirmation.InMemoryPendingSensitiveActionStore;
 import com.superfercho.assistant.infrastructure.conversation.InMemoryConversationStore;
@@ -76,6 +80,7 @@ class ChatApplicationServiceTest {
     private static final UUID ADDRESS_ID = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
     private static final UUID ORDER_ID = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
     private static final UUID ITEM_ID = UUID.fromString("99999999-9999-9999-9999-000000000001");
+    private static final UUID OTHER_USER_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
 
     @Mock
     private CurrentUserProvider currentUserProvider;
@@ -138,6 +143,27 @@ class ChatApplicationServiceTest {
         assertFalse(response.awaitingConfirmation());
         assertEquals(1, llm.requests().size());
         assertEquals("hola", llm.requests().get(0).messages().get(0).content());
+    }
+
+    @Test
+    void shouldSendFerchoSystemPromptWithoutPersistingIt() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(clockPort.currentTime()).thenReturn(NOW);
+        llm.enqueue(LlmResponse.text("¡Hola! Soy Fercho."));
+
+        ChatResponse response = chat.execute(new ChatCommand(null, "hola", null));
+
+        LlmRequest request = llm.requests().get(0);
+        assertEquals(FerchoSystemPrompt.TEXT, request.systemPrompt());
+        assertTrue(request.systemPrompt().contains("Eres Fercho"));
+        assertTrue(request.systemPrompt().contains("NO es fuente de precios"));
+        assertTrue(request.systemPrompt().contains("checkout y cancel_order son acciones sensibles"));
+        assertEquals(1, request.messages().size());
+        assertEquals("hola", request.messages().get(0).content());
+        List<Message> stored = conversations.findById(response.conversationId()).orElseThrow().messages();
+        assertEquals(2, stored.size());
+        assertEquals(MessageRole.USER, stored.get(0).role());
+        assertEquals(MessageRole.ASSISTANT, stored.get(1).role());
     }
 
     @Test
@@ -320,6 +346,51 @@ class ChatApplicationServiceTest {
                         started.conversationId(), null, new ExplicitConfirmation("missing-token"))));
         verify(checkoutUseCase, never()).execute(any());
         verify(cancelOrderUseCase, never()).execute(any());
+    }
+
+    @Test
+    void shouldStopAfterMaxToolRoundsWithoutInfiniteLoop() {
+        // MAX_TOOL_ROUNDS es 8 (ChatApplicationService): el bucle hace como maximo 8 llamadas
+        // al LLM; si la octava respuesta tambien trae tool_calls, sale del bucle sin novena
+        // llamada y devuelve el texto de fallback como mensaje del asistente.
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(clockPort.currentTime()).thenReturn(NOW);
+        when(getCartUseCase.execute()).thenReturn(emptyCart());
+        for (int round = 1; round <= 8; round++) {
+            llm.enqueue(LlmResponse.toolCalls(List.of(
+                    new LlmMessage.LlmToolCall("c" + round, ToolNames.GET_CART, Map.of()))));
+        }
+
+        ChatResponse response = chat.execute(new ChatCommand(null, "ver carrito sin parar", null));
+
+        assertEquals(8, llm.requests().size());
+        assertEquals("Too many tool calls were requested in this turn.", response.assistantMessage());
+        assertFalse(response.awaitingConfirmation());
+        List<Message> stored = conversations.findById(response.conversationId()).orElseThrow().messages();
+        assertEquals(18, stored.size());
+        Message last = stored.get(stored.size() - 1);
+        assertEquals(MessageRole.ASSISTANT, last.role());
+        assertEquals("Too many tool calls were requested in this turn.", last.content());
+    }
+
+    @Test
+    void shouldNotLetAnotherUserAccessExistingConversation() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(clockPort.currentTime()).thenReturn(NOW);
+        llm.enqueue(LlmResponse.text("Hola A"));
+        ChatResponse created = chat.execute(new ChatCommand(null, "hola", null));
+
+        when(currentUserProvider.getCurrentUserId()).thenReturn(OTHER_USER_ID);
+        llm.enqueue(LlmResponse.text("Hola B"));
+
+        assertThrows(
+                ConversationNotFoundException.class,
+                () -> chat.execute(new ChatCommand(created.conversationId(), "mensaje de B", null)));
+
+        assertEquals(1, llm.requests().size());
+        Conversation conversation = conversations.findById(created.conversationId()).orElseThrow();
+        assertEquals(USER_ID, conversation.userId());
+        assertEquals(2, conversation.messages().size());
     }
 
     private static CartResponse emptyCart() {
