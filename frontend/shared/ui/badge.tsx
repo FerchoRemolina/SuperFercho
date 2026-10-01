@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 import { cx } from "@/shared/utils/cx";
 
-type BadgeTone = "neutral" | "primary" | "accent" | "danger";
+type BadgeTone = "neutral" | "primary" | "success" | "accent" | "danger";
 
 const tones: Record<BadgeTone, string> = {
   neutral: "bg-sf-bg text-sf-muted",
   primary: "bg-sf-primary/10 text-sf-primary",
+  success: "bg-sf-success/10 text-sf-success",
   accent: "bg-sf-yellow-soft text-sf-ink",
   danger: "bg-sf-error/10 text-sf-error",
 };

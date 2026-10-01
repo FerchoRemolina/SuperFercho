@@ -186,7 +186,7 @@ describe("admin presentation", () => {
     expect(productStatusLabel("ACTIVE")).toBe("Activo");
     expect(productStatusLabel("INACTIVE")).toBe("Inactivo");
     expect(productStatusLabel("ARCHIVED")).toBe("Archivado");
-    expect(productStatusTone("ACTIVE")).toBe("primary");
+    expect(productStatusTone("ACTIVE")).toBe("success");
     expect(productStatusTone("INACTIVE")).toBe("neutral");
     expect(productStatusTone("ARCHIVED")).toBe("danger");
   });

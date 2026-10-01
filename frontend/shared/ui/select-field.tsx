@@ -5,6 +5,7 @@ export function SelectField({
   id,
   label,
   error,
+  labelClassName,
   className,
   children,
   ...props
@@ -12,12 +13,17 @@ export function SelectField({
   id: string;
   label: string;
   error?: string;
+  /** Ajuste opcional del estilo del label (p. ej. filtros compactos). */
+  labelClassName?: string;
 }) {
   const errorId = error ? `${id}-error` : undefined;
 
   return (
     <div className="grid gap-1">
-      <label htmlFor={id} className="text-sm font-semibold">
+      <label
+        htmlFor={id}
+        className={cx("text-sm font-semibold", labelClassName)}
+      >
         {label}
       </label>
       <select

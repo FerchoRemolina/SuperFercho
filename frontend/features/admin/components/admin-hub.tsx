@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useQueries } from "@tanstack/react-query";
 import Link from "next/link";
 import {
@@ -8,10 +8,8 @@ import {
   adminKeys,
   getAdminProduct,
   getAdminProductVariant,
-  SALES_PERIOD_GRANULARITIES,
   type AdminProduct,
-  type AdminSalesBucket,
-  type SalesPeriodGranularity,
+  type OrderStatus,
 } from "@/features/admin/api";
 import {
   useAdminOrdersQuery,
@@ -19,6 +17,7 @@ import {
   useAdminRecentBuyersQuery,
   useAdminSalesPeriodSummaryQuery,
 } from "@/features/admin/hooks";
+import { AnalyticsCard } from "@/features/admin/components/admin-analytics-card";
 import {
   adminInventoryHref,
   adminOrderDetailHref,
@@ -28,7 +27,6 @@ import {
   formatAdminInstant,
   isAdminRole,
   partitionAdminStockAttention,
-  salesPeriodGranularityLabel,
   withDisambiguatedRecentlySoldLabels,
 } from "@/features/admin/presentation";
 import { orderStatusLabel } from "@/features/orders/api";
@@ -46,32 +44,39 @@ import {
 import { Skeleton } from "@/shared/ui/skeleton";
 import { cx } from "@/shared/utils/cx";
 
-const RECENT_ORDERS_PAGE_SIZE = 8;
-const RECENT_BUYERS_LIMIT = 8;
+const RECENT_ORDERS_PAGE_SIZE = 5;
+const RECENT_BUYERS_LIMIT = 5;
 const SOLD_SAMPLE_SIZE = 20;
 const SOLD_RANK_LIMIT = 5;
 
+const IN_PROCESS_ORDER_STATUSES: readonly OrderStatus[] = [
+  "CONFIRMED",
+  "PREPARING",
+  "DELIVERY",
+] as const;
+
 export function AdminHub() {
   return (
-    <main className="px-4 py-5 md:px-7 md:py-6 lg:px-8">
-      <header className="mb-5 max-w-3xl md:mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-sf-ink md:text-[1.85rem]">
+    <main className="px-4 py-4 md:px-8 md:py-5">
+      <header className="mb-4 max-w-3xl">
+        <h1 className="text-2xl font-bold tracking-tight text-sf-ink md:text-[1.75rem]">
           Inicio
         </h1>
-        <p className="mt-1.5 text-sm leading-relaxed text-sf-muted md:text-[0.95rem]">
-          Centro operativo: inventario, pedidos, ventas del período y clientes
-          con compras recientes.
+        <p className="mt-1 text-sm leading-relaxed text-sf-muted md:text-[0.95rem]">
+          Centro operativo de SuperFercho: inventario, pedidos, ventas del
+          período y clientes con compras recientes.
         </p>
       </header>
 
-      {/* A. Inventario → B. Pedidos + vendidos → C. Ventas → D. Clientes */}
-      <div className="grid gap-4 md:gap-5">
+      {/* B. Atención → C. Resumen → D. Reciente → E. Analítica → F. Clientes */}
+      <div className="grid gap-3.5">
         <InventoryAttentionHero />
-        <div className="grid gap-4 lg:grid-cols-2 lg:gap-5">
+        <BusinessSummaryStrip />
+        <div className="grid gap-3.5 lg:grid-cols-2">
           <RecentOrdersCard />
           <RecentlySoldProductsCard />
         </div>
-        <SalesPeriodCard />
+        <AnalyticsCard />
         <RecentBuyersCard />
       </div>
     </main>
@@ -88,7 +93,7 @@ function InventoryAttentionHero() {
 
   if (productsQuery.isPending) {
     return (
-      <Card className="rounded-2xl p-5 shadow-[0_8px_24px_rgba(23,33,27,0.05)] md:p-6">
+      <Card className="rounded-xl p-5 shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
         <Skeleton className="h-6 w-56" />
         <Skeleton className="mt-4 h-24 w-full" />
       </Card>
@@ -97,7 +102,7 @@ function InventoryAttentionHero() {
 
   if (productsQuery.isError) {
     return (
-      <Card className="rounded-2xl border-sf-border p-5 md:p-6">
+      <Card className="rounded-xl border-sf-border p-5">
         <h2 className="text-lg font-bold text-sf-ink">Atención de inventario</h2>
         <p className="mt-2 text-sm text-sf-muted">
           No se pudo cargar el inventario activo.
@@ -109,70 +114,66 @@ function InventoryAttentionHero() {
   return (
     <Card
       className={cx(
-        "overflow-hidden rounded-2xl border p-0 shadow-[0_8px_28px_rgba(23,33,27,0.06)]",
-        total > 0
-          ? "border-amber-200/80 bg-gradient-to-br from-amber-50/90 via-sf-surface to-sf-surface"
-          : "border-sf-border bg-sf-surface",
+        "overflow-hidden rounded-xl border p-0 shadow-[0_1px_2px_rgba(16,24,40,0.05)]",
+        total > 0 ? "border-amber-200/80 bg-sf-surface" : "border-sf-border bg-sf-surface",
       )}
     >
-      <div className="flex flex-col gap-5 p-5 md:flex-row md:items-stretch md:justify-between md:p-6 lg:gap-8">
-        <div className="flex min-w-0 flex-1 items-start gap-4">
+      <div className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between lg:gap-6">
+        <div className="flex min-w-0 flex-1 items-start gap-3.5">
           <span
             className={cx(
-              "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl shadow-sm",
+              "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
               total > 0
                 ? "bg-amber-100 text-amber-800"
                 : "bg-emerald-100 text-emerald-700",
             )}
           >
             {total > 0 ? (
-              <WarningIcon className="h-7 w-7" />
+              <WarningIcon className="h-5 w-5" />
             ) : (
-              <CheckCircleIcon className="h-7 w-7" />
+              <CheckCircleIcon className="h-5 w-5" />
             )}
           </span>
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-sf-muted">
-              Inventario
-            </p>
-            <h2 className="mt-1 text-xl font-bold tracking-tight text-sf-ink md:text-2xl">
+            <h2 className="text-lg font-bold tracking-tight text-sf-ink">
               {total > 0
                 ? "Inventario requiere atención"
                 : "Inventario al día"}
             </h2>
-            <p className="mt-2 max-w-xl text-sm leading-relaxed text-sf-muted">
+            <p className="mt-1 max-w-xl text-sm leading-relaxed text-sf-muted">
               {total > 0
-                ? "Productos activos agotados (stock 0) o próximos a agotarse (1–5 unidades). Los inactivos o archivados no generan atención."
-                : "No hay productos activos agotados ni próximos a agotarse."}
+                ? "Hay productos que necesitan reposición."
+                : "No hay productos que requieran reposición."}
             </p>
-            <Link
-              href={adminInventoryHref()}
-              className={cx(
-                buttonClassName("primary"),
-                "mt-4 inline-flex transition-transform duration-150 hover:-translate-y-px",
-              )}
-            >
-              Control de inventario
-            </Link>
+            {total > 0 ? (
+              <Link
+                href={adminInventoryHref()}
+                className={cx(buttonClassName("primary"), "mt-3 inline-flex")}
+              >
+                Control de inventario
+              </Link>
+            ) : null}
           </div>
         </div>
 
-        <div className="grid shrink-0 gap-3 sm:grid-cols-2 lg:w-[22rem] xl:w-[26rem]">
-          <MetricTile
-            href={adminInventoryHref("out")}
-            label="Agotados"
-            value={buckets.outOfStock.length}
-            tone="danger"
-            icon={PackageIcon}
-          />
-          <MetricTile
-            href={adminInventoryHref("low")}
-            label="Próximos a agotarse"
-            value={buckets.lowStock.length}
-            tone="warning"
-            icon={WarningIcon}
-          />
-        </div>
+        {total > 0 ? (
+          <div className="grid shrink-0 gap-3 sm:grid-cols-2 lg:w-[20rem]">
+            <MetricTile
+              href={adminInventoryHref("out")}
+              label="Agotados"
+              value={buckets.outOfStock.length}
+              tone="danger"
+              icon={PackageIcon}
+            />
+            <MetricTile
+              href={adminInventoryHref("low")}
+              label="Próximos a agotarse"
+              value={buckets.lowStock.length}
+              tone="warning"
+              icon={WarningIcon}
+            />
+          </div>
+        ) : null}
       </div>
     </Card>
   );
@@ -195,23 +196,23 @@ function MetricTile({
     <Link
       href={href}
       className={cx(
-        "flex items-center gap-3 rounded-2xl border bg-sf-surface/90 px-4 py-4 shadow-sm",
-        "transition-all duration-150 hover:-translate-y-px hover:border-sf-primary/35 hover:shadow-md",
+        "flex items-center gap-3 rounded-lg border bg-sf-surface px-3.5 py-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]",
+        "transition-colors duration-150 hover:border-sf-primary/35",
         tone === "danger" ? "border-red-100" : "border-amber-100",
       )}
     >
       <span
         className={cx(
-          "flex h-11 w-11 items-center justify-center rounded-xl",
+          "flex h-9 w-9 items-center justify-center rounded-lg",
           tone === "danger"
             ? "bg-red-50 text-red-700"
             : "bg-amber-50 text-amber-800",
         )}
       >
-        <Icon className="h-5 w-5" />
+        <Icon className="h-4.5 w-4.5" />
       </span>
       <span>
-        <span className="block text-2xl font-bold tabular-nums text-sf-ink">
+        <span className="block text-lg font-bold tabular-nums text-sf-ink">
           {value}
         </span>
         <span className="block text-xs font-semibold text-sf-muted">{label}</span>
@@ -220,205 +221,103 @@ function MetricTile({
   );
 }
 
-function SalesPeriodCard() {
-  const [granularity, setGranularity] =
-    useState<SalesPeriodGranularity>("WEEK");
-  const salesQuery = useAdminSalesPeriodSummaryQuery(granularity);
-  const buckets = useMemo(
-    () => salesQuery.data?.buckets ?? [],
-    [salesQuery.data?.buckets],
+/**
+ * C. Resumen general: estado real de la operación con datos del API.
+ * - "En proceso" = CONFIRMED + PREPARING + DELIVERY (activos, sin entregar ni
+ *   cancelar). Los conteos de pedidos son totales acumulados (no existe hoy
+ *   un endpoint de conteos por período); ventas es la cifra de la semana.
+ * Pendientes futuros (sin endpoint hoy): conteos por período, KPI de pagos.
+ */
+function BusinessSummaryStrip() {
+  const inProcessQuery = useAdminOrdersQuery({
+    page: 0,
+    size: 1,
+    status: [...IN_PROCESS_ORDER_STATUSES],
+  });
+  const deliveredQuery = useAdminOrdersQuery({
+    page: 0,
+    size: 1,
+    status: ["DELIVERED"],
+  });
+  const cancelledQuery = useAdminOrdersQuery({
+    page: 0,
+    size: 1,
+    status: ["CANCELLED"],
+  });
+  const weekSalesQuery = useAdminSalesPeriodSummaryQuery("WEEK");
+
+  const weekTotal = useMemo(
+    () =>
+      (weekSalesQuery.data?.buckets ?? []).reduce(
+        (sum, bucket) => sum + moneyAmount(bucket.total),
+        0,
+      ),
+    [weekSalesQuery.data?.buckets],
   );
-  const periodTotal = useMemo(
-    () => buckets.reduce((sum, bucket) => sum + moneyAmount(bucket.total), 0),
-    [buckets],
-  );
-  const periodOrders = useMemo(
-    () => buckets.reduce((sum, bucket) => sum + bucket.orderCount, 0),
-    [buckets],
-  );
+
+  function orderCount(
+    query: typeof inProcessQuery | typeof deliveredQuery | typeof cancelledQuery,
+  ): string | null {
+    if (query.isPending) {
+      return null;
+    }
+    return query.isError ? "—" : String(query.data?.totalElements ?? 0);
+  }
+
+  const metrics = [
+    {
+      label: "Pedidos en proceso",
+      value: orderCount(inProcessQuery),
+      caption: "Requieren gestión",
+    },
+    {
+      label: "Pedidos entregados",
+      value: orderCount(deliveredQuery),
+      caption: "Completados",
+    },
+    {
+      label: "Pedidos cancelados",
+      value: orderCount(cancelledQuery),
+      caption: "Cancelados",
+    },
+    {
+      label: "Ventas",
+      value: weekSalesQuery.isPending
+        ? null
+        : weekSalesQuery.isError
+          ? "—"
+          : formatMoney({ amount: weekTotal, currency: "COP" }),
+      caption: "Esta semana",
+    },
+  ];
 
   return (
-    <section aria-labelledby="admin-hub-sales-heading">
-      <Card className="overflow-hidden rounded-2xl border-sf-border p-0 shadow-[0_8px_28px_rgba(23,33,27,0.05)]">
-        <div className="flex flex-col gap-4 border-b border-sf-border px-5 py-4 md:flex-row md:items-start md:justify-between md:px-6 md:py-5">
-          <div className="flex items-start gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sf-primary/10 text-sf-primary">
-              <ClipboardListIcon className="h-5 w-5" />
-            </span>
-            <div>
-              <h2
-                id="admin-hub-sales-heading"
-                className="text-lg font-bold tracking-tight text-sf-ink"
-              >
-                Ventas
-              </h2>
-              <p className="mt-0.5 text-sm text-sf-muted">
-                Totales reales del período (pedidos no cancelados).
-              </p>
-              {!salesQuery.isPending && !salesQuery.isError ? (
-                <p className="mt-2 text-base font-bold tabular-nums text-sf-ink">
-                  {formatMoney({ amount: periodTotal, currency: "COP" })}
-                  <span className="ml-2 text-sm font-medium text-sf-muted">
-                    · {periodOrders}{" "}
-                    {periodOrders === 1 ? "pedido" : "pedidos"}
-                  </span>
-                </p>
-              ) : null}
-            </div>
-          </div>
-          <div
-            className="inline-flex flex-wrap gap-1 rounded-xl bg-sf-bg p-1"
-            role="tablist"
-            aria-label="Granularidad de ventas"
-          >
-            {SALES_PERIOD_GRANULARITIES.map((option) => {
-              const active = option === granularity;
-              return (
-                <button
-                  key={option}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  className={cx(
-                    "min-h-9 rounded-lg px-3.5 text-sm font-semibold transition-all duration-150",
-                    active
-                      ? "bg-sf-surface text-sf-primary shadow-sm"
-                      : "text-sf-muted hover:text-sf-ink",
-                  )}
-                  onClick={() => setGranularity(option)}
-                >
-                  {salesPeriodGranularityLabel(option)}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="px-3 py-4 md:px-5 md:py-5">
-          {salesQuery.isPending ? (
-            <Skeleton className="mx-2 h-72 w-[calc(100%-1rem)] md:h-80" />
-          ) : salesQuery.isError ? (
-            <p className="px-3 py-12 text-center text-sm text-sf-muted" role="alert">
-              No se pudieron cargar las ventas del período. Comprueba la
-              conexión con el API de dashboard.
-            </p>
-          ) : (
-            <SalesChart buckets={buckets} />
-          )}
-        </div>
-      </Card>
-    </section>
+    <Card className="overflow-hidden rounded-xl border-sf-border p-0 shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+      <div className="grid gap-px bg-sf-border sm:grid-cols-2 lg:grid-cols-4">
+        {metrics.map((metric) => (
+          <SummaryMetric key={metric.label} {...metric} />
+        ))}
+      </div>
+    </Card>
   );
 }
 
-function SalesChart({ buckets }: { buckets: AdminSalesBucket[] }) {
-  const amounts = buckets.map((bucket) => moneyAmount(bucket.total));
-  const maxAmount = Math.max(...amounts, 0);
-  const width = 960;
-  const height = 320;
-  const padX = 36;
-  const padY = 28;
-  const chartW = width - padX * 2;
-  const chartH = height - padY * 2 - 32;
-  const points = buckets.map((bucket, index) => {
-    const x =
-      buckets.length === 1
-        ? padX + chartW / 2
-        : padX + (index / Math.max(buckets.length - 1, 1)) * chartW;
-    const ratio = maxAmount > 0 ? moneyAmount(bucket.total) / maxAmount : 0;
-    const y = padY + chartH - ratio * chartH;
-    return { x, y, bucket };
-  });
-  const linePath = points
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
-    .join(" ");
-  const areaPath =
-    points.length === 0
-      ? ""
-      : `${linePath} L ${points[points.length - 1]?.x ?? padX} ${padY + chartH} L ${points[0]?.x ?? padX} ${padY + chartH} Z`;
-
-  if (buckets.length === 0) {
-    return (
-      <p className="px-3 py-16 text-center text-sm text-sf-muted">
-        No hay ventas en este período.
-      </p>
-    );
-  }
-
-  const labelStep = Math.max(1, Math.ceil(buckets.length / 10));
-
+function SummaryMetric({
+  label,
+  value,
+  caption,
+}: {
+  label: string;
+  value: string | null;
+  caption: string;
+}) {
   return (
-    <div className="w-full">
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className="h-72 w-full md:h-80"
-        role="img"
-        aria-label="Gráfica de ventas del período"
-      >
-        <defs>
-          <linearGradient id="sfSalesFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#087443" stopOpacity="0.24" />
-            <stop offset="100%" stopColor="#087443" stopOpacity="0.02" />
-          </linearGradient>
-        </defs>
-        {[0.25, 0.5, 0.75, 1].map((ratio) => {
-          const y = padY + chartH * (1 - ratio);
-          return (
-            <line
-              key={ratio}
-              x1={padX}
-              x2={width - padX}
-              y1={y}
-              y2={y}
-              stroke="#e5e8e3"
-              strokeDasharray="4 6"
-            />
-          );
-        })}
-        <path d={areaPath} fill="url(#sfSalesFill)" />
-        <path
-          d={linePath}
-          fill="none"
-          stroke="#087443"
-          strokeWidth="2.75"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        {points.map((point) => (
-          <circle
-            key={point.bucket.periodStart}
-            cx={point.x}
-            cy={point.y}
-            r="4"
-            fill="#ffffff"
-            stroke="#087443"
-            strokeWidth="2"
-          >
-            <title>
-              {point.bucket.label}:{" "}
-              {formatMoney({
-                amount: moneyAmount(point.bucket.total),
-                currency: "COP",
-              })}{" "}
-              ({point.bucket.orderCount} pedidos)
-            </title>
-          </circle>
-        ))}
-        {points.map((point, index) =>
-          index % labelStep === 0 || index === points.length - 1 ? (
-            <text
-              key={`${point.bucket.periodStart}-label`}
-              x={point.x}
-              y={height - 10}
-              textAnchor="middle"
-              fill="#667085"
-              fontSize="12"
-            >
-              {point.bucket.label}
-            </text>
-          ) : null,
-        )}
-      </svg>
+    <div className="bg-sf-surface px-4 py-3">
+      <div className="text-xl font-bold tracking-tight tabular-nums text-sf-ink">
+        {value ?? <Skeleton className="h-6 w-24" />}
+      </div>
+      <p className="mt-0.5 text-sm font-semibold text-sf-ink">{label}</p>
+      <p className="mt-0.5 text-xs text-sf-muted">{caption}</p>
     </div>
   );
 }
@@ -445,13 +344,13 @@ function RecentOrdersCard() {
         <EmptyCopy>Aún no hay pedidos registrados.</EmptyCopy>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[28rem] text-left text-sm">
-            <thead className="bg-sf-bg/90 text-xs font-semibold uppercase tracking-wide text-sf-muted">
+          <table className="w-full min-w-[24rem] text-left text-sm">
+            <thead className="bg-sf-bg/80 text-[13px] text-sf-muted">
               <tr>
-                <th className="px-5 py-3 font-semibold">Pedido</th>
-                <th className="px-5 py-3 font-semibold">Estado</th>
-                <th className="px-5 py-3 font-semibold">Total</th>
-                <th className="px-5 py-3 font-semibold">Fecha</th>
+                <th className="px-4 py-2 font-medium">Pedido</th>
+                <th className="px-4 py-2 font-medium">Estado</th>
+                <th className="px-4 py-2 font-medium">Total</th>
+                <th className="px-4 py-2 font-medium">Fecha</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-sf-border/80">
@@ -460,7 +359,7 @@ function RecentOrdersCard() {
                   key={order.id}
                   className="transition-colors duration-150 hover:bg-sf-bg/60"
                 >
-                  <td className="px-5 py-3">
+                  <td className="px-4 py-2">
                     <Link
                       href={adminOrderDetailHref(order.id)}
                       className="font-semibold text-sf-primary transition-colors hover:underline"
@@ -468,15 +367,15 @@ function RecentOrdersCard() {
                       {order.orderNumber}
                     </Link>
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-4 py-2">
                     <StatusPill status={order.status}>
                       {orderStatusLabel(order.status)}
                     </StatusPill>
                   </td>
-                  <td className="px-5 py-3 font-semibold tabular-nums text-sf-ink">
+                  <td className="px-4 py-2 font-semibold tabular-nums text-sf-ink">
                     {formatMoney(order.total)}
                   </td>
-                  <td className="px-5 py-3 text-sf-muted">
+                  <td className="px-4 py-2 text-sf-muted">
                     {formatAdminInstant(order.createdAt)}
                   </td>
                 </tr>
@@ -603,11 +502,11 @@ function RecentlySoldProductsCard() {
         <EmptyCopy>No hay ventas recientes para agregar productos.</EmptyCopy>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[22rem] text-left text-sm">
-            <thead className="bg-sf-bg/90 text-xs font-semibold uppercase tracking-wide text-sf-muted">
+          <table className="w-full min-w-[20rem] text-left text-sm">
+            <thead className="bg-sf-bg/80 text-[13px] text-sf-muted">
               <tr>
-                <th className="px-5 py-3 font-semibold">Producto</th>
-                <th className="px-5 py-3 text-right font-semibold">Unidades</th>
+                <th className="px-4 py-2 font-medium">Producto</th>
+                <th className="px-4 py-2 text-right font-medium">Unidades</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-sf-border/80">
@@ -616,7 +515,7 @@ function RecentlySoldProductsCard() {
                   key={row.productId}
                   className="transition-colors duration-150 hover:bg-sf-bg/60"
                 >
-                  <td className="px-5 py-3">
+                  <td className="px-4 py-2">
                     <div className="flex items-start gap-3">
                       <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sf-primary/10 text-xs font-bold text-sf-primary">
                         {index + 1}
@@ -629,7 +528,7 @@ function RecentlySoldProductsCard() {
                       </Link>
                     </div>
                   </td>
-                  <td className="px-5 py-3 text-right font-semibold tabular-nums text-sf-ink">
+                  <td className="px-4 py-2 text-right font-semibold tabular-nums text-sf-ink">
                     {row.quantity}
                   </td>
                 </tr>
@@ -665,13 +564,13 @@ function RecentBuyersCard() {
           <EmptyCopy>No hay clientes con compras recientes.</EmptyCopy>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[32rem] text-left text-sm">
-              <thead className="bg-sf-bg/90 text-xs font-semibold uppercase tracking-wide text-sf-muted">
+            <table className="w-full min-w-[26rem] text-left text-sm">
+              <thead className="bg-sf-bg/80 text-[13px] text-sf-muted">
                 <tr>
-                  <th className="px-5 py-3 font-semibold">Cliente</th>
-                  <th className="px-5 py-3 font-semibold">Última compra</th>
-                  <th className="px-5 py-3 font-semibold">Pedidos recientes</th>
-                  <th className="px-5 py-3 font-semibold">Último total</th>
+                  <th className="px-4 py-2 font-medium">Cliente</th>
+                  <th className="px-4 py-2 font-medium">Última compra</th>
+                  <th className="px-4 py-2 font-medium">Pedidos recientes</th>
+                  <th className="px-4 py-2 text-right font-medium">Último total</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-sf-border/80">
@@ -680,23 +579,23 @@ function RecentBuyersCard() {
                     key={buyer.customerId}
                     className="transition-colors duration-150 hover:bg-sf-bg/60"
                   >
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sf-primary/10 text-xs font-bold text-sf-primary">
+                    <td className="px-4 py-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sf-primary/10 text-xs font-bold text-sf-primary">
                           {buyerInitials(buyer.displayName)}
                         </span>
-                        <span className="font-semibold text-sf-ink">
+                        <span className="truncate font-semibold text-sf-ink">
                           {buyer.displayName}
                         </span>
                       </div>
                     </td>
-                    <td className="px-5 py-3 text-sf-muted">
+                    <td className="px-4 py-2 text-sf-muted">
                       {formatAdminInstant(buyer.lastOrderAt)}
                     </td>
-                    <td className="px-5 py-3 font-semibold tabular-nums text-sf-ink">
+                    <td className="px-4 py-2 font-semibold tabular-nums text-sf-ink">
                       {buyer.orderCount}
                     </td>
-                    <td className="px-5 py-3 font-semibold tabular-nums text-sf-ink">
+                    <td className="px-4 py-2 text-right font-semibold tabular-nums text-sf-ink">
                       {formatMoney(buyer.lastOrderTotal)}
                     </td>
                   </tr>
@@ -728,10 +627,10 @@ function HubTableCard({
   children: ReactNode;
 }) {
   return (
-    <Card className="overflow-hidden rounded-2xl border-sf-border p-0 shadow-[0_8px_28px_rgba(23,33,27,0.05)]">
-      <div className="flex items-start justify-between gap-3 border-b border-sf-border px-5 py-4 md:px-6">
-        <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-sf-primary/10 text-sf-primary">
+    <Card className="overflow-hidden rounded-xl border-sf-border p-0 shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+      <div className="flex items-center justify-between gap-3 border-b border-sf-border px-4 py-3 md:px-5">
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sf-primary/10 text-sf-primary">
             <Icon className="h-4 w-4" />
           </span>
           <div>
@@ -746,7 +645,7 @@ function HubTableCard({
         {actionHref && actionLabel ? (
           <Link
             href={actionHref}
-            className="shrink-0 rounded-lg px-2 py-1 text-sm font-semibold text-sf-primary transition-colors hover:bg-sf-primary/10"
+            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-sf-border bg-sf-surface px-3 py-1.5 text-sm font-semibold text-sf-primary transition-colors hover:bg-sf-bg"
           >
             {actionLabel}
           </Link>
@@ -759,16 +658,16 @@ function HubTableCard({
 
 function LoadingRows() {
   return (
-    <div className="space-y-3 p-5">
-      <Skeleton className="h-10 w-full" />
-      <Skeleton className="h-10 w-full" />
-      <Skeleton className="h-10 w-full" />
+    <div className="space-y-3 p-4">
+      <Skeleton className="h-9 w-full" />
+      <Skeleton className="h-9 w-full" />
+      <Skeleton className="h-9 w-full" />
     </div>
   );
 }
 
 function EmptyCopy({ children }: { children: ReactNode }) {
-  return <p className="px-5 py-8 text-sm text-sf-muted">{children}</p>;
+  return <p className="px-5 py-7 text-sm text-sf-muted">{children}</p>;
 }
 
 function StatusPill({

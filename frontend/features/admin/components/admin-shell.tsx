@@ -23,15 +23,15 @@ export function AdminShell({ children }: { children: ReactNode }) {
   }, [productsQuery.data]);
 
   return (
-    <div className="min-h-screen bg-sf-bg">
+    <div className="sf-admin min-h-screen bg-sf-bg">
       <AdminSidebar
         inventoryAttentionCount={inventoryAttentionCount}
         mobileOpen={mobileOpen}
         onCloseMobile={() => setMobileOpen(false)}
       />
-        <div className="lg:pl-[16rem]">
+      <div className="lg:pl-[16rem]">
         <AdminHeader onOpenMobileNav={() => setMobileOpen(true)} />
-        <div className="min-h-[calc(100vh-4rem)]">{children}</div>
+        <div className="min-h-[calc(100vh-3.5rem)]">{children}</div>
       </div>
     </div>
   );

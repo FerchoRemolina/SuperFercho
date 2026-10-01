@@ -13,11 +13,14 @@ export function ProductImage({
   alt,
   className,
   children,
+  compact = false,
 }: {
   src: string | null | undefined;
   alt: string;
   className?: string;
   children?: ReactNode;
+  /** Miniatura pequeña (listas admin): fallback solo con la marca. */
+  compact?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
   const hasImage = Boolean(src && src.trim() && !failed);
@@ -42,8 +45,17 @@ export function ProductImage({
           <img
             src={src ?? ""}
             alt={alt}
-            className="h-full w-full object-contain p-3"
+            className={compact ? "h-full w-full object-contain p-1" : "h-full w-full object-contain p-3"}
             onError={() => setFailed(true)}
+          />
+        ) : compact ? (
+          // eslint-disable-next-line @next/next/no-img-element -- static branding SVG from /public
+          <img
+            src={brandingAssets.mark}
+            alt=""
+            width={24}
+            height={24}
+            className="size-6 opacity-90"
           />
         ) : (
           <div className="flex flex-col items-center gap-2 px-4 text-center">

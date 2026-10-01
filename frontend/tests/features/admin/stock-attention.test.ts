@@ -29,7 +29,7 @@ describe("admin stock attention panel", () => {
     expect(hub).toContain("Últimos pedidos");
     expect(hub).toContain("Productos más vendidos recientemente");
     expect(hub).toContain("Ventas");
-    expect(hub).toContain("SalesPeriodCard");
+    expect(hub).toContain("AnalyticsCard");
     expect(hub).toContain("useAdminSalesPeriodSummaryQuery");
     expect(hub).toContain("Clientes con compras recientes");
     expect(hub).toContain("useAdminRecentBuyersQuery");
@@ -37,11 +37,11 @@ describe("admin stock attention panel", () => {
     expect(hub).toContain("withDisambiguatedRecentlySoldLabels");
     expect(hub).toContain("getAdminProduct");
     expect(hub).toContain("getAdminProductVariant");
-    expect(hub.indexOf("RecentOrdersCard")).toBeLessThan(
-      hub.indexOf("SalesPeriodCard"),
+    expect(hub.indexOf("<RecentOrdersCard />")).toBeLessThan(
+      hub.indexOf("<AnalyticsCard />"),
     );
-    expect(hub.indexOf("SalesPeriodCard")).toBeLessThan(
-      hub.indexOf("RecentBuyersCard"),
+    expect(hub.indexOf("<AnalyticsCard />")).toBeLessThan(
+      hub.indexOf("<RecentBuyersCard />"),
     );
     expect(hub).not.toContain("Ir a productos");
     expect(hub).not.toContain("HubProductsArt");
@@ -183,14 +183,15 @@ describe("recently sold aggregation", () => {
 });
 
 describe("storefront preview enter button presentation", () => {
-  it("uses SuperFercho surface styling and an eye icon without changing preview behavior", () => {
+  it("uses SuperFercho primary styling and an eye icon without changing preview behavior", () => {
     const enter = source(
       "features/admin/components/storefront-preview-enter-button.tsx",
     );
     expect(enter).toContain("enterStorefrontPreview");
     expect(enter).toContain("Ver tienda");
     expect(enter).toContain("EyeIcon");
-    expect(enter).toContain("bg-sf-primary/5");
+    expect(enter).toContain("bg-sf-primary text-white");
+    expect(enter).toContain("hover:bg-sf-primary-hover");
     expect(enter).not.toContain("bg-indigo-700");
   });
 });

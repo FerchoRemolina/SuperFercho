@@ -45,9 +45,9 @@ export function productStatusLabel(status: ProductStatus | CategoryStatus): stri
 
 export function productStatusTone(
   status: ProductStatus,
-): "primary" | "neutral" | "danger" {
+): "success" | "primary" | "neutral" | "danger" {
   if (status === "ACTIVE") {
-    return "primary";
+    return "success";
   }
   if (status === "ARCHIVED") {
     return "danger";
@@ -176,6 +176,36 @@ export function formatAdminInstant(iso: string): string {
     timeStyle: "short",
     timeZone: "America/Bogota",
   }).format(new Date(iso));
+}
+
+export type AdminProductsFilters = {
+  text: string;
+  categoryId?: string;
+  status?: ProductStatus | "";
+};
+
+/**
+ * Combina los filtros actuales con un cambio del usuario.
+ * `undefined` en un campo = mantener el valor actual;
+ * cadena vacía o null = quitar el filtro (Todas/Todos → sin categoryId).
+ */
+export function mergeAdminProductsFilters(
+  current: AdminProductsFilters,
+  change: {
+    text?: string;
+    categoryId?: string | null;
+    status?: ProductStatus | "";
+  },
+): AdminProductsFilters {
+  return {
+    text: change.text ?? current.text,
+    categoryId:
+      change.categoryId === undefined
+        ? current.categoryId
+        : change.categoryId || undefined,
+    status:
+      change.status === undefined ? current.status : change.status || undefined,
+  };
 }
 
 export function adminProductsHref(query: {

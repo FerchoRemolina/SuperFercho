@@ -257,10 +257,9 @@ export function serializeAdminOrdersStatusParam(
   if (typeof status === "string") {
     return status;
   }
-  if (isAdminSalesOrderStatuses(status)) {
-    return ADMIN_SALES_ORDER_STATUSES.join(",");
-  }
-  return undefined;
+  // El backend (AdminOrderController) enlaza status como List<String>,
+  // así que cualquier conjunto de estados se envía separado por comas.
+  return status.join(",");
 }
 
 export function adminKeys() {
@@ -297,6 +296,17 @@ export function adminKeys() {
     order: (orderId: string) => ["admin", "order", orderId] as const,
     salesPeriod: (granularity: SalesPeriodGranularity) =>
       ["admin", "orders", "dashboard", "sales", granularity] as const,
+    analyticsSales: (from: string, to: string, granularity: AnalyticsGranularity) =>
+      ["admin", "analytics", "sales", from, to, granularity] as const,
+    analyticsNewCustomers: (
+      from: string,
+      to: string,
+      granularity: AnalyticsGranularity,
+    ) => ["admin", "analytics", "newCustomers", from, to, granularity] as const,
+    analyticsTopProducts: (from: string, to: string, sort: "DESC" | "ASC") =>
+      ["admin", "analytics", "topProducts", from, to, sort] as const,
+    analyticsTopCustomers: (from: string, to: string) =>
+      ["admin", "analytics", "topCustomers", from, to] as const,
     recentBuyers: (limit: number) =>
       ["admin", "orders", "dashboard", "recent-buyers", limit] as const,
     knowledgeRoot: () => ["admin", "knowledge"] as const,
@@ -585,6 +595,115 @@ export async function listAdminOrders(
     })}`,
   );
 }
+
+/**
+ * Contrato real de Analítica (backend implementado):
+ *  - GET /admin/orders/dashboard/sales?from&to&granularity  → serie con total
+ *    (dinero) y orderCount por bucket; excluye CANCELLED.
+ *  - GET /admin/customers/dashboard/new?from&to&granularity → clientes nuevos
+ *    por registro real.
+ *  - GET /admin/orders/dashboard/products?from&to&sort=ASC|DESC&limit → ranking
+ *    por unidades vendidas.
+ *  - GET /admin/orders/dashboard/customers/top?from&to&limit → ranking por
+ *    valor comprado.
+ * from/to son instantes ISO-8601 (fechas sueltas se interpretan en
+ * America/Bogota); el período es [from, to). Granularidad HOUR|DAY|MONTH
+ * (HOUR ≤ 7 días, DAY ≤ 400 días).
+ */
+export type AnalyticsGranularity = "HOUR" | "DAY" | "MONTH";
+
+export type AnalyticsSalesResponse = {
+  granularity: string;
+  buckets: {
+    periodStart: string;
+    label: string;
+    total: Money;
+    orderCount: number;
+  }[];
+};
+
+export type AnalyticsNewCustomersResponse = {
+  total: number;
+  buckets: {
+    periodStart: string;
+    label: string;
+    count: number;
+  }[];
+};
+
+export type AnalyticsTopProductsResponse = {
+  items: { productId: string; productName: string; quantity: number }[];
+};
+
+export type AnalyticsTopCustomersResponse = {
+  items: {
+    customerId: string;
+    customerName: string;
+    total: Money;
+    orderCount: number;
+  }[];
+};
+
+export async function getAdminSalesAnalytics(params: {
+  from: string;
+  to: string;
+  granularity: AnalyticsGranularity;
+}): Promise<AnalyticsSalesResponse> {  return request<AnalyticsSalesResponse>(
+    `/admin/orders/dashboard/sales${toQuery({
+      from: params.from,
+      to: params.to,
+      granularity: params.granularity,
+    })}`,
+  );
+}
+
+export async function getAdminNewCustomers(params: {
+  from: string;
+  to: string;
+  granularity: AnalyticsGranularity;
+}): Promise<AnalyticsNewCustomersResponse> {
+  return request<AnalyticsNewCustomersResponse>(
+    `/admin/customers/dashboard/new${toQuery({
+      from: params.from,
+      to: params.to,
+      granularity: params.granularity,
+    })}`,
+  );
+}
+
+export async function getAdminTopProducts(params: {
+  from: string;
+  to: string;
+  sort: "DESC" | "ASC";
+  limit: number;
+}): Promise<AnalyticsTopProductsResponse> {
+  return request<AnalyticsTopProductsResponse>(
+    `/admin/orders/dashboard/products${toQuery({
+      from: params.from,
+      to: params.to,
+      sort: params.sort,
+      limit: String(params.limit),
+    })}`,
+  );
+}
+
+export async function getAdminTopCustomers(params: {
+  from: string;
+  to: string;
+  limit: number;
+}): Promise<AnalyticsTopCustomersResponse> {
+  return request<AnalyticsTopCustomersResponse>(
+    `/admin/orders/dashboard/customers/top${toQuery({
+      from: params.from,
+      to: params.to,
+      limit: String(params.limit),
+    })}`,
+  );
+}
+
+/**
+ * Legacy rolling-window sales summary (kept for the operational summary strip).
+ */
 
 /** GET /api/v1/admin/orders/{orderId} — ADMIN; no reutilizar GET /api/v1/orders/{orderId}. */
 export async function getAdminOrder(orderId: string): Promise<Order> {

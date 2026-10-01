@@ -114,17 +114,17 @@ export function AdminSidebar({
       <aside
         className={cx(
           "fixed inset-y-0 left-0 z-50 flex w-[16rem] flex-col border-r border-sf-border bg-sf-surface",
-          "shadow-[0_1px_3px_rgba(23,33,27,0.05)] transition-transform duration-200 ease-out lg:translate-x-0",
+          "shadow-[0_1px_3px_rgba(16,24,40,0.04)] transition-transform duration-200 ease-out lg:translate-x-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
         aria-label="Navegación administrativa"
       >
-        <div className="flex h-16 shrink-0 items-center border-b border-sf-border px-5">
-          <BrandLogo href="/admin" className="min-h-0 [&_img]:w-[148px]" />
+        <div className="flex h-16 shrink-0 items-center px-4">
+          <BrandLogo href="/admin" className="min-h-0 [&_img]:w-[216px]" />
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-5">
-          <ul className="grid gap-1.5">
+        <nav className="flex-1 overflow-y-auto px-3 py-4">
+          <ul className="grid gap-1">
             {ADMIN_NAV_TREE.map((node) => (
               <li key={node.kind === "leaf" ? node.href : node.id}>
                 <AdminNavItem
@@ -170,7 +170,7 @@ function AdminNavItem({
         href={node.href}
         onClick={onNavigate}
         className={cx(
-          "relative flex min-h-11 items-center gap-2.5 rounded-xl px-3 text-sm font-semibold transition-all duration-150",
+          "relative flex min-h-10 items-center gap-2.5 rounded-lg px-3 text-sm font-semibold transition-all duration-150",
           depth >= 1 && "pl-3",
           active
             ? "bg-sf-primary/10 text-sf-primary before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full before:bg-sf-primary"
@@ -227,7 +227,7 @@ function AdminNavGroupItem({
       <button
         type="button"
         className={cx(
-          "flex min-h-11 w-full items-center gap-2.5 rounded-xl px-3 text-left text-sm font-semibold transition-all duration-150",
+          "flex min-h-10 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-semibold transition-all duration-150",
           groupActive
             ? "bg-sf-primary/10 text-sf-primary"
             : open

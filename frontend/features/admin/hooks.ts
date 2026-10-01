@@ -28,6 +28,10 @@ import {
   getAdminProductType,
   getAdminProductVariant,
   getAdminSalesPeriodSummary,
+  getAdminSalesAnalytics,
+  getAdminNewCustomers,
+  getAdminTopProducts,
+  getAdminTopCustomers,
   listAdminCategories,
   listAdminKnowledgeDocuments,
   listAdminOrders,
@@ -45,8 +49,9 @@ import {
   updateAdminProduct,
   updateAdminProductType,
   updateAdminProductVariant,
-  type AdjustAdminProductStockRequest,
-  type ChangeAdminProductPriceRequest,
+   type AdjustAdminProductStockRequest,
+   type AnalyticsGranularity,
+   type ChangeAdminProductPriceRequest,
   type CreateAdminCategoryRequest,
   type CreateAdminKnowledgeDocumentRequest,
   type CreateAdminProductRequest,
@@ -61,7 +66,7 @@ import {
   type UpdateAdminProductRequest,
   type UpdateAdminProductTypeRequest,
   type UpdateAdminProductVariantRequest,
-} from "@/features/admin/api";
+ } from "@/features/admin/api";
 import {
   isAdminRole,
   shouldSearchAdminKnowledge,
@@ -486,13 +491,80 @@ export function useAdminOrdersQuery(query: ListAdminOrdersQuery) {
 
 export function useAdminSalesPeriodSummaryQuery(
   granularity: SalesPeriodGranularity,
+  enabled = true,
 ) {
   const { session } = useSession();
 
   return useQuery({
     queryKey: keys.salesPeriod(granularity),
     queryFn: () => getAdminSalesPeriodSummary(granularity),
-    enabled: isAdminRole(session?.role),
+    enabled: isAdminRole(session?.role) && enabled,
+  });
+}
+
+const ANALYTICS_LIMIT = 5;
+
+/** Serie de ventas (dinero) + pedidos por bucket del período resuelto. */
+export function useAdminAnalyticsSalesQuery(
+  from: string,
+  to: string,
+  granularity: AnalyticsGranularity,
+  enabled = true,
+) {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.analyticsSales(from, to, granularity),
+    queryFn: () => getAdminSalesAnalytics({ from, to, granularity }),
+    enabled: isAdminRole(session?.role) && enabled,
+  });
+}
+
+/** Clientes nuevos (por registro real) por bucket del período resuelto. */
+export function useAdminAnalyticsNewCustomersQuery(
+  from: string,
+  to: string,
+  granularity: AnalyticsGranularity,
+  enabled = true,
+) {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.analyticsNewCustomers(from, to, granularity),
+    queryFn: () => getAdminNewCustomers({ from, to, granularity }),
+    enabled: isAdminRole(session?.role) && enabled,
+  });
+}
+
+/** Ranking de productos por unidades vendidas (ASC = menos vendidos). */
+export function useAdminAnalyticsTopProductsQuery(
+  from: string,
+  to: string,
+  sort: "DESC" | "ASC",
+  enabled = true,
+) {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.analyticsTopProducts(from, to, sort),
+    queryFn: () =>
+      getAdminTopProducts({ from, to, sort, limit: ANALYTICS_LIMIT }),
+    enabled: isAdminRole(session?.role) && enabled,
+  });
+}
+
+/** Ranking de clientes por valor comprado en el período. */
+export function useAdminAnalyticsTopCustomersQuery(
+  from: string,
+  to: string,
+  enabled = true,
+) {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.analyticsTopCustomers(from, to),
+    queryFn: () => getAdminTopCustomers({ from, to, limit: ANALYTICS_LIMIT }),
+    enabled: isAdminRole(session?.role) && enabled,
   });
 }
 

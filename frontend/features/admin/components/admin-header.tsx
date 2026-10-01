@@ -55,11 +55,11 @@ export function AdminHeader({
 
   return (
     <header className="sticky top-0 z-30 border-b border-sf-border bg-sf-surface/95 backdrop-blur-sm">
-      <div className="flex h-16 items-center gap-4 px-4 md:px-6 lg:px-8">
+      <div className="flex h-14 items-center gap-3 px-4 md:gap-4 md:px-6 lg:px-8">
         <button
           type="button"
           className={cx(
-            "inline-flex h-10 w-10 items-center justify-center rounded-xl border border-sf-border text-sf-ink lg:hidden",
+            "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-sf-border text-sf-ink lg:hidden",
             "hover:bg-sf-bg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sf-primary",
           )}
           aria-label="Abrir menú de administración"
@@ -68,41 +68,45 @@ export function AdminHeader({
           <MenuIcon className="h-5 w-5" />
         </button>
 
-        <nav
-          aria-label="Ruta"
-          className="min-w-0 flex-1 overflow-hidden text-sm text-sf-muted"
-        >
-          <ol className="flex flex-wrap items-center gap-1.5">
-            {crumbs.map((crumb, index) => {
-              const isLast = index === crumbs.length - 1;
-              return (
-                <li
-                  key={`${crumb.label}-${index}`}
-                  className="flex items-center gap-1.5"
-                >
-                  {index > 0 ? <span aria-hidden="true">›</span> : null}
-                  {crumb.href && !isLast ? (
-                    <Link
-                      href={crumb.href}
-                      className="truncate font-medium hover:text-sf-primary"
-                    >
-                      {crumb.label}
-                    </Link>
-                  ) : (
-                    <span
-                      className={cx(
-                        "truncate",
-                        isLast ? "font-semibold text-sf-ink" : "font-medium",
-                      )}
-                    >
-                      {crumb.label}
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
-        </nav>
+        {crumbs.length > 1 ? (
+          <nav
+            aria-label="Ruta"
+            className="min-w-0 flex-1 overflow-hidden text-sm text-sf-muted"
+          >
+            <ol className="flex flex-wrap items-center gap-1.5">
+              {crumbs.map((crumb, index) => {
+                const isLast = index === crumbs.length - 1;
+                return (
+                  <li
+                    key={`${crumb.label}-${index}`}
+                    className="flex items-center gap-1.5"
+                  >
+                    {index > 0 ? <span aria-hidden="true">›</span> : null}
+                    {crumb.href && !isLast ? (
+                      <Link
+                        href={crumb.href}
+                        className="truncate font-medium hover:text-sf-primary"
+                      >
+                        {crumb.label}
+                      </Link>
+                    ) : (
+                      <span
+                        className={cx(
+                          "truncate",
+                          isLast ? "font-semibold text-sf-ink" : "font-medium",
+                        )}
+                      >
+                        {crumb.label}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          </nav>
+        ) : (
+          <div className="min-w-0 flex-1" aria-hidden="true" />
+        )}
 
         <div className="flex shrink-0 items-center gap-3 border-l border-sf-border pl-3 md:gap-4 md:pl-4">
           <StorefrontPreviewEnterButton />
@@ -143,18 +147,18 @@ export function AdminHeader({
               <div
                 id={menuId}
                 role="menu"
-                className="absolute right-0 mt-2 w-48 overflow-hidden rounded-xl border border-sf-border bg-sf-surface py-1 shadow-[0_8px_24px_rgba(23,33,27,0.12)]"
+                className="absolute right-0 mt-2 w-48 overflow-hidden rounded-xl border border-sf-border bg-sf-surface py-1 shadow-[0_8px_24px_rgba(16,24,40,0.10)]"
               >
                 <button
                   type="button"
                   role="menuitem"
-                  className="flex w-full min-h-11 items-center gap-2.5 px-3 text-left text-sm font-semibold text-sf-ink hover:bg-sf-bg"
+                  className="flex w-full min-h-11 items-center gap-2.5 px-3 text-left text-sm font-semibold text-sf-error transition-colors hover:bg-sf-error/10"
                   onClick={() => {
                     setMenuOpen(false);
                     logout();
                   }}
                 >
-                  <LogOutIcon className="h-4 w-4 text-sf-muted" />
+                  <LogOutIcon className="h-4 w-4 text-sf-error" />
                   Cerrar sesión
                 </button>
               </div>

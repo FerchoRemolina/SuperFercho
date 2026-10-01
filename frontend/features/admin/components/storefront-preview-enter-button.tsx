@@ -25,11 +25,9 @@ export function StorefrontPreviewEnterButton({
         type="button"
         disabled={pending}
         className={cx(
-          "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold",
-          "border border-sf-primary/25 bg-sf-primary/5 text-sf-primary",
-          "shadow-[0_1px_2px_rgba(8,116,67,0.08)]",
-          "transition-all duration-150 hover:-translate-y-px hover:border-sf-primary/45 hover:bg-sf-primary/10",
-          "disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0",
+          "inline-flex min-h-9 items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold",
+          "bg-sf-primary text-white hover:bg-sf-primary-hover",
+          "disabled:cursor-not-allowed disabled:opacity-60",
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sf-primary",
         )}
         onClick={() => {

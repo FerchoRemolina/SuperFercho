@@ -18,6 +18,21 @@
   --color-sf-warning: #b54708;
 }
 
+/*
+ * Panel administrativo: overrides del sistema visual (azul corporativo y
+ * neutros gris-azulados) según la referencia de diseño del Admin Hub.
+ * El storefront conserva los tokens raíz (verde).
+ */
+.sf-admin {
+  --color-sf-bg: #f5f7fa;
+  --color-sf-ink: #101828;
+  --color-sf-border: #e7eaf0;
+  --color-sf-primary: #1d6ceb;
+  --color-sf-primary-hover: #1558c4;
+  --color-sf-accent: #1d6ceb;
+  --color-sf-accent-hover: #1558c4;
+}
+
 html {
   color-scheme: light;
 }
