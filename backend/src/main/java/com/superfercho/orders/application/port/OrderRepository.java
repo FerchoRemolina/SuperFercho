@@ -1,9 +1,14 @@
 package com.superfercho.orders.application.port;
 
+import com.superfercho.orders.application.dto.AdminCustomerSalesRow;
+import com.superfercho.orders.application.dto.AdminOrderStatusCountRow;
+import com.superfercho.orders.application.dto.AdminProductSalesRow;
+import com.superfercho.orders.application.dto.AdminSalesBucketRow;
 import com.superfercho.orders.application.dto.PageRequest;
 import com.superfercho.orders.application.dto.PagedResult;
 import com.superfercho.orders.domain.model.Order;
 import com.superfercho.orders.domain.model.OrderStatus;
+import com.superfercho.platform.time.BucketGranularity;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -48,4 +53,30 @@ public interface OrderRepository {
             Instant fromInclusive, Instant toExclusive, OrderStatus excludedStatus);
 
     void deleteAllByCustomerId(UUID customerId);
+
+    /**
+     * Sales totals (CANCELLED excluded) grouped by {@code granularity} buckets over
+     * {@code [fromInclusive, toExclusive)}. Bucket boundaries follow America/Bogota.
+     */
+    List<AdminSalesBucketRow> aggregateSalesBuckets(
+            BucketGranularity granularity, Instant fromInclusive, Instant toExclusive);
+
+    /**
+     * Order count and sales amount per status over {@code [fromInclusive, toExclusive)}.
+     */
+    List<AdminOrderStatusCountRow> countByStatusBetween(Instant fromInclusive, Instant toExclusive);
+
+    /**
+     * Units sold per product (CANCELLED excluded) over {@code [fromInclusive, toExclusive)},
+     * ordered by quantity (ascending when {@code ascending}). Limited to {@code limit} rows.
+     */
+    List<AdminProductSalesRow> findTopProductsByQuantity(
+            Instant fromInclusive, Instant toExclusive, int limit, boolean ascending);
+
+    /**
+     * Purchased value per customer (CANCELLED excluded) over
+     * {@code [fromInclusive, toExclusive)}, ordered by total desc. Limited to {@code limit} rows.
+     */
+    List<AdminCustomerSalesRow> findTopCustomersByTotal(
+            Instant fromInclusive, Instant toExclusive, int limit);
 }

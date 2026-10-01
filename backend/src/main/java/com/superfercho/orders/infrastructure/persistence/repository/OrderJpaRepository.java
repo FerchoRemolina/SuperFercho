@@ -56,4 +56,102 @@ public interface OrderJpaRepository extends JpaRepository<OrderJpaEntity, UUID> 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional
     void deleteAllByCustomerId(UUID customerId);
+
+    @Query(
+            value =
+                    """
+                    SELECT date_trunc(CAST(:unit AS text), o.created_at AT TIME ZONE 'America/Bogota')
+                               AT TIME ZONE 'America/Bogota' AS bucket_start,
+                           COALESCE(SUM(o.total_amount), 0) AS total_amount,
+                           COUNT(*) AS order_count
+                      FROM orders.orders o
+                     WHERE o.created_at >= :fromInclusive
+                       AND o.created_at < :toExclusive
+                       AND o.status <> 'CANCELLED'
+                     GROUP BY 1
+                     ORDER BY 1
+                    """,
+            nativeQuery = true)
+    List<Object[]> aggregateSalesBuckets(
+            @Param("unit") String unit,
+            @Param("fromInclusive") Instant fromInclusive,
+            @Param("toExclusive") Instant toExclusive);
+
+    @Query(
+            value =
+                    """
+                    SELECT o.status AS status,
+                           COUNT(*) AS order_count,
+                           COALESCE(SUM(o.total_amount), 0) AS total_amount
+                      FROM orders.orders o
+                     WHERE o.created_at >= :fromInclusive
+                       AND o.created_at < :toExclusive
+                     GROUP BY o.status
+                    """,
+            nativeQuery = true)
+    List<Object[]> countByStatusBetween(
+            @Param("fromInclusive") Instant fromInclusive, @Param("toExclusive") Instant toExclusive);
+
+    @Query(
+            value =
+                    """
+                    SELECT oi.product_id AS product_id,
+                           MAX(oi.product_name) AS product_name,
+                           SUM(oi.quantity) AS quantity
+                      FROM orders.order_items oi
+                      JOIN orders.orders o ON o.id = oi.order_id
+                     WHERE o.created_at >= :fromInclusive
+                       AND o.created_at < :toExclusive
+                       AND o.status <> 'CANCELLED'
+                     GROUP BY oi.product_id
+                     ORDER BY quantity DESC, oi.product_id ASC
+                     LIMIT :limit
+                    """,
+            nativeQuery = true)
+    List<Object[]> findTopProductsByQuantityDesc(
+            @Param("fromInclusive") Instant fromInclusive,
+            @Param("toExclusive") Instant toExclusive,
+            @Param("limit") int limit);
+
+    @Query(
+            value =
+                    """
+                    SELECT oi.product_id AS product_id,
+                           MAX(oi.product_name) AS product_name,
+                           SUM(oi.quantity) AS quantity
+                      FROM orders.order_items oi
+                      JOIN orders.orders o ON o.id = oi.order_id
+                     WHERE o.created_at >= :fromInclusive
+                       AND o.created_at < :toExclusive
+                       AND o.status <> 'CANCELLED'
+                     GROUP BY oi.product_id
+                     ORDER BY quantity ASC, oi.product_id ASC
+                     LIMIT :limit
+                    """,
+            nativeQuery = true)
+    List<Object[]> findTopProductsByQuantityAsc(
+            @Param("fromInclusive") Instant fromInclusive,
+            @Param("toExclusive") Instant toExclusive,
+            @Param("limit") int limit);
+
+    @Query(
+            value =
+                    """
+                    SELECT o.customer_id AS customer_id,
+                           MAX(o.shipping_recipient_name) AS customer_name,
+                           COALESCE(SUM(o.total_amount), 0) AS total_amount,
+                           COUNT(*) AS order_count
+                      FROM orders.orders o
+                     WHERE o.created_at >= :fromInclusive
+                       AND o.created_at < :toExclusive
+                       AND o.status <> 'CANCELLED'
+                     GROUP BY o.customer_id
+                     ORDER BY total_amount DESC, o.customer_id ASC
+                     LIMIT :limit
+                    """,
+            nativeQuery = true)
+    List<Object[]> findTopCustomersByTotal(
+            @Param("fromInclusive") Instant fromInclusive,
+            @Param("toExclusive") Instant toExclusive,
+            @Param("limit") int limit);
 }

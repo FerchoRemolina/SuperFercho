@@ -31,6 +31,7 @@ import com.superfercho.identity.application.usecase.ExpireStorefrontPreviewsUseC
 import com.superfercho.identity.application.usecase.FinalizeStorefrontPreviewUseCase;
 import com.superfercho.identity.application.usecase.FindAdminCustomerByDocumentUseCase;
 import com.superfercho.identity.application.usecase.GetAdminCustomerRecordUseCase;
+import com.superfercho.identity.application.usecase.GetAdminNewCustomersUseCase;
 import com.superfercho.identity.application.usecase.GetStorefrontPreviewUseCase;
 import com.superfercho.identity.application.usecase.ListAddressesUseCase;
 import com.superfercho.identity.application.usecase.ListAdminCustomerOrdersUseCase;
@@ -156,6 +157,13 @@ public class IdentityUseCaseConfiguration {
     DeactivateAdminCustomerAccountUseCase deactivateAdminCustomerAccountUseCase(
             CustomerRecordRepository customerRecordRepository, UserRepository userRepository, Clock clock) {
         return new DeactivateAdminCustomerAccountUseCase(customerRecordRepository, userRepository, clock);
+    }
+
+    @Bean
+    @ConditionalOnBean(CustomerRecordRepository.class)
+    GetAdminNewCustomersUseCase getAdminNewCustomersUseCase(
+            CustomerRecordRepository customerRecordRepository) {
+        return new GetAdminNewCustomersUseCase(customerRecordRepository);
     }
 
     @Bean

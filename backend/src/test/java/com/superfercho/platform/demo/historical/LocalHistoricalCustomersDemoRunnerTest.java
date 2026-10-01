@@ -505,6 +505,32 @@ class LocalHistoricalCustomersDemoRunnerTest {
             orders.entrySet().removeIf(entry -> entry.getValue().customerId().equals(customerId));
         }
 
+        @Override
+        public List<com.superfercho.orders.application.dto.AdminSalesBucketRow> aggregateSalesBuckets(
+                com.superfercho.platform.time.BucketGranularity granularity,
+                Instant fromInclusive,
+                Instant toExclusive) {
+            return List.of();
+        }
+
+        @Override
+        public List<com.superfercho.orders.application.dto.AdminOrderStatusCountRow> countByStatusBetween(
+                Instant fromInclusive, Instant toExclusive) {
+            return List.of();
+        }
+
+        @Override
+        public List<com.superfercho.orders.application.dto.AdminProductSalesRow> findTopProductsByQuantity(
+                Instant fromInclusive, Instant toExclusive, int limit, boolean ascending) {
+            return List.of();
+        }
+
+        @Override
+        public List<com.superfercho.orders.application.dto.AdminCustomerSalesRow> findTopCustomersByTotal(
+                Instant fromInclusive, Instant toExclusive, int limit) {
+            return List.of();
+        }
+
         List<Order> all() {
             return List.copyOf(orders.values());
         }

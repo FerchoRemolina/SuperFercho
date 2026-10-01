@@ -15,6 +15,7 @@ import com.superfercho.orders.application.exception.StockUnavailableException;
 import com.superfercho.orders.domain.exception.InvalidOrderException;
 import com.superfercho.orders.domain.exception.InvalidOrderItemException;
 import com.superfercho.orders.domain.exception.InvalidOrderStateTransitionException;
+import com.superfercho.orders.domain.exception.InvalidSalesPeriodException;
 import com.superfercho.orders.domain.exception.OrderCancellationNotAllowedException;
 import com.superfercho.payments.application.exception.PaymentNotFoundException;
 import org.springframework.context.annotation.Profile;
@@ -103,6 +104,11 @@ public class OrdersExceptionHandler {
     @ExceptionHandler({InvalidOrderException.class, InvalidOrderItemException.class})
     ProblemDetail handleInvalidOrder(RuntimeException exception) {
         return problem(HttpStatus.BAD_REQUEST, "INVALID_ORDER", exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidSalesPeriodException.class)
+    ProblemDetail handleInvalidSalesPeriod(InvalidSalesPeriodException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "INVALID_SALES_PERIOD", exception.getMessage());
     }
 
     private static ProblemDetail problem(HttpStatus status, String code, String detail) {

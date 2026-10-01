@@ -14,8 +14,12 @@ import com.superfercho.orders.application.usecase.AdvanceOrderLifecycleUseCase;
 import com.superfercho.orders.application.usecase.CancelAndDeletePreviewOrdersUseCase;
 import com.superfercho.orders.application.usecase.CancelOrderUseCase;
 import com.superfercho.orders.application.usecase.CheckoutUseCase;
+import com.superfercho.orders.application.usecase.GetAdminOrderPeriodSummaryUseCase;
 import com.superfercho.orders.application.usecase.GetAdminOrderUseCase;
+import com.superfercho.orders.application.usecase.GetAdminSalesPeriodAnalyticsUseCase;
 import com.superfercho.orders.application.usecase.GetAdminSalesPeriodSummaryUseCase;
+import com.superfercho.orders.application.usecase.GetAdminTopCustomersUseCase;
+import com.superfercho.orders.application.usecase.GetAdminTopProductsUseCase;
 import com.superfercho.orders.application.usecase.GetOrderUseCase;
 import com.superfercho.orders.application.usecase.ListAdminOrdersUseCase;
 import com.superfercho.orders.application.usecase.ListAdminRecentBuyersUseCase;
@@ -110,6 +114,26 @@ public class OrdersUseCaseConfiguration {
     GetAdminSalesPeriodSummaryUseCase getAdminSalesPeriodSummaryUseCase(
             OrderRepository orderRepository, ClockProvider ordersClockProvider) {
         return new GetAdminSalesPeriodSummaryUseCase(orderRepository, ordersClockProvider);
+    }
+
+    @Bean
+    GetAdminSalesPeriodAnalyticsUseCase getAdminSalesPeriodAnalyticsUseCase(OrderRepository orderRepository) {
+        return new GetAdminSalesPeriodAnalyticsUseCase(orderRepository);
+    }
+
+    @Bean
+    GetAdminOrderPeriodSummaryUseCase getAdminOrderPeriodSummaryUseCase(OrderRepository orderRepository) {
+        return new GetAdminOrderPeriodSummaryUseCase(orderRepository);
+    }
+
+    @Bean
+    GetAdminTopProductsUseCase getAdminTopProductsUseCase(OrderRepository orderRepository) {
+        return new GetAdminTopProductsUseCase(orderRepository);
+    }
+
+    @Bean
+    GetAdminTopCustomersUseCase getAdminTopCustomersUseCase(OrderRepository orderRepository) {
+        return new GetAdminTopCustomersUseCase(orderRepository);
     }
 
     @Bean

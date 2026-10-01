@@ -34,6 +34,7 @@ import com.superfercho.identity.application.usecase.DeactivateAddressUseCase;
 import com.superfercho.identity.application.usecase.DeactivateAdminCustomerAccountUseCase;
 import com.superfercho.identity.application.usecase.FindAdminCustomerByDocumentUseCase;
 import com.superfercho.identity.application.usecase.GetAdminCustomerRecordUseCase;
+import com.superfercho.identity.application.usecase.GetAdminNewCustomersUseCase;
 import com.superfercho.identity.application.usecase.ListAddressesUseCase;
 import com.superfercho.identity.application.usecase.ListAdminCustomerOrdersUseCase;
 import com.superfercho.identity.application.usecase.ListAdminCustomerPaymentsUseCase;
@@ -56,8 +57,12 @@ import com.superfercho.orders.application.dto.OrderResult;
 import com.superfercho.orders.application.dto.PagedResult;
 import com.superfercho.orders.application.dto.PaymentStatus;
 import com.superfercho.orders.application.dto.ShippingAddressResult;
+import com.superfercho.orders.application.usecase.GetAdminOrderPeriodSummaryUseCase;
 import com.superfercho.orders.application.usecase.GetAdminOrderUseCase;
+import com.superfercho.orders.application.usecase.GetAdminSalesPeriodAnalyticsUseCase;
 import com.superfercho.orders.application.usecase.GetAdminSalesPeriodSummaryUseCase;
+import com.superfercho.orders.application.usecase.GetAdminTopCustomersUseCase;
+import com.superfercho.orders.application.usecase.GetAdminTopProductsUseCase;
 import com.superfercho.orders.application.usecase.GetOrderUseCase;
 import com.superfercho.orders.application.usecase.ListAdminOrdersUseCase;
 import com.superfercho.orders.application.usecase.ListAdminRecentBuyersUseCase;
@@ -214,6 +219,21 @@ class HttpAuthorizationSecurityTest {
 
     @MockitoBean
     private DeactivateAdminCustomerAccountUseCase deactivateAdminCustomerAccountUseCase;
+
+    @MockitoBean
+    private GetAdminNewCustomersUseCase getAdminNewCustomersUseCase;
+
+    @MockitoBean
+    private GetAdminSalesPeriodAnalyticsUseCase getAdminSalesPeriodAnalyticsUseCase;
+
+    @MockitoBean
+    private GetAdminOrderPeriodSummaryUseCase getAdminOrderPeriodSummaryUseCase;
+
+    @MockitoBean
+    private GetAdminTopProductsUseCase getAdminTopProductsUseCase;
+
+    @MockitoBean
+    private GetAdminTopCustomersUseCase getAdminTopCustomersUseCase;
 
     @BeforeEach
     void stubUseCases() {

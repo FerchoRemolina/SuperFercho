@@ -1,18 +1,27 @@
 package com.superfercho.orders.infrastructure.rest.dto;
 
+import com.superfercho.orders.application.dto.AdminSalesAnalyticsResult;
 import com.superfercho.orders.application.dto.AdminSalesBucketResult;
 import com.superfercho.orders.application.dto.AdminSalesPeriodSummaryResult;
-import com.superfercho.orders.domain.model.SalesPeriodGranularity;
 import com.superfercho.platform.money.Money;
 import java.time.Instant;
 import java.util.List;
 
-public record AdminSalesPeriodSummaryRestResponse(
-        SalesPeriodGranularity granularity, List<AdminSalesBucketRestResponse> buckets) {
+/**
+ * Unified shape for the sales dashboard: legacy rolling windows (DAY, WEEK,
+ * MONTH, YEAR) and arbitrary [from, to) periods (HOUR, DAY, MONTH buckets).
+ */
+public record AdminSalesPeriodSummaryRestResponse(String granularity, List<AdminSalesBucketRestResponse> buckets) {
 
     public static AdminSalesPeriodSummaryRestResponse from(AdminSalesPeriodSummaryResult result) {
         return new AdminSalesPeriodSummaryRestResponse(
-                result.granularity(),
+                result.granularity().name(),
+                result.buckets().stream().map(AdminSalesBucketRestResponse::from).toList());
+    }
+
+    public static AdminSalesPeriodSummaryRestResponse from(AdminSalesAnalyticsResult result) {
+        return new AdminSalesPeriodSummaryRestResponse(
+                result.granularity().name(),
                 result.buckets().stream().map(AdminSalesBucketRestResponse::from).toList());
     }
 

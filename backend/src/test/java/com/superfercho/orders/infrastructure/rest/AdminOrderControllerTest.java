@@ -9,10 +9,18 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.superfercho.orders.application.dto.AdminCustomerSalesRow;
+import com.superfercho.orders.application.dto.AdminOrderPeriodSummaryResult;
+import com.superfercho.orders.application.dto.AdminProductSalesRow;
 import com.superfercho.orders.application.dto.AdminRecentBuyerResult;
+import com.superfercho.orders.application.dto.AdminSalesAnalyticsResult;
 import com.superfercho.orders.application.dto.AdminSalesBucketResult;
 import com.superfercho.orders.application.dto.AdminSalesPeriodSummaryResult;
+import com.superfercho.orders.application.dto.GetAdminDashboardSummaryCommand;
+import com.superfercho.orders.application.dto.GetAdminSalesPeriodAnalyticsCommand;
 import com.superfercho.orders.application.dto.GetAdminSalesPeriodSummaryCommand;
+import com.superfercho.orders.application.dto.GetAdminTopCustomersCommand;
+import com.superfercho.orders.application.dto.GetAdminTopProductsCommand;
 import com.superfercho.orders.application.dto.GetOrderCommand;
 import com.superfercho.orders.application.dto.ListAdminOrdersCommand;
 import com.superfercho.orders.application.dto.ListAdminRecentBuyersCommand;
@@ -24,14 +32,19 @@ import com.superfercho.orders.application.dto.PaymentResult;
 import com.superfercho.orders.application.dto.PaymentStatus;
 import com.superfercho.orders.application.dto.ShippingAddressResult;
 import com.superfercho.orders.application.exception.OrderNotFoundException;
+import com.superfercho.orders.application.usecase.GetAdminOrderPeriodSummaryUseCase;
 import com.superfercho.orders.application.usecase.GetAdminOrderUseCase;
+import com.superfercho.orders.application.usecase.GetAdminSalesPeriodAnalyticsUseCase;
 import com.superfercho.orders.application.usecase.GetAdminSalesPeriodSummaryUseCase;
+import com.superfercho.orders.application.usecase.GetAdminTopCustomersUseCase;
+import com.superfercho.orders.application.usecase.GetAdminTopProductsUseCase;
 import com.superfercho.orders.application.usecase.ListAdminOrdersUseCase;
 import com.superfercho.orders.application.usecase.ListAdminRecentBuyersUseCase;
 import com.superfercho.orders.domain.model.OrderStatus;
 import com.superfercho.orders.domain.model.SalesPeriodGranularity;
 import com.superfercho.platform.error.ApiExceptionHandler;
 import com.superfercho.platform.money.Money;
+import com.superfercho.platform.time.BucketGranularity;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -73,6 +86,18 @@ class AdminOrderControllerTest {
 
     @MockitoBean
     private ListAdminRecentBuyersUseCase listAdminRecentBuyersUseCase;
+
+    @MockitoBean
+    private GetAdminSalesPeriodAnalyticsUseCase getAdminSalesPeriodAnalyticsUseCase;
+
+    @MockitoBean
+    private GetAdminOrderPeriodSummaryUseCase getAdminOrderPeriodSummaryUseCase;
+
+    @MockitoBean
+    private GetAdminTopProductsUseCase getAdminTopProductsUseCase;
+
+    @MockitoBean
+    private GetAdminTopCustomersUseCase getAdminTopCustomersUseCase;
 
     @Test
     void shouldGetOrderByIdForAnyCustomer() throws Exception {
@@ -247,6 +272,114 @@ class AdminOrderControllerTest {
 
         verify(listAdminRecentBuyersUseCase).execute(ListAdminRecentBuyersCommand.of(5));
         verifyNoInteractions(listAdminOrdersUseCase, getAdminOrderUseCase, getAdminSalesPeriodSummaryUseCase);
+    }
+
+    @Test
+    void shouldReturnSalesForArbitraryPeriod() throws Exception {
+        GetAdminSalesPeriodAnalyticsCommand command = GetAdminSalesPeriodAnalyticsCommand.of(
+                "2026-05-01T00:00:00", "2026-05-04T00:00:00", "DAY");
+        when(getAdminSalesPeriodAnalyticsUseCase.execute(command))
+                .thenReturn(new AdminSalesAnalyticsResult(
+                        BucketGranularity.DAY,
+                        List.of(new AdminSalesBucketResult(
+                                Instant.parse("2026-05-01T05:00:00Z"), "01 may.", TOTAL, 8))));
+
+        mockMvc.perform(get("/api/v1/admin/orders/dashboard/sales")
+                        .param("from", "2026-05-01T00:00:00")
+                        .param("to", "2026-05-04T00:00:00")
+                        .param("granularity", "DAY"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.granularity").value("DAY"))
+                .andExpect(jsonPath("$.buckets[0].periodStart").value("2026-05-01T05:00:00Z"))
+                .andExpect(jsonPath("$.buckets[0].label").value("01 may."))
+                .andExpect(jsonPath("$.buckets[0].orderCount").value(8))
+                .andExpect(jsonPath("$.buckets[0].total.amount").value(21.00))
+                .andExpect(jsonPath("$.buckets[0].total.currency").value("COP"));
+
+        verify(getAdminSalesPeriodAnalyticsUseCase).execute(command);
+        verifyNoInteractions(getAdminSalesPeriodSummaryUseCase);
+    }
+
+    @Test
+    void shouldRejectArbitrarySalesPeriodWithMissingBound() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/orders/dashboard/sales").param("from", "2026-05-01T00:00:00"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_SALES_PERIOD"));
+
+        verifyNoInteractions(getAdminSalesPeriodAnalyticsUseCase, getAdminSalesPeriodSummaryUseCase);
+    }
+
+    @Test
+    void shouldReturnDashboardSummaryForArbitraryPeriod() throws Exception {
+        GetAdminDashboardSummaryCommand command =
+                GetAdminDashboardSummaryCommand.of("2026-05-01T00:00:00", "2026-06-01T00:00:00");
+        when(getAdminOrderPeriodSummaryUseCase.execute(command))
+                .thenReturn(new AdminOrderPeriodSummaryResult(Money.cop(new BigDecimal("1234500.00")), 49, 10, 35, 4));
+
+        mockMvc.perform(get("/api/v1/admin/orders/dashboard/summary")
+                        .param("from", "2026-05-01T00:00:00")
+                        .param("to", "2026-06-01T00:00:00"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.from").value("2026-05-01T05:00:00Z"))
+                .andExpect(jsonPath("$.to").value("2026-06-01T05:00:00Z"))
+                .andExpect(jsonPath("$.sales.amount").value(1234500.00))
+                .andExpect(jsonPath("$.sales.currency").value("COP"))
+                .andExpect(jsonPath("$.totalOrders").value(49))
+                .andExpect(jsonPath("$.inProcessOrders").value(10))
+                .andExpect(jsonPath("$.deliveredOrders").value(35))
+                .andExpect(jsonPath("$.cancelledOrders").value(4));
+
+        verify(getAdminOrderPeriodSummaryUseCase).execute(command);
+    }
+
+    @Test
+    void shouldRejectSwappedDashboardSummaryPeriod() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/orders/dashboard/summary")
+                        .param("from", "2026-06-01T00:00:00")
+                        .param("to", "2026-05-01T00:00:00"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_SALES_PERIOD"));
+
+        verifyNoInteractions(getAdminOrderPeriodSummaryUseCase);
+    }
+
+    @Test
+    void shouldReturnTopProductsForArbitraryPeriod() throws Exception {
+        GetAdminTopProductsCommand command =
+                GetAdminTopProductsCommand.of("2026-05-01", "2026-06-01", 3, "ASC");
+        when(getAdminTopProductsUseCase.execute(command))
+                .thenReturn(List.of(new AdminProductSalesRow(PRODUCT_ID, "Leche entera", 25)));
+
+        mockMvc.perform(get("/api/v1/admin/orders/dashboard/products")
+                        .param("from", "2026-05-01")
+                        .param("to", "2026-06-01")
+                        .param("limit", "3")
+                        .param("sort", "ASC"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].productId").value(PRODUCT_ID.toString()))
+                .andExpect(jsonPath("$.items[0].productName").value("Leche entera"))
+                .andExpect(jsonPath("$.items[0].quantity").value(25));
+
+        verify(getAdminTopProductsUseCase).execute(command);
+    }
+
+    @Test
+    void shouldReturnTopCustomersForArbitraryPeriod() throws Exception {
+        GetAdminTopCustomersCommand command = GetAdminTopCustomersCommand.of("2026-05-01", "2026-06-01", 5);
+        when(getAdminTopCustomersUseCase.execute(command))
+                .thenReturn(List.of(new AdminCustomerSalesRow(
+                        CUSTOMER_ID, "Ada Lovelace", new BigDecimal("450000.00"), 6)));
+
+        mockMvc.perform(get("/api/v1/admin/orders/dashboard/customers/top")
+                        .param("from", "2026-05-01")
+                        .param("to", "2026-06-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].customerId").value(CUSTOMER_ID.toString()))
+                .andExpect(jsonPath("$.items[0].customerName").value("Ada Lovelace"))
+                .andExpect(jsonPath("$.items[0].total.amount").value(450000.00))
+                .andExpect(jsonPath("$.items[0].orderCount").value(6));
+
+        verify(getAdminTopCustomersUseCase).execute(command);
     }
 
     private static OrderResult orderResult(PaymentResult payment) {

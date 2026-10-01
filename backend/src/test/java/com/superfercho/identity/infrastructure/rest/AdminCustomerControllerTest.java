@@ -1,6 +1,7 @@
 package com.superfercho.identity.infrastructure.rest;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -10,14 +11,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.superfercho.identity.application.dto.AdminCustomerAccountResult;
 import com.superfercho.identity.application.dto.AdminCustomerRecordResult;
+import com.superfercho.identity.application.dto.AdminNewCustomersResult;
 import com.superfercho.identity.application.dto.AdminPagedResult;
 import com.superfercho.identity.application.dto.CustomerCommercialOrderView;
 import com.superfercho.identity.application.dto.CustomerCommercialPaymentView;
+import com.superfercho.identity.application.dto.GetAdminNewCustomersCommand;
 import com.superfercho.identity.application.exception.CustomerRecordNotFoundException;
 import com.superfercho.identity.application.usecase.ActivateAdminCustomerAccountUseCase;
 import com.superfercho.identity.application.usecase.DeactivateAdminCustomerAccountUseCase;
 import com.superfercho.identity.application.usecase.FindAdminCustomerByDocumentUseCase;
 import com.superfercho.identity.application.usecase.GetAdminCustomerRecordUseCase;
+import com.superfercho.identity.application.usecase.GetAdminNewCustomersUseCase;
 import com.superfercho.identity.application.usecase.ListAdminCustomerOrdersUseCase;
 import com.superfercho.identity.application.usecase.ListAdminCustomerPaymentsUseCase;
 import com.superfercho.identity.domain.model.UserStatus;
@@ -65,6 +69,9 @@ class AdminCustomerControllerTest {
 
     @MockitoBean
     private DeactivateAdminCustomerAccountUseCase deactivateAdminCustomerAccountUseCase;
+
+    @MockitoBean
+    private GetAdminNewCustomersUseCase getAdminNewCustomersUseCase;
 
     @Test
     void shouldFindByDocument() throws Exception {
@@ -160,6 +167,39 @@ class AdminCustomerControllerTest {
 
         verify(activateAdminCustomerAccountUseCase).execute(any());
         verify(deactivateAdminCustomerAccountUseCase).execute(any());
+    }
+
+    @Test
+    void shouldReturnNewCustomersForArbitraryPeriod() throws Exception {
+        GetAdminNewCustomersCommand command =
+                GetAdminNewCustomersCommand.of("2026-05-01T00:00:00", "2026-06-01T00:00:00", "DAY");
+        when(getAdminNewCustomersUseCase.execute(command))
+                .thenReturn(new AdminNewCustomersResult(4, List.of(
+                        new AdminNewCustomersResult.AdminNewCustomersBucket(
+                                Instant.parse("2026-05-01T05:00:00Z"), "01 may.", 4))));
+
+        mockMvc.perform(get("/api/v1/admin/customers/dashboard/new")
+                        .param("from", "2026-05-01T00:00:00")
+                        .param("to", "2026-06-01T00:00:00")
+                        .param("granularity", "DAY"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(4))
+                .andExpect(jsonPath("$.buckets[0].periodStart").value("2026-05-01T05:00:00Z"))
+                .andExpect(jsonPath("$.buckets[0].label").value("01 may."))
+                .andExpect(jsonPath("$.buckets[0].count").value(4));
+
+        verify(getAdminNewCustomersUseCase).execute(command);
+    }
+
+    @Test
+    void shouldRejectInvalidNewCustomersPeriod() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/customers/dashboard/new")
+                        .param("from", "2026-06-01T00:00:00")
+                        .param("to", "2026-05-01T00:00:00"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ADMIN_CUSTOMER_QUERY"));
+
+        verify(getAdminNewCustomersUseCase, never()).execute(any());
     }
 
     private static AdminCustomerRecordResult recordResult() {

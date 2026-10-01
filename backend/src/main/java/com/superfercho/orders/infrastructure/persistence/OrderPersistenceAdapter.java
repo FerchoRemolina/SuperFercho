@@ -1,5 +1,9 @@
 package com.superfercho.orders.infrastructure.persistence;
 
+import com.superfercho.orders.application.dto.AdminCustomerSalesRow;
+import com.superfercho.orders.application.dto.AdminOrderStatusCountRow;
+import com.superfercho.orders.application.dto.AdminProductSalesRow;
+import com.superfercho.orders.application.dto.AdminSalesBucketRow;
 import com.superfercho.orders.application.dto.PageRequest;
 import com.superfercho.orders.application.dto.PagedResult;
 import com.superfercho.orders.application.port.OrderRepository;
@@ -8,7 +12,12 @@ import com.superfercho.orders.domain.model.OrderStatus;
 import com.superfercho.orders.infrastructure.persistence.entity.OrderJpaEntity;
 import com.superfercho.orders.infrastructure.persistence.mapper.OrderPersistenceMapper;
 import com.superfercho.orders.infrastructure.persistence.repository.OrderJpaRepository;
+import com.superfercho.platform.time.BucketGranularity;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -121,6 +130,88 @@ public class OrderPersistenceAdapter implements OrderRepository {
     @Override
     public void deleteAllByCustomerId(UUID customerId) {
         orderJpaRepository.deleteAllByCustomerId(customerId);
+    }
+
+    @Override
+    public List<AdminSalesBucketRow> aggregateSalesBuckets(
+            BucketGranularity granularity, Instant fromInclusive, Instant toExclusive) {
+        return orderJpaRepository
+                .aggregateSalesBuckets(truncUnit(granularity), fromInclusive, toExclusive)
+                .stream()
+                .map(row -> new AdminSalesBucketRow(
+                        toInstant(row[0]), requireBigDecimal(row[1]), requireLong(row[2])))
+                .toList();
+    }
+
+    @Override
+    public List<AdminOrderStatusCountRow> countByStatusBetween(Instant fromInclusive, Instant toExclusive) {
+        return orderJpaRepository.countByStatusBetween(fromInclusive, toExclusive).stream()
+                .map(row -> new AdminOrderStatusCountRow(
+                        OrderStatus.valueOf(String.valueOf(row[0])), requireLong(row[1]), requireBigDecimal(row[2])))
+                .toList();
+    }
+
+    @Override
+    public List<AdminProductSalesRow> findTopProductsByQuantity(
+            Instant fromInclusive, Instant toExclusive, int limit, boolean ascending) {
+        List<Object[]> rows = ascending
+                ? orderJpaRepository.findTopProductsByQuantityAsc(fromInclusive, toExclusive, limit)
+                : orderJpaRepository.findTopProductsByQuantityDesc(fromInclusive, toExclusive, limit);
+        return rows.stream()
+                .map(row -> new AdminProductSalesRow(
+                        (UUID) row[0], String.valueOf(row[1]), requireLong(row[2])))
+                .toList();
+    }
+
+    @Override
+    public List<AdminCustomerSalesRow> findTopCustomersByTotal(
+            Instant fromInclusive, Instant toExclusive, int limit) {
+        return orderJpaRepository.findTopCustomersByTotal(fromInclusive, toExclusive, limit).stream()
+                .map(row -> new AdminCustomerSalesRow(
+                        (UUID) row[0], String.valueOf(row[1]), requireBigDecimal(row[2]), requireLong(row[3])))
+                .toList();
+    }
+
+    private static String truncUnit(BucketGranularity granularity) {
+        return switch (granularity) {
+            case HOUR -> "hour";
+            case DAY -> "day";
+            case MONTH -> "month";
+        };
+    }
+
+    private static Instant toInstant(Object raw) {
+        if (raw instanceof OffsetDateTime offsetDateTime) {
+            return offsetDateTime.toInstant();
+        }
+        if (raw instanceof Timestamp timestamp) {
+            return timestamp.toInstant();
+        }
+        if (raw instanceof Instant instant) {
+            return instant;
+        }
+        if (raw instanceof LocalDateTime localDateTime) {
+            return localDateTime.atZone(com.superfercho.platform.time.BusinessZone.BOGOTA)
+                    .toInstant();
+        }
+        throw new IllegalStateException("Unsupported timestamp type from aggregation: " + raw.getClass());
+    }
+
+    private static BigDecimal requireBigDecimal(Object raw) {
+        if (raw instanceof BigDecimal amount) {
+            return amount;
+        }
+        if (raw instanceof Number number) {
+            return BigDecimal.valueOf(number.longValue());
+        }
+        throw new IllegalStateException("Unsupported amount type from aggregation: " + raw.getClass());
+    }
+
+    private static long requireLong(Object raw) {
+        if (raw instanceof Number number) {
+            return number.longValue();
+        }
+        throw new IllegalStateException("Unsupported count type from aggregation: " + raw.getClass());
     }
 
     private PagedResult<Order> toPagedResult(Page<OrderJpaEntity> page, PageRequest pageRequest) {

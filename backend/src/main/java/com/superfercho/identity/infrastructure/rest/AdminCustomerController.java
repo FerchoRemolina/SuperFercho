@@ -4,17 +4,20 @@ import com.superfercho.identity.application.dto.ActivateAdminCustomerAccountComm
 import com.superfercho.identity.application.dto.DeactivateAdminCustomerAccountCommand;
 import com.superfercho.identity.application.dto.FindAdminCustomerByDocumentCommand;
 import com.superfercho.identity.application.dto.GetAdminCustomerRecordCommand;
+import com.superfercho.identity.application.dto.GetAdminNewCustomersCommand;
 import com.superfercho.identity.application.dto.ListAdminCustomerCommercialHistoryCommand;
 import com.superfercho.identity.application.usecase.ActivateAdminCustomerAccountUseCase;
 import com.superfercho.identity.application.usecase.DeactivateAdminCustomerAccountUseCase;
 import com.superfercho.identity.application.usecase.FindAdminCustomerByDocumentUseCase;
 import com.superfercho.identity.application.usecase.GetAdminCustomerRecordUseCase;
+import com.superfercho.identity.application.usecase.GetAdminNewCustomersUseCase;
 import com.superfercho.identity.application.usecase.ListAdminCustomerOrdersUseCase;
 import com.superfercho.identity.application.usecase.ListAdminCustomerPaymentsUseCase;
 import com.superfercho.identity.infrastructure.rest.dto.AdminCustomerAccountRestResponse;
 import com.superfercho.identity.infrastructure.rest.dto.AdminCustomerOrdersRestResponse;
 import com.superfercho.identity.infrastructure.rest.dto.AdminCustomerPaymentsRestResponse;
 import com.superfercho.identity.infrastructure.rest.dto.AdminCustomerRecordRestResponse;
+import com.superfercho.identity.infrastructure.rest.dto.AdminNewCustomersRestResponse;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,6 +38,7 @@ public class AdminCustomerController {
     private final ListAdminCustomerPaymentsUseCase listAdminCustomerPaymentsUseCase;
     private final ActivateAdminCustomerAccountUseCase activateAdminCustomerAccountUseCase;
     private final DeactivateAdminCustomerAccountUseCase deactivateAdminCustomerAccountUseCase;
+    private final GetAdminNewCustomersUseCase getAdminNewCustomersUseCase;
 
     public AdminCustomerController(
             FindAdminCustomerByDocumentUseCase findAdminCustomerByDocumentUseCase,
@@ -42,13 +46,28 @@ public class AdminCustomerController {
             ListAdminCustomerOrdersUseCase listAdminCustomerOrdersUseCase,
             ListAdminCustomerPaymentsUseCase listAdminCustomerPaymentsUseCase,
             ActivateAdminCustomerAccountUseCase activateAdminCustomerAccountUseCase,
-            DeactivateAdminCustomerAccountUseCase deactivateAdminCustomerAccountUseCase) {
+            DeactivateAdminCustomerAccountUseCase deactivateAdminCustomerAccountUseCase,
+            GetAdminNewCustomersUseCase getAdminNewCustomersUseCase) {
         this.findAdminCustomerByDocumentUseCase = findAdminCustomerByDocumentUseCase;
         this.getAdminCustomerRecordUseCase = getAdminCustomerRecordUseCase;
         this.listAdminCustomerOrdersUseCase = listAdminCustomerOrdersUseCase;
         this.listAdminCustomerPaymentsUseCase = listAdminCustomerPaymentsUseCase;
         this.activateAdminCustomerAccountUseCase = activateAdminCustomerAccountUseCase;
         this.deactivateAdminCustomerAccountUseCase = deactivateAdminCustomerAccountUseCase;
+        this.getAdminNewCustomersUseCase = getAdminNewCustomersUseCase;
+    }
+
+    /**
+     * New customers for an arbitrary [from, to) period, based on the real
+     * registration (CustomerRecord creation) instant, bucketed in America/Bogota.
+     */
+    @GetMapping("/dashboard/new")
+    public AdminNewCustomersRestResponse newCustomers(
+            @RequestParam String from,
+            @RequestParam String to,
+            @RequestParam(required = false) String granularity) {
+        return AdminNewCustomersRestResponse.from(
+                getAdminNewCustomersUseCase.execute(GetAdminNewCustomersCommand.of(from, to, granularity)));
     }
 
     @GetMapping("/by-document")
