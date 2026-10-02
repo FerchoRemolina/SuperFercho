@@ -3,6 +3,7 @@ package com.superfercho.catalog.application.usecase;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.superfercho.catalog.domain.model.CategoryIcon;
 import com.superfercho.catalog.domain.model.Category;
 import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.domain.model.Presentation;
@@ -111,7 +112,7 @@ class CatalogVisibilityTest {
     }
 
     private static Category category(CategoryStatus status) {
-        return Category.create(CATEGORY_ID, "Lácteos", null, status, CREATED_AT, CREATED_AT);
+        return Category.create(CATEGORY_ID, "Lácteos", null, CategoryIcon.OTHER, status, CREATED_AT, CREATED_AT);
     }
 
     private static ProductType productType(ProductTypeStatus status) {

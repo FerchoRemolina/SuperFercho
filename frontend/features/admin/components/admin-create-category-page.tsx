@@ -35,7 +35,7 @@ export function AdminCreateCategoryPageContent() {
       >
         Volver al listado
       </Link>
-      <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
+      <h1 className="text-2xl font-bold tracking-tight text-sf-ink">
         Nueva categoría
       </h1>
       <p className="mt-2 max-w-2xl text-base text-sf-muted">

@@ -1,5 +1,6 @@
 package com.superfercho.catalog.infrastructure.persistence.entity;
 
+import com.superfercho.catalog.domain.model.CategoryIcon;
 import com.superfercho.catalog.domain.model.CategoryStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -25,6 +26,10 @@ public class CategoryJpaEntity {
     private String description;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "icon", nullable = false)
+    private CategoryIcon icon;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private CategoryStatus status;
 
@@ -41,12 +46,14 @@ public class CategoryJpaEntity {
             UUID id,
             String name,
             String description,
+            CategoryIcon icon,
             CategoryStatus status,
             Instant createdAt,
             Instant updatedAt) {
         this.id = id;
         this.name = name;
         this.description = description;
+        this.icon = icon;
         this.status = status;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -62,6 +69,10 @@ public class CategoryJpaEntity {
 
     public String getDescription() {
         return description;
+    }
+
+    public CategoryIcon getIcon() {
+        return icon;
     }
 
     public CategoryStatus getStatus() {

@@ -7,6 +7,8 @@ import type {
 } from "@/features/admin/payloads";
 import { Button } from "@/shared/ui/button";
 import { TextField } from "@/shared/ui/text-field";
+import { CATEGORY_ICON_OPTIONS } from "@/features/admin/components/category-icon";
+import { cx } from "@/shared/utils/cx";
 
 export function AdminCategoryForm({
   mode,
@@ -49,6 +51,12 @@ export function AdminCategoryForm({
 
   return (
     <form className="grid gap-4" onSubmit={handleSubmit} noValidate>
+      <CategoryIconPicker
+        formId={formId}
+        value={values.icon}
+        error={fieldErrors.icon}
+        onChange={(icon) => update("icon", icon)}
+      />
       <TextField
         id={`${formId}-name`}
         label="Nombre"
@@ -89,5 +97,61 @@ export function AdminCategoryForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+/** Cuadrícula compacta de iconos disponibles (sin emojis; set cerrado del
+ *  backend). Radiogroup accesible con botones reales. */
+function CategoryIconPicker({
+  formId,
+  value,
+  error,
+  onChange,
+}: {
+  formId: string;
+  value: AdminCategoryFormValues["icon"];
+  error?: string;
+  onChange: (icon: AdminCategoryFormValues["icon"]) => void;
+}) {
+  return (
+    <div className="grid gap-1">
+      <span id={`${formId}-icon-label`} className="text-sm font-semibold">
+        Icono
+      </span>
+      <div
+        role="radiogroup"
+        aria-labelledby={`${formId}-icon-label`}
+        className="flex flex-wrap gap-2"
+      >
+        {CATEGORY_ICON_OPTIONS.map((option) => {
+          const selected = option.id === value;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              aria-label={option.label}
+              title={option.label}
+              onClick={() => onChange(option.id)}
+              className={cx(
+                "flex size-11 items-center justify-center rounded-lg border transition-colors",
+                "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sf-primary",
+                selected
+                  ? cx("border-sf-primary ring-1 ring-sf-primary", option.tile)
+                  : cx("border-sf-border bg-sf-surface hover:bg-sf-bg", option.tile),
+              )}
+            >
+              <option.Icon className="h-5 w-5" />
+            </button>
+          );
+        })}
+      </div>
+      {error ? (
+        <p id={`${formId}-icon-error`} className="text-sm text-sf-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }

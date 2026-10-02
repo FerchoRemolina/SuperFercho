@@ -20,6 +20,7 @@ import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.application.port.ProductTypeRepository;
 import com.superfercho.catalog.domain.exception.InvalidProductTypeException;
 import com.superfercho.catalog.domain.model.Category;
+import com.superfercho.catalog.domain.model.CategoryIcon;
 import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.domain.model.ProductType;
 import com.superfercho.catalog.domain.model.ProductTypeStatus;
@@ -218,7 +219,7 @@ class ProductTypeUseCasesTest {
     }
 
     private static Category category() {
-        return Category.create(CATEGORY_ID, "Lácteos", null, CategoryStatus.ACTIVE, CREATED_AT, CREATED_AT);
+        return Category.create(CATEGORY_ID, "Lácteos", null, CategoryIcon.OTHER, CategoryStatus.ACTIVE, CREATED_AT, CREATED_AT);
     }
 
     private static ProductType productType(UUID id, ProductTypeStatus status) {

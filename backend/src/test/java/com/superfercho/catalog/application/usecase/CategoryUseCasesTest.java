@@ -18,6 +18,7 @@ import com.superfercho.catalog.application.dto.UpdateCategoryCommand;
 import com.superfercho.catalog.application.exception.CategoryNotFoundException;
 import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.domain.model.Category;
+import com.superfercho.catalog.domain.model.CategoryIcon;
 import com.superfercho.catalog.domain.model.CategoryStatus;
 import java.time.Clock;
 import java.time.Instant;
@@ -62,7 +63,7 @@ class CategoryUseCasesTest {
     void shouldCreateCategoryAsActive() {
         when(categoryRepository.save(any(Category.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        CategoryResult result = createCategory.execute(new CreateCategoryCommand("Frutas", "Fresh produce"));
+        CategoryResult result = createCategory.execute(new CreateCategoryCommand("Frutas", "Fresh produce", "FRUITS"));
 
         assertEquals("Frutas", result.name());
         assertEquals("Fresh produce", result.description());
@@ -97,7 +98,7 @@ class CategoryUseCasesTest {
 
         assertThrows(
                 CategoryNotFoundException.class,
-                () -> updateCategory.execute(new UpdateCategoryCommand(CATEGORY_ID, "Verduras", null)));
+                () -> updateCategory.execute(new UpdateCategoryCommand(CATEGORY_ID, "Verduras", null, "OTHER")));
         verify(categoryRepository, never()).save(any());
     }
 
@@ -128,7 +129,7 @@ class CategoryUseCasesTest {
         when(categoryRepository.save(any(Category.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         CategoryResult result =
-                updateCategory.execute(new UpdateCategoryCommand(CATEGORY_ID, "Verduras", "Leafy greens"));
+                updateCategory.execute(new UpdateCategoryCommand(CATEGORY_ID, "Verduras", "Leafy greens", "OTHER"));
 
         assertEquals(CATEGORY_ID, result.id());
         assertEquals("Verduras", result.name());
@@ -189,6 +190,6 @@ class CategoryUseCasesTest {
 
     private static Category category(UUID id, String name, CategoryStatus status) {
         Instant createdAt = Instant.parse("2026-01-01T00:00:00Z");
-        return Category.create(id, name, "desc", status, createdAt, createdAt);
+        return Category.create(id, name, "desc", CategoryIcon.OTHER, status, createdAt, createdAt);
     }
 }

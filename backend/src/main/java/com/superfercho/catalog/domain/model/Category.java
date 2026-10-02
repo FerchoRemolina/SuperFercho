@@ -9,6 +9,7 @@ public final class Category {
     private final UUID id;
     private final String name;
     private final String description;
+    private final CategoryIcon icon;
     private final CategoryStatus status;
     private final Instant createdAt;
     private final Instant updatedAt;
@@ -17,12 +18,14 @@ public final class Category {
             UUID id,
             String name,
             String description,
+            CategoryIcon icon,
             CategoryStatus status,
             Instant createdAt,
             Instant updatedAt) {
         this.id = id;
         this.name = name;
         this.description = description;
+        this.icon = icon;
         this.status = status;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -32,11 +35,13 @@ public final class Category {
             UUID id,
             String name,
             String description,
+            CategoryIcon icon,
             CategoryStatus status,
             Instant createdAt,
             Instant updatedAt) {
         requireNonNull(id, "id");
         requireText(name, "name");
+        requireNonNull(icon, "icon");
         requireNonNull(status, "status");
         requireNonNull(createdAt, "createdAt");
         requireNonNull(updatedAt, "updatedAt");
@@ -44,19 +49,20 @@ public final class Category {
             throw new InvalidCategoryException("createdAt must not be after updatedAt");
         }
 
-        return new Category(id, name, description, status, createdAt, updatedAt);
+        return new Category(id, name, description, icon, status, createdAt, updatedAt);
     }
 
-    public Category updateInformation(String name, String description, Instant updatedAt) {
-        return create(id, name, description, status, createdAt, updatedAt);
+    public Category updateInformation(
+            String name, String description, CategoryIcon icon, Instant updatedAt) {
+        return create(id, name, description, icon, status, createdAt, updatedAt);
     }
 
     public Category activate(Instant updatedAt) {
-        return create(id, name, description, CategoryStatus.ACTIVE, createdAt, updatedAt);
+        return create(id, name, description, icon, CategoryStatus.ACTIVE, createdAt, updatedAt);
     }
 
     public Category deactivate(Instant updatedAt) {
-        return create(id, name, description, CategoryStatus.INACTIVE, createdAt, updatedAt);
+        return create(id, name, description, icon, CategoryStatus.INACTIVE, createdAt, updatedAt);
     }
 
     public UUID id() {
@@ -69,6 +75,10 @@ public final class Category {
 
     public String description() {
         return description;
+    }
+
+    public CategoryIcon icon() {
+        return icon;
     }
 
     public CategoryStatus status() {

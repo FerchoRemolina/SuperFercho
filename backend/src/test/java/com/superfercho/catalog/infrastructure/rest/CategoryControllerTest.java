@@ -28,6 +28,7 @@ import com.superfercho.catalog.application.usecase.GetCategoryUseCase;
 import com.superfercho.catalog.application.usecase.ListCategoriesUseCase;
 import com.superfercho.catalog.application.usecase.UpdateCategoryUseCase;
 import com.superfercho.catalog.domain.exception.InvalidCategoryException;
+import com.superfercho.catalog.domain.model.CategoryIcon;
 import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.platform.error.ApiExceptionHandler;
 import java.time.Instant;
@@ -85,11 +86,12 @@ class CategoryControllerTest {
                 .andExpect(jsonPath("$.id").value(CATEGORY_ID.toString()))
                 .andExpect(jsonPath("$.name").value("Lácteos"))
                 .andExpect(jsonPath("$.description").value("Leche y derivados"))
+                .andExpect(jsonPath("$.icon").value("FRUITS"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.createdAt").value(CREATED_AT.toString()))
                 .andExpect(jsonPath("$.updatedAt").value(UPDATED_AT.toString()));
 
-        verify(createCategoryUseCase).execute(new CreateCategoryCommand("Lácteos", "Leche y derivados"));
+        verify(createCategoryUseCase).execute(new CreateCategoryCommand("Lácteos", "Leche y derivados", "FRUITS"));
         verifyNoInteractions(
                 getCategoryUseCase,
                 listCategoriesUseCase,
@@ -173,7 +175,7 @@ class CategoryControllerTest {
                 .andExpect(jsonPath("$.id").value(CATEGORY_ID.toString()));
 
         verify(updateCategoryUseCase)
-                .execute(new UpdateCategoryCommand(CATEGORY_ID, "Lácteos frescos", "Actualizada"));
+                .execute(new UpdateCategoryCommand(CATEGORY_ID, "Lácteos frescos", "Actualizada", "FRUITS"));
         verifyNoInteractions(
                 createCategoryUseCase,
                 getCategoryUseCase,
@@ -277,13 +279,14 @@ class CategoryControllerTest {
         return """
                 {
                   "name": "%s",
-                  "description": "%s"
+                  "description": "%s",
+                  "icon": "FRUITS"
                 }
                 """.formatted(name, description);
     }
 
     private static CategoryResult categoryResult(CategoryStatus status) {
         return new CategoryResult(
-                CATEGORY_ID, "Lácteos", "Leche y derivados", status, CREATED_AT, UPDATED_AT);
+                CATEGORY_ID, "Lácteos", "Leche y derivados", CategoryIcon.FRUITS, status, CREATED_AT, UPDATED_AT);
     }
 }

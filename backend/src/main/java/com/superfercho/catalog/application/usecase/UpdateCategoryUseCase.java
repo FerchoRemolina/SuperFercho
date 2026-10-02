@@ -5,6 +5,7 @@ import com.superfercho.catalog.application.dto.UpdateCategoryCommand;
 import com.superfercho.catalog.application.exception.CategoryNotFoundException;
 import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.domain.model.Category;
+import com.superfercho.catalog.domain.model.CategoryIcon;
 import java.time.Clock;
 
 public final class UpdateCategoryUseCase {
@@ -22,7 +23,7 @@ public final class UpdateCategoryUseCase {
                 .findById(command.categoryId())
                 .orElseThrow(() -> new CategoryNotFoundException(command.categoryId()));
         Category updated =
-                category.updateInformation(command.name(), command.description(), clock.instant());
+                category.updateInformation(command.name(), command.description(), CategoryIcon.valueOf(command.icon()), clock.instant());
         return CategoryResult.from(categoryRepository.save(updated));
     }
 }

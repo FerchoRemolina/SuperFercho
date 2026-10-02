@@ -1,4 +1,4 @@
 package com.superfercho.catalog.infrastructure.rest.dto;
 
-public record UpdateCategoryRequest(String name, String description) {
+public record UpdateCategoryRequest(String name, String description, String icon) {
 }

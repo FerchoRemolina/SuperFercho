@@ -1,5 +1,7 @@
 package com.superfercho.catalog.domain.model;
 
+import com.superfercho.catalog.domain.model.CategoryIcon;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 

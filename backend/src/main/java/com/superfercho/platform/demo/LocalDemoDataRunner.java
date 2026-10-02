@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.superfercho.catalog.application.dto.ArchiveProductCommand;
 import com.superfercho.catalog.application.dto.CategoryResult;
+import com.superfercho.catalog.domain.model.CategoryIcon;
 import com.superfercho.catalog.application.dto.CreateCategoryCommand;
 import com.superfercho.catalog.application.dto.CreateProductCommand;
 import com.superfercho.catalog.application.dto.CreateProductVariantCommand;
@@ -279,9 +280,40 @@ public class LocalDemoDataRunner implements ApplicationRunner {
                 listDocumentsUseCase.execute(new ListDocumentsCommand()).size());
     }
 
-    private UUID createCategory(String name, String description) {
+    private CategoryIcon iconFor(String categoryName) {
+        String normalizedName = java.text.Normalizer.normalize(categoryName, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase();
+        if (normalizedName.contains("aseo") || normalizedName.contains("limpieza") || normalizedName.contains("hogar")) {
+            return CategoryIcon.CLEANING;
+        }
+        if (normalizedName.contains("bebida")) {
+            return CategoryIcon.DRINKS;
+        }
+        if (normalizedName.contains("higiene") || normalizedName.contains("cuidado personal")) {
+            return CategoryIcon.PERSONAL_CARE;
+        }
+        if (normalizedName.contains("despensa") || normalizedName.contains("granos") || normalizedName.contains("basicos")) {
+            return CategoryIcon.GROCERY;
+        }
+        if (normalizedName.contains("frutas") || normalizedName.contains("verduras")) {
+            return CategoryIcon.FRUITS;
+        }
+        if (normalizedName.contains("panadera") || normalizedName.contains("pastelera")) {
+            return CategoryIcon.BAKERY;
+        }
+        if (normalizedName.contains("carnes") || normalizedName.contains("aves") || normalizedName.contains("pescados")) {
+            return CategoryIcon.MEAT;
+        }
+        if (normalizedName.contains("lacteos") || normalizedName.contains("huevos") || normalizedName.contains("refrigerados")) {
+            return CategoryIcon.DAIRY;
+        }
+        return CategoryIcon.OTHER;
+    }
+
+    private UUID createCategory(String name, String description, CategoryIcon icon) {
         CategoryResult created =
-                createCategoryUseCase.execute(new CreateCategoryCommand(name, description));
+                createCategoryUseCase.execute(new CreateCategoryCommand(name, description, icon.name()));
         return created.id();
     }
 
@@ -309,7 +341,7 @@ public class LocalDemoDataRunner implements ApplicationRunner {
                             ? createProductType(categoryId, categoryName)
                             : types.getFirst().id());
         } else {
-            categoryId = createCategory(categoryName, null);
+            categoryId = createCategory(categoryName, null, iconFor(categoryName));
             productTypeId = createProductType(categoryId, categoryName);
         }
 

@@ -2,6 +2,33 @@ import { request } from "@/shared/api/client";
 import type { Money } from "@/shared/money/money";
 
 export type CategoryStatus = "ACTIVE" | "INACTIVE";
+
+/** Conjunto cerrado de iconos de categoría (mirrors CategoryIcon del backend). */
+export const CATEGORY_ICON_IDS = [
+  "CLEANING",
+  "DRINKS",
+  "PERSONAL_CARE",
+  "GROCERY",
+  "FRUITS",
+  "BAKERY",
+  "MEAT",
+  "DAIRY",
+  "PETS",
+  "BABY",
+  "ELECTRONICS",
+  "HOME",
+  "OTHER",
+] as const;
+
+export type CategoryIconId = (typeof CATEGORY_ICON_IDS)[number];
+
+export function isCategoryIconId(value: unknown): value is CategoryIconId {
+  return (
+    typeof value === "string" &&
+    (CATEGORY_ICON_IDS as readonly string[]).includes(value)
+  );
+}
+
 export type ProductStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
 
 /** Mirrors CategoryRestResponse for GET /api/v1/categories. */
@@ -9,6 +36,7 @@ export type Category = {
   id: string;
   name: string;
   description: string | null;
+  icon: CategoryIconId;
   status: CategoryStatus;
   createdAt: string;
   updatedAt: string;

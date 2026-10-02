@@ -19,6 +19,7 @@ import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.application.port.ProductRepository;
 import com.superfercho.catalog.application.port.ProductTypeRepository;
 import com.superfercho.catalog.application.port.ProductVariantRepository;
+import com.superfercho.catalog.domain.model.CategoryIcon;
 import com.superfercho.catalog.domain.model.Category;
 import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.domain.model.Presentation;
@@ -300,7 +301,7 @@ class PublicCatalogVisibilityTest {
     }
 
     private static Category category(UUID id, CategoryStatus status) {
-        return Category.create(id, "Lácteos", null, status, CREATED_AT, CREATED_AT);
+        return Category.create(id, "Lácteos", null, CategoryIcon.OTHER, status, CREATED_AT, CREATED_AT);
     }
 
     private static ProductType productType(UUID id, UUID categoryId, ProductTypeStatus status) {

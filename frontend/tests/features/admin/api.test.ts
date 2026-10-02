@@ -448,6 +448,7 @@ describe("admin catalog api", () => {
     await createAdminCategory({
       name: "Lácteos",
       description: "Leche y derivados",
+      icon: "OTHER",
     });
 
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
@@ -459,6 +460,7 @@ describe("admin catalog api", () => {
       JSON.stringify({
         name: "Lácteos",
         description: "Leche y derivados",
+        icon: "OTHER",
       }),
     );
     expect(String(init.body)).not.toContain("status");
@@ -471,6 +473,7 @@ describe("admin catalog api", () => {
     await updateAdminCategory(category.id, {
       name: "Lácteos frescos",
       description: null,
+      icon: "OTHER",
     });
 
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit;

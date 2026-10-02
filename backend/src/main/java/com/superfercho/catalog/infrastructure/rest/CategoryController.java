@@ -60,7 +60,7 @@ public class CategoryController {
     @PostMapping
     public ResponseEntity<CategoryRestResponse> create(@RequestBody CreateCategoryRequest request) {
         CategoryRestResponse body = CategoryRestResponse.from(
-                createCategoryUseCase.execute(new CreateCategoryCommand(request.name(), request.description())));
+                createCategoryUseCase.execute(new CreateCategoryCommand(request.name(), request.description(), request.icon())));
         return ResponseEntity.created(ServletUriComponentsBuilder.fromCurrentRequest()
                         .path("/{categoryId}")
                         .buildAndExpand(body.id())
@@ -86,7 +86,7 @@ public class CategoryController {
     public CategoryRestResponse update(
             @PathVariable UUID categoryId, @RequestBody UpdateCategoryRequest request) {
         return CategoryRestResponse.from(updateCategoryUseCase.execute(
-                new UpdateCategoryCommand(categoryId, request.name(), request.description())));
+                new UpdateCategoryCommand(categoryId, request.name(), request.description(), request.icon())));
     }
 
     @PostMapping("/{categoryId}/activate")

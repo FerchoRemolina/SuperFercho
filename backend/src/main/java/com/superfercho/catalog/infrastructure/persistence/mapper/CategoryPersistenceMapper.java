@@ -12,6 +12,7 @@ public class CategoryPersistenceMapper {
                 category.id(),
                 category.name(),
                 category.description(),
+                category.icon(),
                 category.status(),
                 category.createdAt(),
                 category.updatedAt());
@@ -22,6 +23,7 @@ public class CategoryPersistenceMapper {
                 entity.getId(),
                 entity.getName(),
                 entity.getDescription(),
+                entity.getIcon(),
                 entity.getStatus(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt());

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.superfercho.catalog.domain.model.Category;
+import com.superfercho.catalog.domain.model.CategoryIcon;
 import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.domain.model.Presentation;
 import com.superfercho.catalog.domain.model.PresentationUnit;
@@ -31,10 +32,11 @@ class CategoryAndProductPersistenceMapperTest {
     @Test
     void shouldMapCategoryRoundTrip() {
         Category category = Category.create(
-                CATEGORY_ID, "Frutas", "Fresh produce", CategoryStatus.ACTIVE, NOW, NOW);
+                CATEGORY_ID, "Frutas", "Fresh produce", CategoryIcon.GROCERY, CategoryStatus.ACTIVE, NOW, NOW);
 
         CategoryJpaEntity entity = categoryMapper.toEntity(category);
         Category mapped = categoryMapper.toDomain(entity);
+        assertEquals(CategoryIcon.GROCERY, mapped.icon());
 
         assertEquals(category.id(), mapped.id());
         assertEquals(category.name(), mapped.name());

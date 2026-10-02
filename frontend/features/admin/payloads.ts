@@ -18,7 +18,7 @@ import type {
   UpdateAdminProductVariantRequest,
 } from "@/features/admin/api";
 import { copMoney, PRESENTATION_UNITS } from "@/features/admin/api";
-import type { Category } from "@/features/catalog/api";
+import { isCategoryIconId, type Category, type CategoryIconId } from "@/features/catalog/api";
 
 /** Catalog content limits (aligned with domain). */
 export const PRODUCT_NAME_MAX_LENGTH = 30;
@@ -30,6 +30,7 @@ export const PRODUCT_VARIANT_NAME_MAX_LENGTH = 30;
 export type AdminCategoryFormValues = {
   name: string;
   description: string;
+  icon: CategoryIconId;
 };
 
 export type AdminCategoryFieldErrors = Partial<
@@ -40,6 +41,7 @@ export function emptyAdminCategoryFormValues(): AdminCategoryFormValues {
   return {
     name: "",
     description: "",
+    icon: "OTHER",
   };
 }
 
@@ -50,6 +52,9 @@ export function validateAdminCategory(
   if (values.name.trim().length === 0) {
     errors.name = "Escribe el nombre de la categoría.";
   }
+  if (!isCategoryIconId(values.icon)) {
+    errors.icon = "Selecciona un icono para la categoría.";
+  }
   return errors;
 }
 
@@ -59,6 +64,7 @@ export function createAdminCategoryRequestFromValues(
   return {
     name: values.name.trim(),
     description: optionalText(values.description),
+    icon: values.icon,
   };
 }
 
@@ -68,6 +74,7 @@ export function updateAdminCategoryRequestFromValues(
   return {
     name: values.name.trim(),
     description: optionalText(values.description),
+    icon: values.icon,
   };
 }
 
@@ -77,6 +84,7 @@ export function adminCategoryFormValuesFromCategory(
   return {
     name: category.name,
     description: category.description ?? "",
+    icon: isCategoryIconId(category.icon) ? category.icon : "OTHER",
   };
 }
 

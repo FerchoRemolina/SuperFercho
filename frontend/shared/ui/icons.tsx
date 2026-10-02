@@ -207,3 +207,111 @@ export function LogOutIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function HomeIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-5.5h-5V21H5a1 1 0 0 1-1-1z" />
+    </Icon>
+  );
+}
+
+export function CupIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6.5 4h11l-1.1 14.2a1.8 1.8 0 0 1-1.8 1.8H9.4a1.8 1.8 0 0 1-1.8-1.8z" />
+      <path d="M7.2 9h9.6" />
+    </Icon>
+  );
+}
+
+export function AppleIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 7.5c-3.4-1.7-6.8.6-6.8 4.3 0 3.8 2.7 7.2 4.8 7.2.9 0 1.3-.5 2-.5s1.1.5 2 .5c2.1 0 4.8-3.4 4.8-7.2 0-3.7-3.4-6-6.8-4.3z" />
+      <path d="M12 7.5c0-1.9.9-3 2.4-3.7" />
+    </Icon>
+  );
+}
+
+export function BreadIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6 20v-8.6A4.4 4.4 0 0 1 10.4 7h3.2A4.4 4.4 0 0 1 18 11.4V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1z" />
+      <path d="M9.5 11V9.5" />
+      <path d="M13 11V9.5" />
+    </Icon>
+  );
+}
+
+export function MeatIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M16.2 3a4.8 4.8 0 0 1 4.8 4.8c0 2.4-1.8 4.3-4.2 4.8-1.3.3-2.3 1-3.2 1.9l-3.7 3.7" />
+      <path d="M9.9 17.4 6.3 21" />
+      <circle cx="5.6" cy="18.4" r="1.9" />
+      <circle cx="8.4" cy="21" r="1.4" />
+    </Icon>
+  );
+}
+
+export function MilkIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M8.5 3h7l1.5 4v12a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V7z" />
+      <path d="M7 7h10" />
+      <path d="M10.5 10.5h3V15h-3z" />
+    </Icon>
+  );
+}
+
+export function InfoIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 8h.01" />
+      <path d="M12 11.5V16" />
+    </Icon>
+  );
+}
+
+export function EditIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M17 3.5a2.6 2.6 0 0 1 3.7 3.7L8 19.9 3 21l1.1-5z" />
+    </Icon>
+  );
+}
+
+export function PawIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <ellipse cx="12" cy="15.5" rx="4" ry="3.4" />
+      <circle cx="6.5" cy="10.5" r="1.7" />
+      <circle cx="10.2" cy="7.4" r="1.7" />
+      <circle cx="13.8" cy="7.4" r="1.7" />
+      <circle cx="17.5" cy="10.5" r="1.7" />
+    </Icon>
+  );
+}
+
+export function BabyIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M9.2 13.4c.8.8 1.7 1.2 2.8 1.2s2-.4 2.8-1.2" />
+      <path d="M9.5 9.8h.01" />
+      <path d="M14.5 9.8h.01" />
+    </Icon>
+  );
+}
+
+export function DeviceIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="4.5" width="18" height="12" rx="1.5" />
+      <path d="M9 20.5h6" />
+      <path d="M12 16.5v4" />
+    </Icon>
+  );
+}

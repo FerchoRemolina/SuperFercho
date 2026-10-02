@@ -1,5 +1,6 @@
 import type {
   Category,
+  CategoryIconId,
   CategoryStatus,
   Product,
   ProductStatus,
@@ -154,12 +155,14 @@ export type AdminProduct = {
 export type CreateAdminCategoryRequest = {
   name: string;
   description: string | null;
+  icon: CategoryIconId;
 };
 
 /** Mirrors UpdateCategoryRequest. Does not include status. */
 export type UpdateAdminCategoryRequest = {
   name: string;
   description: string | null;
+  icon: CategoryIconId;
 };
 
 /** Mirrors CreateProductRequest. Does not accept categoryId. */

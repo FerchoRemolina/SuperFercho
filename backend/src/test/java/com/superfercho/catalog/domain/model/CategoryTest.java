@@ -1,5 +1,7 @@
 package com.superfercho.catalog.domain.model;
 
+import com.superfercho.catalog.domain.model.CategoryIcon;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -26,6 +28,7 @@ class CategoryTest {
         assertEquals(ID, category.id());
         assertEquals("Frutas", category.name());
         assertEquals("Fresh produce", category.description());
+        assertEquals(CategoryIcon.FRUITS, category.icon());
         assertEquals(CategoryStatus.ACTIVE, category.status());
         assertEquals(CREATED_AT, category.createdAt());
         assertEquals(UPDATED_AT, category.updatedAt());
@@ -48,6 +51,28 @@ class CategoryTest {
     @ValueSource(strings = {" ", "   "})
     void shouldRejectCategoryWhenNameIsBlank(String blank) {
         assertThrows(InvalidCategoryException.class, () -> validCategory().name(blank).build());
+    }
+
+    @Test
+    void shouldRejectCategoryWhenIconIsNull() {
+        assertThrows(InvalidCategoryException.class, () -> validCategory().icon(null).build());
+    }
+
+    @Test
+    void shouldPreserveIconOnActivateAndDeactivate() {
+        Category withIcon = validCategory().icon(CategoryIcon.BAKERY).build();
+
+        assertEquals(CategoryIcon.BAKERY, withIcon.deactivate(LATER).icon());
+        assertEquals(CategoryIcon.BAKERY, withIcon.deactivate(LATER).activate(LATER).icon());
+    }
+
+    @Test
+    void shouldUpdateIconOnInformationUpdate() {
+        Category original = validCategory().build();
+
+        Category updated = original.updateInformation("Verduras", "Leafy greens", CategoryIcon.OTHER, LATER);
+
+        assertEquals(CategoryIcon.OTHER, updated.icon());
     }
 
     @Test
@@ -95,7 +120,7 @@ class CategoryTest {
     void shouldUpdateCategoryInformationAndPreserveIdentity() {
         Category original = validCategory().build();
 
-        Category updated = original.updateInformation("Verduras", "Leafy greens", LATER);
+        Category updated = original.updateInformation("Verduras", "Leafy greens", CategoryIcon.OTHER, LATER);
 
         assertEquals(original.id(), updated.id());
         assertEquals(original.status(), updated.status());
@@ -110,7 +135,7 @@ class CategoryTest {
         Category original = validCategory().build();
 
         assertThrows(
-                InvalidCategoryException.class, () -> original.updateInformation("  ", "Leafy greens", LATER));
+                InvalidCategoryException.class, () -> original.updateInformation("  ", "Leafy greens", CategoryIcon.OTHER, LATER));
     }
 
     private static CategoryBuilder validCategory() {
@@ -121,6 +146,7 @@ class CategoryTest {
         private UUID id = ID;
         private String name = "Frutas";
         private String description = "Fresh produce";
+        private CategoryIcon icon = CategoryIcon.FRUITS;
         private CategoryStatus status = CategoryStatus.ACTIVE;
         private Instant createdAt = CREATED_AT;
         private Instant updatedAt = UPDATED_AT;
@@ -140,6 +166,11 @@ class CategoryTest {
             return this;
         }
 
+        private CategoryBuilder icon(CategoryIcon icon) {
+            this.icon = icon;
+            return this;
+        }
+
         private CategoryBuilder status(CategoryStatus status) {
             this.status = status;
             return this;
@@ -156,7 +187,7 @@ class CategoryTest {
         }
 
         private Category build() {
-            return Category.create(id, name, description, status, createdAt, updatedAt);
+            return Category.create(id, name, description, icon, status, createdAt, updatedAt);
         }
     }
 }

@@ -4,7 +4,7 @@ import { Badge } from "@/shared/ui/badge";
 
 export function CategoryStatusBadge({ status }: { status: CategoryStatus }) {
   return (
-    <Badge tone={status === "ACTIVE" ? "primary" : "neutral"}>
+    <Badge tone={status === "ACTIVE" ? "success" : "neutral"}>
       {categoryStatusLabel(status)}
     </Badge>
   );

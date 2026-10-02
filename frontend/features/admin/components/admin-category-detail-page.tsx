@@ -125,7 +125,7 @@ export function AdminCategoryDetailPageContent({
 
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
+          <h1 className="text-2xl font-bold tracking-tight text-sf-ink">
             {category.name}
           </h1>
           <p className="mt-2 text-base text-sf-muted">
@@ -159,7 +159,9 @@ export function AdminCategoryDetailPageContent({
         </Card>
 
         <Card className="grid gap-4">
-          <h2 className="text-xl font-semibold text-sf-ink">Ficha</h2>
+          <h2 className="text-xl font-semibold text-sf-ink">
+            Editar categoría
+          </h2>
           {saved ? (
             <p className="text-sm font-semibold text-sf-success">
               Cambios guardados correctamente.

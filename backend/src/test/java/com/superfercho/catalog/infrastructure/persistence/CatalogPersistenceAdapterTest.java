@@ -12,6 +12,7 @@ import com.superfercho.catalog.application.port.InventoryPort;
 import com.superfercho.catalog.application.port.ProductRepository;
 import com.superfercho.catalog.application.port.ProductTypeRepository;
 import com.superfercho.catalog.domain.model.Category;
+import com.superfercho.catalog.domain.model.CategoryIcon;
 import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.domain.model.Presentation;
 import com.superfercho.catalog.domain.model.PresentationUnit;
@@ -345,8 +346,7 @@ class CatalogPersistenceAdapterTest {
     }
 
     private static Category newCategory(String name, CategoryStatus status) {
-        return Category.create(UUID.randomUUID(), name, "Fresh produce", status, NOW, NOW);
-    }
+        return Category.create(UUID.randomUUID(), name, "Fresh produce", CategoryIcon.OTHER, status, NOW, NOW);    }
 
     private static ProductType newProductType(UUID categoryId, String name) {
         return ProductType.create(
