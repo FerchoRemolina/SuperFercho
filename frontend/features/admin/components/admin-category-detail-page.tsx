@@ -2,10 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { AdminCategoryForm } from "@/features/admin/components/admin-category-form";
+import { useSearchParams } from "next/navigation";import { AdminCategoryForm } from "@/features/admin/components/admin-category-form";
 import { AdminProductTypeSection } from "@/features/admin/components/admin-product-type-section";
-import { CategoryStatusActions } from "@/features/admin/components/category-status-actions";
 import { CategoryStatusBadge } from "@/features/admin/components/category-status-badge";
 import {
   useAdminCategoryQuery,
@@ -21,7 +19,8 @@ import { formatAdminInstant } from "@/features/admin/presentation";
 import { isApiError } from "@/shared/errors/api-problem";
 import { messageForApiProblem } from "@/shared/errors/messages";
 import { Alert } from "@/shared/ui/alert";
-import { Button, buttonClassName } from "@/shared/ui/button";
+import { buttonClassName } from "@/shared/ui/button";
+import { BackLink } from "@/shared/ui/back-link";
 import { Card } from "@/shared/ui/card";
 import { Container } from "@/shared/ui/container";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -32,7 +31,6 @@ export function AdminCategoryDetailPageContent({
 }: {
   categoryId: string;
 }) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const created = searchParams.get("created") === "1";
   const categoryQuery = useAdminCategoryQuery(categoryId);
@@ -108,12 +106,7 @@ export function AdminCategoryDetailPageContent({
 
   return (
     <Container as="main" className="py-10 md:py-16">
-      <Link
-        href="/admin/categories"
-        className={`${buttonClassName("ghost")} mb-4 px-0`}
-      >
-        Volver al listado
-      </Link>
+      <BackLink href="/admin/categories" className="mb-4">Volver al listado</BackLink>
 
       {created ? (
         <div className="mb-6">
@@ -193,22 +186,11 @@ export function AdminCategoryDetailPageContent({
           />
         </Card>
 
-        <Card className="grid gap-3">
-          <h2 className="text-xl font-semibold text-sf-ink">Estado</h2>
-          <CategoryStatusActions category={category} />
-        </Card>
-
         <AdminProductTypeSection categoryId={category.id} />
       </div>
 
       <div className="mt-8">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => router.push("/admin/categories")}
-        >
-          Volver al listado
-        </Button>
+        <BackLink href="/admin/categories" />
       </div>
     </Container>
   );
