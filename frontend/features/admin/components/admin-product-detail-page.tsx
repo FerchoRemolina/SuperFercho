@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { AdminProductForm } from "@/features/admin/components/admin-product-form";
 import { ProductPricePanel } from "@/features/admin/components/product-price-panel";
 import { ProductStockPanel } from "@/features/admin/components/product-stock-panel";
@@ -26,7 +26,8 @@ import { isApiError } from "@/shared/errors/api-problem";
 import { messageForApiProblem } from "@/shared/errors/messages";
 import { formatMoney } from "@/shared/money/money";
 import { Alert } from "@/shared/ui/alert";
-import { Button, buttonClassName } from "@/shared/ui/button";
+import { buttonClassName } from "@/shared/ui/button";
+import { BackLink } from "@/shared/ui/back-link";
 import { Card } from "@/shared/ui/card";
 import { Container } from "@/shared/ui/container";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -37,7 +38,6 @@ export function AdminProductDetailPageContent({
 }: {
   productId: string;
 }) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const created = searchParams.get("created") === "1";
   const listHref = adminProductsListHrefFromSearchParams({
@@ -123,12 +123,7 @@ export function AdminProductDetailPageContent({
 
   return (
     <Container as="main" className="py-10 md:py-16">
-      <Link
-        href={listHref}
-        className={`${buttonClassName("ghost")} mb-4 px-0`}
-      >
-        Volver al listado
-      </Link>
+      <BackLink href={listHref} className="mb-4">Volver al listado</BackLink>
 
       {created ? (
         <div className="mb-6">
@@ -245,13 +240,7 @@ export function AdminProductDetailPageContent({
       </div>
 
       <div className="mt-8">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => router.push(listHref)}
-        >
-          Volver al listado
-        </Button>
+        <BackLink href={listHref} />
       </div>
     </Container>
   );

@@ -18,6 +18,7 @@ import { messageForApiProblem } from "@/shared/errors/messages";
 import { formatMoney } from "@/shared/money/money";
 import { Alert } from "@/shared/ui/alert";
 import { Button, buttonClassName } from "@/shared/ui/button";
+import { BackLink } from "@/shared/ui/back-link";
 import { Card } from "@/shared/ui/card";
 import { Container } from "@/shared/ui/container";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -108,12 +109,7 @@ export function AdminOrderDetailPageContent({
 
   return (
     <Container as="main" className="py-10 md:py-16">
-      <Link
-        href="/admin/orders"
-        className={`${buttonClassName("ghost")} mb-4 px-0`}
-      >
-        Volver al listado
-      </Link>
+      <BackLink href="/admin/orders" className="mb-4">Volver al listado</BackLink>
 
       <p className="text-sm font-semibold text-sf-muted">Pedido</p>
       <h1 className="mt-1 text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">

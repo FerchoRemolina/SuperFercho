@@ -23,6 +23,7 @@ import { isApiError } from "@/shared/errors/api-problem";
 import { messageForApiProblem } from "@/shared/errors/messages";
 import { Alert } from "@/shared/ui/alert";
 import { Button, buttonClassName } from "@/shared/ui/button";
+import { BackLink } from "@/shared/ui/back-link";
 import { Card } from "@/shared/ui/card";
 import { Container } from "@/shared/ui/container";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -125,12 +126,7 @@ export function AdminKnowledgeDocumentDetailPage({
 
   return (
     <Container as="main" className="py-10 md:py-16">
-      <Link
-        href={adminKnowledgeHref()}
-        className={`${buttonClassName("ghost")} mb-4 px-0`}
-      >
-        Volver al listado
-      </Link>
+      <BackLink href={adminKnowledgeHref()} className="mb-4">Volver al listado</BackLink>
 
       {replaced ? (
         <div className="mb-6">

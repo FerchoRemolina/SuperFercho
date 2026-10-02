@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AdminCategoryForm } from "@/features/admin/components/admin-category-form";
+import { BackLink } from "@/shared/ui/back-link";
 import { useCreateAdminCategoryMutation } from "@/features/admin/hooks";
 import {
   createAdminCategoryRequestFromValues,
@@ -12,7 +12,6 @@ import {
 } from "@/features/admin/payloads";
 import { isApiError } from "@/shared/errors/api-problem";
 import { messageForApiProblem } from "@/shared/errors/messages";
-import { buttonClassName } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { Container } from "@/shared/ui/container";
 
@@ -29,12 +28,7 @@ export function AdminCreateCategoryPageContent() {
 
   return (
     <Container as="main" className="py-10 md:py-16">
-      <Link
-        href="/admin/categories"
-        className={`${buttonClassName("ghost")} mb-4 px-0`}
-      >
-        Volver al listado
-      </Link>
+      <BackLink href="/admin/categories" className="mb-4">Volver al listado</BackLink>
       <h1 className="text-2xl font-bold tracking-tight text-sf-ink">
         Nueva categoría
       </h1>

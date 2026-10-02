@@ -15,6 +15,7 @@ import { messageForApiProblem } from "@/shared/errors/messages";
 import { formatMoney } from "@/shared/money/money";
 import { Alert } from "@/shared/ui/alert";
 import { Button, buttonClassName } from "@/shared/ui/button";
+import { BackLink } from "@/shared/ui/back-link";
 import { Card } from "@/shared/ui/card";
 import { Container } from "@/shared/ui/container";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -94,12 +95,7 @@ export function AdminPaymentDetailPage({ paymentId }: { paymentId: string }) {
 
   return (
     <Container as="main" className="py-10 md:py-16">
-      <Link
-        href={adminOrdersHref({})}
-        className={`${buttonClassName("ghost")} mb-4 px-0`}
-      >
-        Volver a pedidos
-      </Link>
+      <BackLink href="adminOrdersHref({})" className="mb-4">Volver a pedidos</BackLink>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
