@@ -87,7 +87,9 @@ function moneyValue(money: { amount: number | string }): number {
   return typeof money.amount === "number" ? money.amount : Number(money.amount);
 }
 
-type SeriesPoint = { label: string; value: number };
+/** `id` es el periodStart del bucket (único por construcción del backend);
+ *  `label` es solo presentación (ej. "HH:mm" se repite en rangos >24h). */
+type SeriesPoint = { id: string; label: string; value: number };
 
 export function AnalyticsCard() {
   const [metricId, setMetricId] = useState<AnalyticsMetricId>("sales");
@@ -403,6 +405,7 @@ function AnalyticsBody({
     if (metricId === "newCustomers") {
       const data = newCustomersQuery.data;
       const points: SeriesPoint[] = (data?.buckets ?? []).map((bucket) => ({
+        id: bucket.periodStart,
         label: bucket.label,
         value: bucket.count,
       }));
@@ -427,6 +430,7 @@ function AnalyticsBody({
     const isSales = metricId === "sales";
     const points: SeriesPoint[] = (salesSeriesQuery.data?.buckets ?? []).map(
       (bucket) => ({
+        id: bucket.periodStart,
         label: bucket.label,
         value: isSales ? moneyValue(bucket.total) : bucket.orderCount,
       }),
@@ -644,7 +648,7 @@ function TrendChart({
             const barH = maxValue > 0 ? (point.value / maxValue) * chartH : 0;
             return (
               <rect
-                key={`${point.label}-${index}`}
+                key={point.id}
                 x={x}
                 y={padY + chartH - barH}
                 width={barW}
@@ -690,7 +694,7 @@ function TrendChart({
                   />
                   {linePoints.map((p) => (
                     <circle
-                      key={p.point.label}
+                      key={p.point.id}
                       cx={p.x}
                       cy={p.y}
                       r="4"
@@ -711,7 +715,7 @@ function TrendChart({
         {points.map((point, index) =>
           index % labelStep === 0 || index === points.length - 1 ? (
             <text
-              key={`${point.label}-label-${index}`}
+              key={`${point.id}-label`}
               x={
                 mode === "bars"
                   ? padX + (chartW / points.length) * index + chartW / points.length / 2
