@@ -78,6 +78,9 @@ public class OrderJpaEntity {
     @Column(name = "cancelled_at")
     private Instant cancelledAt;
 
+    @Column(name = "delivered_at")
+    private Instant deliveredAt;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
@@ -108,6 +111,7 @@ public class OrderJpaEntity {
             Instant createdAt,
             Instant confirmedAt,
             Instant cancelledAt,
+            Instant deliveredAt,
             Instant updatedAt,
             List<OrderItemJpaEntity> items) {
         this.id = id;
@@ -128,6 +132,7 @@ public class OrderJpaEntity {
         this.createdAt = createdAt;
         this.confirmedAt = confirmedAt;
         this.cancelledAt = cancelledAt;
+        this.deliveredAt = deliveredAt;
         this.updatedAt = updatedAt;
         this.items = items == null ? new ArrayList<>() : new ArrayList<>(items);
     }
@@ -202,6 +207,10 @@ public class OrderJpaEntity {
 
     public Instant getCancelledAt() {
         return cancelledAt;
+    }
+
+    public Instant getDeliveredAt() {
+        return deliveredAt;
     }
 
     public Instant getUpdatedAt() {

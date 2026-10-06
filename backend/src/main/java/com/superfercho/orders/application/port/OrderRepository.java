@@ -20,11 +20,12 @@ public interface OrderRepository {
     Order save(Order order);
 
     /**
-     * Persists a leaving-CONFIRMED transition ({@code PREPARING} or {@code CANCELLED})
-     * only if the stored row is still {@code CONFIRMED}. Empty means another writer
-     * already changed the status (cancel vs lifecycle race).
+     * Persists a lifecycle transition with an optimistic CAS: the row is only
+     * written when its current status still equals {@code fromStatus}. Empty
+     * means another writer already changed the status (e.g. cancel vs
+     * lifecycle, or two role actions racing the same transition).
      */
-    Optional<Order> saveIfConfirmed(Order order);
+    Optional<Order> saveIfCurrent(Order order, OrderStatus fromStatus);
 
     Optional<Order> findById(UUID orderId);
 

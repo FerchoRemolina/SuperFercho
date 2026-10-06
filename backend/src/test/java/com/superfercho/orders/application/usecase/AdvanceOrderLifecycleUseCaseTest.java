@@ -2,6 +2,7 @@ package com.superfercho.orders.application.usecase;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -49,18 +50,19 @@ class AdvanceOrderLifecycleUseCaseTest {
     }
 
     @Test
-    void shouldLeaveConfirmedThroughSaveIfConfirmed() {
+    void shouldLeaveConfirmedThroughSaveIfCurrent() {
         Order confirmed = confirmedOrder("ORD-1");
         when(clockProvider.currentTime()).thenReturn(CONFIRMED_AT.plusSeconds(120));
         when(orderRepository.findInProgressForLifecycle()).thenReturn(List.of(confirmed));
-        when(orderRepository.saveIfConfirmed(any())).thenAnswer(call -> Optional.of(call.getArgument(0)));
+        when(orderRepository.saveIfCurrent(any(), any())).thenAnswer(call -> Optional.of(call.getArgument(0)));
 
         List<OrderResult> advanced = advanceLifecycle.execute();
 
         ArgumentCaptor<Order> saved = ArgumentCaptor.forClass(Order.class);
-        verify(orderRepository).saveIfConfirmed(saved.capture());
+        verify(orderRepository).saveIfCurrent(saved.capture(), eq(OrderStatus.CONFIRMED));
         verify(orderRepository, never()).save(any());
         assertEquals(OrderStatus.PREPARING, saved.getValue().status());
+        assertNullDeliveredAt(saved.getValue());
         assertEquals(1, advanced.size());
         assertEquals(confirmed.id(), advanced.get(0).id());
         assertEquals(OrderStatus.PREPARING, advanced.get(0).status());
@@ -70,40 +72,46 @@ class AdvanceOrderLifecycleUseCaseTest {
     void shouldSkipConfirmedOrderWhenTransitionIsLost() {
         when(clockProvider.currentTime()).thenReturn(CONFIRMED_AT.plusSeconds(120));
         when(orderRepository.findInProgressForLifecycle()).thenReturn(List.of(confirmedOrder("ORD-1")));
-        when(orderRepository.saveIfConfirmed(any())).thenReturn(Optional.empty());
+        when(orderRepository.saveIfCurrent(any(), any())).thenReturn(Optional.empty());
 
         List<OrderResult> advanced = advanceLifecycle.execute();
 
         assertEquals(List.of(), advanced);
-        verify(orderRepository).saveIfConfirmed(any());
+        verify(orderRepository).saveIfCurrent(any(), any());
         verify(orderRepository, never()).save(any());
     }
 
     @Test
-    void shouldAdvanceAlreadyStartedOrdersThroughPlainSave() {
+    void shouldAdvanceAlreadyStartedOrdersThroughSaveIfCurrent() {
         Order preparing = confirmedOrder("ORD-1").startPreparation(CONFIRMED_AT.plusSeconds(120));
         when(clockProvider.currentTime()).thenReturn(CONFIRMED_AT.plusSeconds(240));
         when(orderRepository.findInProgressForLifecycle()).thenReturn(List.of(preparing));
-        when(orderRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(orderRepository.saveIfCurrent(any(), any())).thenAnswer(call -> Optional.of(call.getArgument(0)));
 
         List<OrderResult> advanced = advanceLifecycle.execute();
 
-        verify(orderRepository, never()).saveIfConfirmed(any());
-        assertEquals(1, advanced.size());
+        ArgumentCaptor<Order> saved = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).saveIfCurrent(saved.capture(), eq(OrderStatus.PREPARING));
+        verify(orderRepository, never()).save(any());
         assertEquals(OrderStatus.DELIVERY, advanced.get(0).status());
+        assertNullDeliveredAt(saved.getValue());
     }
 
     @Test
     void shouldCatchUpToDeliveredWhenJobIsLate() {
+        Instant now = CONFIRMED_AT.plusSeconds(3600);
         Order preparing = confirmedOrder("ORD-1").startPreparation(CONFIRMED_AT.plusSeconds(120));
-        when(clockProvider.currentTime()).thenReturn(CONFIRMED_AT.plusSeconds(3600));
+        when(clockProvider.currentTime()).thenReturn(now);
         when(orderRepository.findInProgressForLifecycle()).thenReturn(List.of(preparing));
-        when(orderRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(orderRepository.saveIfCurrent(any(), any())).thenAnswer(call -> Optional.of(call.getArgument(0)));
 
         List<OrderResult> advanced = advanceLifecycle.execute();
 
+        ArgumentCaptor<Order> saved = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).saveIfCurrent(saved.capture(), eq(OrderStatus.PREPARING));
         assertEquals(1, advanced.size());
         assertEquals(OrderStatus.DELIVERED, advanced.get(0).status());
+        assertEquals(now, saved.getValue().deliveredAt());
     }
 
     @Test
@@ -111,13 +119,13 @@ class AdvanceOrderLifecycleUseCaseTest {
         Order previewOrder = confirmedOrder("ORD-PREVIEW");
         when(clockProvider.currentTime()).thenReturn(CONFIRMED_AT.plusSeconds(360));
         when(orderRepository.findInProgressForLifecycle()).thenReturn(List.of(previewOrder));
-        when(orderRepository.saveIfConfirmed(any())).thenAnswer(call -> Optional.of(call.getArgument(0)));
+        when(orderRepository.saveIfCurrent(any(), any())).thenAnswer(call -> Optional.of(call.getArgument(0)));
 
         List<OrderResult> advanced = advanceLifecycle.execute();
 
         assertEquals(1, advanced.size());
         assertEquals(OrderStatus.DELIVERED, advanced.get(0).status());
-        verify(orderRepository).saveIfConfirmed(any());
+        verify(orderRepository).saveIfCurrent(any(), eq(OrderStatus.CONFIRMED));
     }
 
     @Test
@@ -129,7 +137,7 @@ class AdvanceOrderLifecycleUseCaseTest {
         List<OrderResult> advanced = advanceLifecycle.execute();
 
         assertEquals(List.of(), advanced);
-        verify(orderRepository, never()).saveIfConfirmed(any());
+        verify(orderRepository, never()).saveIfCurrent(any(), any());
         verify(orderRepository, never()).save(any());
     }
 
@@ -139,13 +147,13 @@ class AdvanceOrderLifecycleUseCaseTest {
         Order tooRecent = order("ORD-RECENT", CONFIRMED_AT.plusSeconds(90));
         when(clockProvider.currentTime()).thenReturn(CONFIRMED_AT.plusSeconds(120));
         when(orderRepository.findInProgressForLifecycle()).thenReturn(List.of(due, tooRecent));
-        when(orderRepository.saveIfConfirmed(any())).thenAnswer(call -> Optional.of(call.getArgument(0)));
+        when(orderRepository.saveIfCurrent(any(), any())).thenAnswer(call -> Optional.of(call.getArgument(0)));
 
         List<OrderResult> advanced = advanceLifecycle.execute();
 
         assertEquals(1, advanced.size());
         assertEquals(due.id(), advanced.get(0).id());
-        verify(orderRepository, times(1)).saveIfConfirmed(any());
+        verify(orderRepository, times(1)).saveIfCurrent(any(), any());
     }
 
     @Test
@@ -154,8 +162,12 @@ class AdvanceOrderLifecycleUseCaseTest {
         when(orderRepository.findInProgressForLifecycle()).thenReturn(List.of());
 
         assertEquals(List.of(), advanceLifecycle.execute());
-        verify(orderRepository, never()).saveIfConfirmed(any());
+        verify(orderRepository, never()).saveIfCurrent(any(), any());
         verify(orderRepository, never()).save(any());
+    }
+
+    private static void assertNullDeliveredAt(Order order) {
+        assertEquals(null, order.deliveredAt());
     }
 
     private static Order confirmedOrder(String orderNumber) {

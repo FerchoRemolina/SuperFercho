@@ -36,11 +36,9 @@ public final class AdvanceOrderLifecycleUseCase {
                 continue;
             }
             Order next = order.advanceLifecycle(now);
-            if (order.status() == OrderStatus.CONFIRMED) {
-                orderRepository.saveIfConfirmed(next).ifPresent(saved -> advanced.add(OrderResult.from(saved)));
-            } else {
-                advanced.add(OrderResult.from(orderRepository.save(next)));
-            }
+            orderRepository
+                    .saveIfCurrent(next, order.status())
+                    .ifPresent(saved -> advanced.add(OrderResult.from(saved)));
         }
         return List.copyOf(advanced);
     }

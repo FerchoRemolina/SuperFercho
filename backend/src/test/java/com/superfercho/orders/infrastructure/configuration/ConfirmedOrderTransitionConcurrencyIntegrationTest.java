@@ -7,6 +7,7 @@ import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.application.port.ProductRepository;
 import com.superfercho.catalog.application.port.ProductTypeRepository;
 import com.superfercho.catalog.domain.model.Category;
+import com.superfercho.catalog.domain.model.CategoryIcon;
 import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.domain.model.Presentation;
 import com.superfercho.catalog.domain.model.PresentationUnit;
@@ -286,7 +287,7 @@ class ConfirmedOrderTransitionConcurrencyIntegrationTest {
 
     private Product persistProduct() {
         Category category = categoryRepository.save(Category.create(
-                UUID.randomUUID(), "Race-" + UUID.randomUUID(), "Fresh produce", CategoryStatus.ACTIVE, NOW, NOW));
+                UUID.randomUUID(), "Race-" + UUID.randomUUID(), "Fresh produce", CategoryIcon.OTHER, CategoryStatus.ACTIVE, NOW, NOW));
         ProductType type = productTypeRepository.save(ProductType.create(
                 UUID.randomUUID(),
                 category.id(),
@@ -343,11 +344,78 @@ class ConfirmedOrderTransitionConcurrencyIntegrationTest {
     /**
      * Clock used only by the lifecycle side of the cancel-vs-advance race: cancel still uses the
      * Spring clock (order still inside the 2-minute window), while advance sees the order as past
-     * {@link Order#PREPARING_AFTER} so CAS {@code saveIfConfirmed} decides the winner.
+     * {@link Order#PREPARING_AFTER} so CAS {@code saveIfCurrent} decides the winner.
      */
     private ClockProvider futureClockPastPreparingWindow() {
         Instant baseline = clock.instant();
         return () -> baseline.plus(Order.PREPARING_AFTER).plusSeconds(1);
+    }
+
+    @Test
+    void shouldApplyPreparingToDeliveryTransitionExactlyOnceUnderCas() throws Exception {
+        PreparedOrder prepared = checkout();
+        ageOrder(prepared.orderId(), Order.PREPARING_AFTER);
+        advanceOrderLifecycleUseCase.execute();
+        Order preparing = orderRepository.findById(prepared.orderId()).orElseThrow();
+        Order next = preparing.startDelivery(clock.instant().plusSeconds(60));
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            var first = executor.submit(() -> {
+                await(start);
+                return orderRepository.saveIfCurrent(next, OrderStatus.PREPARING);
+            });
+            var second = executor.submit(() -> {
+                await(start);
+                return orderRepository.saveIfCurrent(next, OrderStatus.PREPARING);
+            });
+            start.countDown();
+            var firstResult = first.get(20, TimeUnit.SECONDS);
+            var secondResult = second.get(20, TimeUnit.SECONDS);
+            executor.shutdownNow();
+
+            long applied = (firstResult.isPresent() ? 1 : 0) + (secondResult.isPresent() ? 1 : 0);
+            assertThat(applied).isEqualTo(1);
+            Order order = orderRepository.findById(prepared.orderId()).orElseThrow();
+            assertThat(order.status()).isEqualTo(OrderStatus.DELIVERY);
+            assertThat(order.deliveredAt()).isNull();
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void shouldApplyDeliveryToDeliveredTransitionExactlyOnceAndRecordDeliveredAt() throws Exception {
+        PreparedOrder prepared = checkout();
+        ageOrder(prepared.orderId(), Order.DELIVERY_AFTER);
+        advanceOrderLifecycleUseCase.execute();
+        Order delivery = orderRepository.findById(prepared.orderId()).orElseThrow();
+        assertThat(delivery.status()).isEqualTo(OrderStatus.DELIVERY);
+        Order next = delivery.markDelivered(clock.instant().plusSeconds(60));
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            var first = executor.submit(() -> {
+                await(start);
+                return orderRepository.saveIfCurrent(next, OrderStatus.DELIVERY);
+            });
+            var second = executor.submit(() -> {
+                await(start);
+                return orderRepository.saveIfCurrent(next, OrderStatus.DELIVERY);
+            });
+            start.countDown();
+            var firstResult = first.get(20, TimeUnit.SECONDS);
+            var secondResult = second.get(20, TimeUnit.SECONDS);
+            executor.shutdownNow();
+
+            long applied = (firstResult.isPresent() ? 1 : 0) + (secondResult.isPresent() ? 1 : 0);
+            assertThat(applied).isEqualTo(1);
+            Order order = orderRepository.findById(prepared.orderId()).orElseThrow();
+            assertThat(order.status()).isEqualTo(OrderStatus.DELIVERED);
+            assertThat(order.deliveredAt()).isNotNull();
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     private static void await(CountDownLatch latch) {

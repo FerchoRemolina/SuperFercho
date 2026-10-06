@@ -36,6 +36,7 @@ public class OrderPersistenceMapper {
                 order.createdAt(),
                 order.confirmedAt(),
                 order.cancelledAt(),
+                order.deliveredAt(),
                 order.updatedAt(),
                 items);
     }
@@ -59,6 +60,7 @@ public class OrderPersistenceMapper {
                 entity.getCreatedAt(),
                 entity.getConfirmedAt(),
                 entity.getCancelledAt(),
+                entity.getDeliveredAt(),
                 entity.getUpdatedAt());
     }
 

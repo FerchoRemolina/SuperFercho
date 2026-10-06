@@ -163,6 +163,7 @@ class OrderPersistenceMapperTest {
                 CREATED_AT,
                 CONFIRMED_AT,
                 null,
+                null,
                 UPDATED_AT);
 
         Order mapped = mapper.toDomain(mapper.toEntity(confirmed));
@@ -179,9 +180,9 @@ class OrderPersistenceMapperTest {
 
     @Test
     void shouldReconstitutePreparingDeliveryAndDeliveredWithoutReplayingTransitions() {
-        Order preparing = reconstituted(OrderStatus.PREPARING, CONFIRMED_AT, null, UPDATED_AT);
-        Order delivery = reconstituted(OrderStatus.DELIVERY, CONFIRMED_AT, null, UPDATED_AT);
-        Order delivered = reconstituted(OrderStatus.DELIVERED, CONFIRMED_AT, null, UPDATED_AT);
+        Order preparing = reconstituted(OrderStatus.PREPARING, CONFIRMED_AT, null, null, UPDATED_AT);
+        Order delivery = reconstituted(OrderStatus.DELIVERY, CONFIRMED_AT, null, null, UPDATED_AT);
+        Order delivered = reconstitutedDelivered(CONFIRMED_AT, UPDATED_AT);
 
         Order mappedPreparing = mapper.toDomain(mapper.toEntity(preparing));
         Order mappedDelivery = mapper.toDomain(mapper.toEntity(delivery));
@@ -197,6 +198,7 @@ class OrderPersistenceMapperTest {
         assertEquals(CONFIRMED_AT, mappedDelivered.confirmedAt());
         assertEquals(UPDATED_AT, mappedDelivered.updatedAt());
         assertEquals(CREATED_AT, mappedDelivered.createdAt());
+        assertEquals(UPDATED_AT, mappedDelivered.deliveredAt());
         assertNull(mappedDelivered.cancelledAt());
         assertEquals(PAYMENT_ID, mappedDelivered.paymentId());
     }
@@ -204,7 +206,7 @@ class OrderPersistenceMapperTest {
     @Test
     void shouldMapCancelledStatusAndTimestamps() {
         Instant cancelledAt = Instant.parse("2026-03-01T10:10:00Z");
-        Order cancelled = reconstituted(OrderStatus.CANCELLED, null, cancelledAt, cancelledAt);
+        Order cancelled = reconstituted(OrderStatus.CANCELLED, null, cancelledAt, null, cancelledAt);
 
         Order mapped = mapper.toDomain(mapper.toEntity(cancelled));
 
@@ -219,7 +221,11 @@ class OrderPersistenceMapperTest {
     }
 
     private static Order reconstituted(
-            OrderStatus status, Instant confirmedAt, Instant cancelledAt, Instant updatedAt) {
+            OrderStatus status,
+            Instant confirmedAt,
+            Instant cancelledAt,
+            Instant deliveredAt,
+            Instant updatedAt) {
         return Order.reconstitute(
                 ORDER_ID,
                 new OrderNumber("ORD-1001"),
@@ -231,7 +237,12 @@ class OrderPersistenceMapperTest {
                 CREATED_AT,
                 confirmedAt,
                 cancelledAt,
+                deliveredAt,
                 updatedAt);
+    }
+
+    private static Order reconstitutedDelivered(Instant confirmedAt, Instant deliveredAt) {
+        return reconstituted(OrderStatus.DELIVERED, confirmedAt, null, deliveredAt, deliveredAt);
     }
 
     private static Order confirmedOrder(UUID paymentId) {

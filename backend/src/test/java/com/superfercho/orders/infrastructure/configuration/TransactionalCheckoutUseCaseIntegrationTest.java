@@ -7,6 +7,7 @@ import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.application.port.ProductRepository;
 import com.superfercho.catalog.application.port.ProductTypeRepository;
 import com.superfercho.catalog.domain.model.Category;
+import com.superfercho.catalog.domain.model.CategoryIcon;
 import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.domain.model.Presentation;
 import com.superfercho.catalog.domain.model.PresentationUnit;
@@ -649,7 +650,7 @@ class TransactionalCheckoutUseCaseIntegrationTest {
 
     private static Category newCategory() {
         return Category.create(
-                UUID.randomUUID(), "Checkout-" + UUID.randomUUID(), "Fresh produce", CategoryStatus.ACTIVE, NOW, NOW);
+                UUID.randomUUID(), "Checkout-" + UUID.randomUUID(), "Fresh produce", CategoryIcon.OTHER, CategoryStatus.ACTIVE, NOW, NOW);
     }
 
     private static Product newProduct(UUID categoryId, UUID productTypeId, int stock, Money price, ProductStatus status) {

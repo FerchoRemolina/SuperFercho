@@ -90,7 +90,7 @@ class CancelOrderUseCaseTest {
         Order order = confirmedOrder(CUSTOMER_ID, PAYMENT_ID);
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
         when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
-        when(orderRepository.saveIfConfirmed(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
+        when(orderRepository.saveIfCurrent(any(), any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         when(paymentPort.getPayment(PAYMENT_ID))
                 .thenReturn(paymentResult(PaymentStatus.APPROVED, "sim-1"));
 
@@ -120,7 +120,7 @@ class CancelOrderUseCaseTest {
         assertThrows(
                 OrderCancellationNotAllowedException.class,
                 () -> cancelOrder.execute(new CancelOrderCommand(ORDER_ID)));
-        verify(orderRepository, never()).saveIfConfirmed(any());
+        verify(orderRepository, never()).saveIfCurrent(any(), any());
         verify(inventoryPort, never()).restoreStock(any());
         verify(paymentPort, never()).refundPayment(any());
     }
@@ -129,7 +129,7 @@ class CancelOrderUseCaseTest {
     void shouldRestoreStockWhenCancellationSucceeds() {
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(confirmedOrder(CUSTOMER_ID, PAYMENT_ID)));
         when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
-        when(orderRepository.saveIfConfirmed(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
+        when(orderRepository.saveIfCurrent(any(), any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         when(paymentPort.getPayment(PAYMENT_ID))
                 .thenReturn(paymentResult(PaymentStatus.APPROVED, "sim-1"));
 
@@ -142,7 +142,7 @@ class CancelOrderUseCaseTest {
     void shouldRefundApprovedSimulatedCardPayment() {
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(confirmedOrder(CUSTOMER_ID, PAYMENT_ID)));
         when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
-        when(orderRepository.saveIfConfirmed(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
+        when(orderRepository.saveIfCurrent(any(), any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         when(paymentPort.getPayment(PAYMENT_ID))
                 .thenReturn(paymentResult(PaymentStatus.APPROVED, "sim-1"));
 
@@ -155,7 +155,7 @@ class CancelOrderUseCaseTest {
     void shouldNotRefundCashOnDelivery() {
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(confirmedOrder(CUSTOMER_ID, PAYMENT_ID)));
         when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
-        when(orderRepository.saveIfConfirmed(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
+        when(orderRepository.saveIfCurrent(any(), any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         when(paymentPort.getPayment(PAYMENT_ID))
                 .thenReturn(paymentResult(PaymentStatus.PENDING, "cod-1"));
 
@@ -169,7 +169,7 @@ class CancelOrderUseCaseTest {
     void shouldRejectCancellationWhenConfirmedTransitionIsLost() {
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(confirmedOrder(CUSTOMER_ID, PAYMENT_ID)));
         when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
-        when(orderRepository.saveIfConfirmed(any())).thenReturn(Optional.empty());
+        when(orderRepository.saveIfCurrent(any(), any())).thenReturn(Optional.empty());
 
         assertThrows(
                 InvalidOrderStateTransitionException.class,
@@ -184,7 +184,7 @@ class CancelOrderUseCaseTest {
         when(previewCustomerExclusionPort.isPreviewTemporaryCustomer(CUSTOMER_ID)).thenReturn(true);
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(confirmedOrder(CUSTOMER_ID, PAYMENT_ID)));
         when(clockProvider.currentTime()).thenReturn(WITHIN_WINDOW);
-        when(orderRepository.saveIfConfirmed(any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
+        when(orderRepository.saveIfCurrent(any(), any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         when(paymentPort.getPayment(PAYMENT_ID))
                 .thenReturn(paymentResult(PaymentStatus.APPROVED, "sim-1"));
 

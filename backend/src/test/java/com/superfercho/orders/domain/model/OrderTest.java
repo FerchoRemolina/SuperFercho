@@ -205,9 +205,15 @@ class OrderTest {
     @Test
     void shouldRejectAdvanceLifecycleFromTerminalStatuses() {
         Order delivered = reconstitute(
-                OrderStatus.DELIVERED, PAYMENT_ID, CREATED_AT, CREATED_AT, null, CREATED_AT.plusSeconds(360));
+                OrderStatus.DELIVERED,
+                PAYMENT_ID,
+                CREATED_AT,
+                CREATED_AT,
+                null,
+                CREATED_AT.plusSeconds(360),
+                CREATED_AT.plusSeconds(360));
         Order cancelled = reconstitute(
-                OrderStatus.CANCELLED, PAYMENT_ID, CREATED_AT, null, CREATED_AT, CREATED_AT);
+                OrderStatus.CANCELLED, PAYMENT_ID, CREATED_AT, null, CREATED_AT, null, CREATED_AT);
 
         assertThrows(
                 InvalidOrderStateTransitionException.class,
@@ -291,6 +297,74 @@ class OrderTest {
             assertEquals(longAfterWindow, cancelled.updatedAt());
             assertNull(cancelled.confirmedAt());
         }
+    }
+
+    @Test
+    void shouldKeepDeliveredAtNullUntilReachingDelivered() {
+        Order confirmed = validOrder().build();
+        Order preparing = confirmed.startPreparation(CREATED_AT.plusSeconds(120));
+        Order delivery = preparing.startDelivery(CREATED_AT.plusSeconds(240));
+
+        assertNull(confirmed.deliveredAt());
+        assertNull(preparing.deliveredAt());
+        assertNull(delivery.deliveredAt());
+    }
+
+    @Test
+    void shouldSetDeliveredAtWhenReachingDelivered() {
+        Instant deliveredAt = CREATED_AT.plusSeconds(360);
+
+        Order delivered = validOrder()
+                .build()
+                .startPreparation(CREATED_AT.plusSeconds(120))
+                .startDelivery(CREATED_AT.plusSeconds(240))
+                .markDelivered(deliveredAt);
+
+        assertEquals(OrderStatus.DELIVERED, delivered.status());
+        assertEquals(deliveredAt, delivered.deliveredAt());
+        assertEquals(deliveredAt, delivered.updatedAt());
+    }
+
+    @Test
+    void shouldSetDeliveredAtOnLifecycleCatchUpToDelivered() {
+        Instant now = CREATED_AT.plusSeconds(3600);
+
+        Order delivered = validOrder()
+                .build()
+                .startPreparation(CREATED_AT.plusSeconds(120))
+                .startDelivery(CREATED_AT.plusSeconds(240))
+                .advanceLifecycle(now);
+
+        assertEquals(OrderStatus.DELIVERED, delivered.status());
+        assertEquals(now, delivered.deliveredAt());
+    }
+
+    @Test
+    void shouldKeepDeliveredAtImmutableAfterDelivery() {
+        Instant deliveredAt = CREATED_AT.plusSeconds(360);
+        Order delivered = validOrder()
+                .build()
+                .startPreparation(CREATED_AT.plusSeconds(120))
+                .startDelivery(CREATED_AT.plusSeconds(240))
+                .markDelivered(deliveredAt);
+
+        assertThrows(
+                InvalidOrderStateTransitionException.class,
+                () -> delivered.markDelivered(deliveredAt.plusSeconds(60)));
+        assertThrows(
+                InvalidOrderStateTransitionException.class,
+                () -> delivered.advanceLifecycle(deliveredAt.plusSeconds(3600)));
+
+        assertEquals(OrderStatus.DELIVERED, delivered.status());
+        assertEquals(deliveredAt, delivered.deliveredAt());
+    }
+
+    @Test
+    void shouldNeverSetDeliveredAtOnCancelledOrder() {
+        Order cancelled = validOrder().build().cancel(WITHIN_WINDOW);
+
+        assertEquals(OrderStatus.CANCELLED, cancelled.status());
+        assertNull(cancelled.deliveredAt());
     }
 
     @Test
@@ -379,7 +453,7 @@ class OrderTest {
     void shouldReconstituteConfirmedOrderPreservingDistinctUpdatedAt() {
         Instant updatedAt = Instant.parse("2026-01-15T12:01:00Z");
         Order reconstituted =
-                reconstitute(OrderStatus.CONFIRMED, PAYMENT_ID, CREATED_AT, CREATED_AT, null, updatedAt);
+                reconstitute(OrderStatus.CONFIRMED, PAYMENT_ID, CREATED_AT, CREATED_AT, null, null, updatedAt);
 
         assertReconstitutedIdentity(reconstituted);
         assertEquals(OrderStatus.CONFIRMED, reconstituted.status());
@@ -395,11 +469,18 @@ class OrderTest {
         Instant updatedAt = Instant.parse("2026-01-15T13:00:00Z");
 
         Order preparing =
-                reconstitute(OrderStatus.PREPARING, PAYMENT_ID, CREATED_AT, confirmedAt, null, updatedAt);
+                reconstitute(OrderStatus.PREPARING, PAYMENT_ID, CREATED_AT, confirmedAt, null, null, updatedAt);
         Order delivery =
-                reconstitute(OrderStatus.DELIVERY, PAYMENT_ID, CREATED_AT, confirmedAt, null, updatedAt);
+                reconstitute(OrderStatus.DELIVERY, PAYMENT_ID, CREATED_AT, confirmedAt, null, null, updatedAt);
         Order delivered =
-                reconstitute(OrderStatus.DELIVERED, PAYMENT_ID, CREATED_AT, confirmedAt, null, updatedAt);
+                reconstitute(
+                        OrderStatus.DELIVERED,
+                        PAYMENT_ID,
+                        CREATED_AT,
+                        confirmedAt,
+                        null,
+                        updatedAt,
+                        updatedAt);
 
         assertEquals(OrderStatus.PREPARING, preparing.status());
         assertEquals(OrderStatus.DELIVERY, delivery.status());
@@ -408,6 +489,7 @@ class OrderTest {
         assertEquals(confirmedAt, delivery.confirmedAt());
         assertEquals(confirmedAt, delivered.confirmedAt());
         assertEquals(updatedAt, delivered.updatedAt());
+        assertEquals(updatedAt, delivered.deliveredAt());
         assertNull(delivered.cancelledAt());
     }
 
@@ -415,7 +497,8 @@ class OrderTest {
     void shouldReconstituteCancelledOrder() {
         Instant cancelledAt = Instant.parse("2026-01-15T12:01:00Z");
         Order reconstituted =
-                reconstitute(OrderStatus.CANCELLED, PAYMENT_ID, CREATED_AT, null, cancelledAt, cancelledAt);
+                reconstitute(
+                        OrderStatus.CANCELLED, PAYMENT_ID, CREATED_AT, null, cancelledAt, null, cancelledAt);
 
         assertEquals(OrderStatus.CANCELLED, reconstituted.status());
         assertEquals(cancelledAt, reconstituted.cancelledAt());
@@ -430,7 +513,8 @@ class OrderTest {
     void shouldRejectReconstituteCancelledWithoutCancelledAt() {
         assertThrows(
                 InvalidOrderException.class,
-                () -> reconstitute(OrderStatus.CANCELLED, PAYMENT_ID, CREATED_AT, null, null, CREATED_AT));
+                () -> reconstitute(
+                        OrderStatus.CANCELLED, PAYMENT_ID, CREATED_AT, null, null, null, CREATED_AT));
     }
 
     @Test
@@ -443,7 +527,52 @@ class OrderTest {
                         CREATED_AT,
                         CREATED_AT,
                         Instant.parse("2026-01-15T12:01:00Z"),
+                        null,
                         Instant.parse("2026-01-15T12:01:00Z")));
+    }
+
+    @Test
+    void shouldRejectReconstituteDeliveredWithoutDeliveredAt() {
+        assertThrows(
+                InvalidOrderException.class,
+                () -> reconstitute(
+                        OrderStatus.DELIVERED,
+                        PAYMENT_ID,
+                        CREATED_AT,
+                        CREATED_AT,
+                        null,
+                        null,
+                        CREATED_AT.plusSeconds(360)));
+    }
+
+    @Test
+    void shouldRejectReconstituteNonDeliveredWithDeliveredAt() {
+        for (OrderStatus status : List.of(OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.DELIVERY)) {
+            assertThrows(
+                    InvalidOrderException.class,
+                    () -> reconstitute(
+                            status,
+                            PAYMENT_ID,
+                            CREATED_AT,
+                            CREATED_AT,
+                            null,
+                            CREATED_AT.plusSeconds(120),
+                            CREATED_AT.plusSeconds(120)));
+        }
+    }
+
+    @Test
+    void shouldRejectReconstituteCancelledWithDeliveredAt() {
+        assertThrows(
+                InvalidOrderException.class,
+                () -> reconstitute(
+                        OrderStatus.CANCELLED,
+                        PAYMENT_ID,
+                        CREATED_AT,
+                        null,
+                        CREATED_AT,
+                        CREATED_AT,
+                        CREATED_AT));
     }
 
     @Test
@@ -452,7 +581,7 @@ class OrderTest {
                 List.of(OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.DELIVERY, OrderStatus.DELIVERED)) {
             assertThrows(
                     InvalidOrderException.class,
-                    () -> reconstitute(status, PAYMENT_ID, CREATED_AT, null, null, CREATED_AT));
+                    () -> reconstitute(status, PAYMENT_ID, CREATED_AT, null, null, null, CREATED_AT));
         }
     }
 
@@ -461,7 +590,7 @@ class OrderTest {
         assertThrows(
                 InvalidOrderException.class,
                 () -> reconstitute(
-                        OrderStatus.CONFIRMED, PAYMENT_ID, CREATED_AT, CREATED_AT, CREATED_AT, CREATED_AT));
+                        OrderStatus.CONFIRMED, PAYMENT_ID, CREATED_AT, CREATED_AT, CREATED_AT, null, CREATED_AT));
     }
 
     @Test
@@ -473,6 +602,7 @@ class OrderTest {
                         PAYMENT_ID,
                         Instant.parse("2026-01-15T12:10:00Z"),
                         Instant.parse("2026-01-15T12:10:00Z"),
+                        null,
                         null,
                         CREATED_AT));
     }
@@ -492,6 +622,7 @@ class OrderTest {
                         CREATED_AT,
                         CREATED_AT,
                         null,
+                        null,
                         CREATED_AT));
     }
 
@@ -510,10 +641,11 @@ class OrderTest {
                         CREATED_AT,
                         CREATED_AT,
                         null,
+                        null,
                         CREATED_AT));
         assertThrows(
                 InvalidOrderException.class,
-                () -> reconstitute(null, PAYMENT_ID, CREATED_AT, CREATED_AT, null, CREATED_AT));
+                () -> reconstitute(null, PAYMENT_ID, CREATED_AT, CREATED_AT, null, null, CREATED_AT));
     }
 
     private static void assertReconstitutedIdentity(Order order) {
@@ -531,6 +663,7 @@ class OrderTest {
             Instant createdAt,
             Instant confirmedAt,
             Instant cancelledAt,
+            Instant deliveredAt,
             Instant updatedAt) {
         return Order.reconstitute(
                 ORDER_ID,
@@ -543,6 +676,7 @@ class OrderTest {
                 createdAt,
                 confirmedAt,
                 cancelledAt,
+                deliveredAt,
                 updatedAt);
     }
 

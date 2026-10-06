@@ -44,7 +44,7 @@ public final class CancelOrderUseCase {
         Order order = OwnedOrderAccess.requireOwnedOrder(orderRepository, customerId, command.orderId());
         Order cancelled = order.cancel(clockProvider.currentTime());
         Order saved = orderRepository
-                .saveIfConfirmed(cancelled)
+                .saveIfCurrent(cancelled, OrderStatus.CONFIRMED)
                 .orElseThrow(
                         () -> new InvalidOrderStateTransitionException(OrderStatus.CONFIRMED, OrderStatus.CANCELLED));
         boolean previewCustomer = previewCustomerExclusionPort.isPreviewTemporaryCustomer(customerId);

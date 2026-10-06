@@ -266,13 +266,16 @@ class OrderPersistenceAdapterTest {
     void shouldStartPreparationOnlyWhileStillConfirmed() {
         Order confirmed = orderRepository.save(confirmedOrder("ORD-P-PEND-1", CUSTOMER_ID, PAYMENT_ID));
 
-        assertThat(orderRepository.saveIfConfirmed(confirmed.startPreparation(PREPARING_AT)))
+        assertThat(orderRepository.saveIfCurrent(
+                        confirmed.startPreparation(PREPARING_AT), OrderStatus.CONFIRMED))
                 .hasValueSatisfying(order -> {
                     assertThat(order.status()).isEqualTo(OrderStatus.PREPARING);
                     assertThat(order.confirmedAt()).isEqualTo(CREATED_AT);
                     assertThat(order.cancelledAt()).isNull();
+                    assertThat(order.deliveredAt()).isNull();
                 });
-        assertThat(orderRepository.saveIfConfirmed(confirmed.cancel(CREATED_AT.plusSeconds(30))))
+        assertThat(orderRepository.saveIfCurrent(
+                        confirmed.cancel(CREATED_AT.plusSeconds(30)), OrderStatus.CONFIRMED))
                 .isEmpty();
 
         Order loaded = orderRepository.findById(confirmed.id()).orElseThrow();
@@ -286,13 +289,15 @@ class OrderPersistenceAdapterTest {
         Order confirmed = orderRepository.save(confirmedOrder("ORD-P-PEND-2", CUSTOMER_ID, PAYMENT_ID));
         Instant at = CREATED_AT.plusSeconds(30);
 
-        assertThat(orderRepository.saveIfConfirmed(confirmed.cancel(at)))
+        assertThat(orderRepository.saveIfCurrent(confirmed.cancel(at), OrderStatus.CONFIRMED))
                 .hasValueSatisfying(order -> {
                     assertThat(order.status()).isEqualTo(OrderStatus.CANCELLED);
                     assertThat(order.cancelledAt()).isEqualTo(at);
                     assertThat(order.confirmedAt()).isNull();
+                    assertThat(order.deliveredAt()).isNull();
                 });
-        assertThat(orderRepository.saveIfConfirmed(confirmed.startPreparation(PREPARING_AT)))
+        assertThat(orderRepository.saveIfCurrent(
+                        confirmed.startPreparation(PREPARING_AT), OrderStatus.CONFIRMED))
                 .isEmpty();
 
         Order loaded = orderRepository.findById(confirmed.id()).orElseThrow();
@@ -302,10 +307,10 @@ class OrderPersistenceAdapterTest {
     }
 
     @Test
-    void shouldRejectSaveIfConfirmedWhenStatusIsStillConfirmed() {
+    void shouldRejectSaveIfCurrentWhenStatusIsStillFromStatus() {
         Order confirmed = orderRepository.save(confirmedOrder("ORD-P-PEND-3", CUSTOMER_ID, PAYMENT_ID));
 
-        assertThatThrownBy(() -> orderRepository.saveIfConfirmed(confirmed))
+        assertThatThrownBy(() -> orderRepository.saveIfCurrent(confirmed, OrderStatus.CONFIRMED))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

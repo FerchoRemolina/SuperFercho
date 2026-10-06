@@ -6,6 +6,7 @@ import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.application.port.ProductRepository;
 import com.superfercho.catalog.application.port.ProductTypeRepository;
 import com.superfercho.catalog.domain.model.Category;
+import com.superfercho.catalog.domain.model.CategoryIcon;
 import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.domain.model.Presentation;
 import com.superfercho.catalog.domain.model.PresentationUnit;
@@ -220,7 +221,7 @@ class PreviewCheckoutInventoryIntegrationTest {
                 UUID.randomUUID(),
                 "Preview-" + UUID.randomUUID(),
                 "Fresh produce",
-                CategoryStatus.ACTIVE,
+                CategoryIcon.OTHER, CategoryStatus.ACTIVE,
                 NOW,
                 NOW));
         ProductType type = productTypeRepository.save(ProductType.create(

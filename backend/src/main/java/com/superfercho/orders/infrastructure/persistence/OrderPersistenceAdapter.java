@@ -50,17 +50,19 @@ public class OrderPersistenceAdapter implements OrderRepository {
     }
 
     @Override
-    public Optional<Order> saveIfConfirmed(Order order) {
-        if (order.status() == OrderStatus.CONFIRMED) {
-            throw new IllegalArgumentException("saveIfConfirmed requires leaving CONFIRMED, got CONFIRMED");
+    public Optional<Order> saveIfCurrent(Order order, OrderStatus fromStatus) {
+        if (order.status() == fromStatus) {
+            throw new IllegalArgumentException(
+                    "saveIfCurrent requires a transition away from " + fromStatus);
         }
-        int updated = orderJpaRepository.updateStatusIfConfirmed(
+        int updated = orderJpaRepository.updateStatusIfCurrent(
                 order.id(),
+                fromStatus,
                 order.status(),
                 order.confirmedAt(),
                 order.cancelledAt(),
-                order.updatedAt(),
-                OrderStatus.CONFIRMED);
+                order.deliveredAt(),
+                order.updatedAt());
         if (updated == 0) {
             return Optional.empty();
         }

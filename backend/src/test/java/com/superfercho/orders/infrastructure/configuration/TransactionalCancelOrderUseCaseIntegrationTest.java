@@ -8,6 +8,7 @@ import com.superfercho.catalog.application.port.CategoryRepository;
 import com.superfercho.catalog.application.port.ProductRepository;
 import com.superfercho.catalog.application.port.ProductTypeRepository;
 import com.superfercho.catalog.domain.model.Category;
+import com.superfercho.catalog.domain.model.CategoryIcon;
 import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.domain.model.Presentation;
 import com.superfercho.catalog.domain.model.PresentationUnit;
@@ -191,7 +192,8 @@ class TransactionalCancelOrderUseCaseIntegrationTest {
     void shouldRejectCancellationWhenOrderAlreadyLeftConfirmed() {
         PreparedOrder prepared = checkoutWith(PaymentMethod.SIMULATED_CARD);
         Order confirmed = orderRepository.findById(prepared.orderId()).orElseThrow();
-        orderRepository.saveIfConfirmed(confirmed.startPreparation(clock.instant())).orElseThrow();
+        orderRepository.saveIfCurrent(
+                confirmed.startPreparation(clock.instant()), OrderStatus.CONFIRMED).orElseThrow();
         PaymentSnapshot paymentBefore = paymentSnapshot(prepared.paymentId());
         int stockBefore = productRepository.findById(prepared.productId()).orElseThrow().stock();
 
@@ -479,7 +481,7 @@ class TransactionalCancelOrderUseCaseIntegrationTest {
 
     private static Category newCategory() {
         return Category.create(
-                UUID.randomUUID(), "Cancel-" + UUID.randomUUID(), "Fresh produce", CategoryStatus.ACTIVE, NOW, NOW);
+                UUID.randomUUID(), "Cancel-" + UUID.randomUUID(), "Fresh produce", CategoryIcon.OTHER, CategoryStatus.ACTIVE, NOW, NOW);
     }
 
     private static Product newProduct(UUID categoryId, UUID productTypeId, int stock, Money price, ProductStatus status) {

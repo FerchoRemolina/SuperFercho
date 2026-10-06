@@ -30,6 +30,7 @@ public final class Order {
     private final Instant createdAt;
     private final Instant confirmedAt;
     private final Instant cancelledAt;
+    private final Instant deliveredAt;
     private final Instant updatedAt;
 
     private Order(
@@ -45,6 +46,7 @@ public final class Order {
             Instant createdAt,
             Instant confirmedAt,
             Instant cancelledAt,
+            Instant deliveredAt,
             Instant updatedAt) {
         this.id = id;
         this.orderNumber = orderNumber;
@@ -58,6 +60,7 @@ public final class Order {
         this.createdAt = createdAt;
         this.confirmedAt = confirmedAt;
         this.cancelledAt = cancelledAt;
+        this.deliveredAt = deliveredAt;
         this.updatedAt = updatedAt;
     }
 
@@ -81,6 +84,7 @@ public final class Order {
                 createdAt,
                 createdAt,
                 null,
+                null,
                 updatedAt);
     }
 
@@ -95,6 +99,7 @@ public final class Order {
             Instant createdAt,
             Instant confirmedAt,
             Instant cancelledAt,
+            Instant deliveredAt,
             Instant updatedAt) {
         return of(
                 id,
@@ -107,6 +112,7 @@ public final class Order {
                 createdAt,
                 confirmedAt,
                 cancelledAt,
+                deliveredAt,
                 updatedAt);
     }
 
@@ -214,6 +220,7 @@ public final class Order {
                 createdAt,
                 confirmedAt,
                 null,
+                newStatus == OrderStatus.DELIVERED ? at : null,
                 at);
     }
 
@@ -229,6 +236,7 @@ public final class Order {
                 createdAt,
                 null,
                 at,
+                null,
                 at);
     }
 
@@ -280,6 +288,10 @@ public final class Order {
         return cancelledAt;
     }
 
+    public Instant deliveredAt() {
+        return deliveredAt;
+    }
+
     public Instant updatedAt() {
         return updatedAt;
     }
@@ -295,6 +307,7 @@ public final class Order {
             Instant createdAt,
             Instant confirmedAt,
             Instant cancelledAt,
+            Instant deliveredAt,
             Instant updatedAt) {
         requireStaticNonNull(id, "id");
         requireStaticNonNull(orderNumber, "orderNumber");
@@ -320,6 +333,11 @@ public final class Order {
         if (status != OrderStatus.CANCELLED) {
             requireStaticNonNull(confirmedAt, "confirmedAt");
         }
+        if (status == OrderStatus.DELIVERED) {
+            requireStaticNonNull(deliveredAt, "deliveredAt");
+        } else if (deliveredAt != null) {
+            throw new InvalidOrderException("deliveredAt can only exist when the order is delivered");
+        }
 
         return new Order(
                 id,
@@ -334,6 +352,7 @@ public final class Order {
                 createdAt,
                 confirmedAt,
                 cancelledAt,
+                deliveredAt,
                 updatedAt);
     }
 
