@@ -22,7 +22,7 @@ import com.superfercho.orders.infrastructure.rest.dto.AdminSalesPeriodSummaryRes
 import com.superfercho.orders.infrastructure.rest.dto.AdminTopCustomersRestResponse;
 import com.superfercho.orders.infrastructure.rest.dto.AdminTopProductsRestResponse;
 import com.superfercho.orders.infrastructure.rest.dto.OrderRestResponse;
-import com.superfercho.orders.infrastructure.rest.dto.PagedOrdersRestResponse;
+import com.superfercho.orders.infrastructure.rest.dto.PagedAdminOrdersRestResponse;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
@@ -65,13 +65,22 @@ public class AdminOrderController {
         this.getAdminTopCustomersUseCase = getAdminTopCustomersUseCase;
     }
 
+    /**
+     * Admin orders list. Optional filters: {@code status} (repeated or
+     * comma-separated), {@code orderNumber} (case-insensitive contains) and
+     * {@code from}/{@code to} creation range {@code [from, to)} (ISO-8601;
+     * bare dates interpreted in America/Bogota). Sorted createdAt DESC, id ASC.
+     */
     @GetMapping
-    public PagedOrdersRestResponse list(
+    public PagedAdminOrdersRestResponse list(
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
-            @RequestParam(required = false) List<String> status) {
-        return PagedOrdersRestResponse.from(
-                listAdminOrdersUseCase.execute(ListAdminOrdersCommand.of(page, size, status)));
+            @RequestParam(required = false) List<String> status,
+            @RequestParam(required = false) String orderNumber,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to) {
+        return PagedAdminOrdersRestResponse.from(listAdminOrdersUseCase.execute(
+                ListAdminOrdersCommand.of(page, size, status, orderNumber, from, to)));
     }
 
     /**
@@ -92,7 +101,8 @@ public class AdminOrderController {
                 getAdminSalesPeriodSummaryUseCase.execute(GetAdminSalesPeriodSummaryCommand.of(granularity)));
     }
 
-    /** Order counters for an arbitrary [from, to) period (sales exclude CANCELLED). */
+    /** Business counters for an arbitrary [from, to) period. Sales = DELIVERED
+     *  orders recognized by delivered_at; in-process is the CURRENT live count. */
     @GetMapping("/dashboard/summary")
     public AdminDashboardSummaryRestResponse dashboardSummary(
             @RequestParam String from, @RequestParam String to) {
@@ -112,12 +122,18 @@ public class AdminOrderController {
                 getAdminTopProductsUseCase.execute(GetAdminTopProductsCommand.of(from, to, limit, sort)));
     }
 
-    /** Top customers by purchased value for an arbitrary [from, to) period. */
+    /**
+     * Top customers for an arbitrary [from, to) period.
+     * {@code sort=TOTAL} (default) ranks by spend; {@code sort=ORDERS} by order count.
+     */
     @GetMapping("/dashboard/customers/top")
     public AdminTopCustomersRestResponse topCustomers(
-            @RequestParam String from, @RequestParam String to, @RequestParam(required = false) Integer limit) {
+            @RequestParam String from,
+            @RequestParam String to,
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) String sort) {
         return AdminTopCustomersRestResponse.from(
-                getAdminTopCustomersUseCase.execute(GetAdminTopCustomersCommand.of(from, to, limit)));
+                getAdminTopCustomersUseCase.execute(GetAdminTopCustomersCommand.of(from, to, limit, sort)));
     }
 
     @GetMapping("/dashboard/recent-buyers")
@@ -129,5 +145,4 @@ public class AdminOrderController {
     @GetMapping("/{orderId}")
     public OrderRestResponse get(@PathVariable UUID orderId) {
         return OrderRestResponse.from(getAdminOrderUseCase.execute(new GetOrderCommand(orderId)));
-    }
-}
+    }}

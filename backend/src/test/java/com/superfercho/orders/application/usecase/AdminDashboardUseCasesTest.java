@@ -58,24 +58,27 @@ class AdminDashboardUseCasesTest {
 
     @Test
     void shouldBucketWeekSalesAcrossFullPeriodNotAPageSample() {
-        Order older = order(
+        Instant olderDeliveredAt = Instant.parse("2026-03-10T12:00:00Z");
+        Instant newerDeliveredAt = Instant.parse("2026-03-14T09:00:00Z");
+        Order older = deliveredOrder(
                 UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
                 "ORD-1",
                 CUSTOMER_A,
-                Instant.parse("2026-03-10T12:00:00Z"),
+                Instant.parse("2026-03-09T12:00:00Z"),
+                olderDeliveredAt,
                 TEN,
                 "Ada");
-        Order newer = order(
+        Order newer = deliveredOrder(
                 UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
                 "ORD-2",
                 CUSTOMER_B,
-                Instant.parse("2026-03-14T09:00:00Z"),
+                Instant.parse("2026-03-13T09:00:00Z"),
+                newerDeliveredAt,
                 TWENTY,
                 "Bob");
-        when(orderRepository.findCreatedBetweenExcludingStatus(
+        when(orderRepository.findDeliveredBetween(
                         org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any(),
-                        eq(OrderStatus.CANCELLED)))
+                        org.mockito.ArgumentMatchers.any()))
                 .thenReturn(List.of(older, newer));
 
         AdminSalesPeriodSummaryResult result =
@@ -92,11 +95,10 @@ class AdminDashboardUseCasesTest {
 
         ArgumentCaptor<Instant> from = ArgumentCaptor.forClass(Instant.class);
         ArgumentCaptor<Instant> to = ArgumentCaptor.forClass(Instant.class);
-        verify(orderRepository)
-                .findCreatedBetweenExcludingStatus(from.capture(), to.capture(), eq(OrderStatus.CANCELLED));
+        verify(orderRepository).findDeliveredBetween(from.capture(), to.capture());
         assertTrue(from.getValue().isBefore(to.getValue()));
-        assertTrue(!from.getValue().isAfter(older.createdAt()));
-        assertTrue(to.getValue().isAfter(newer.createdAt()));
+        assertTrue(!from.getValue().isAfter(older.deliveredAt()));
+        assertTrue(to.getValue().isAfter(newer.deliveredAt()));
     }
 
     @Test
@@ -139,6 +141,35 @@ class AdminDashboardUseCasesTest {
         assertEquals(Instant.parse("2026-03-14T10:00:00Z"), buyers.get(0).lastOrderAt());
         assertEquals(CUSTOMER_B, buyers.get(1).customerId());
         assertEquals(1, buyers.get(1).orderCount());
+    }
+
+    private static Order deliveredOrder(
+            UUID id,
+            String number,
+            UUID customerId,
+            Instant createdAt,
+            Instant deliveredAt,
+            Money total,
+            String recipient) {
+        int quantity = total.amount().intValue() / 10;
+        return Order.create(
+                id,
+                new OrderNumber(number),
+                customerId,
+                List.of(OrderItem.create(
+                        UUID.randomUUID(),
+                        PRODUCT_ID,
+                        "Producto",
+                        Money.cop(new BigDecimal("10.00")),
+                        Math.max(quantity, 1))),
+                new ShippingAddressSnapshot(
+                        recipient, "Calle 1", null, "Bogotá", "Cundinamarca", "3001234567"),
+                null,
+                createdAt,
+                createdAt)
+                .startPreparation(createdAt.plusSeconds(1))
+                .startDelivery(createdAt.plusSeconds(2))
+                .markDelivered(deliveredAt);
     }
 
     private static Order order(

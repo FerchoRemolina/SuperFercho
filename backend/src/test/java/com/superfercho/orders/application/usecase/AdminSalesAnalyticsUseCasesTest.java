@@ -4,12 +4,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.superfercho.orders.application.dto.AdminBusinessPeriodRow;
 import com.superfercho.orders.application.dto.AdminCustomerSalesRow;
 import com.superfercho.orders.application.dto.AdminOrderPeriodSummaryResult;
-import com.superfercho.orders.application.dto.AdminOrderStatusCountRow;
 import com.superfercho.orders.application.dto.AdminProductSalesRow;
 import com.superfercho.orders.application.dto.AdminSalesBucketRow;
 import com.superfercho.orders.application.dto.GetAdminDashboardSummaryCommand;
@@ -181,16 +184,11 @@ class AdminSalesAnalyticsUseCasesTest {
     // -------------------------------------------------------------- summary
 
     @Test
-    void shouldSummarizeOrderCountersExcludingCancelledFromSales() {
+    void shouldSummarizeCountersByDeliveryAndCancellationTimestamps() {
         Instant from = MAY_START;
         Instant to = JUNE_START;
-        when(orderRepository.countByStatusBetween(from, to))
-                .thenReturn(List.of(
-                        new AdminOrderStatusCountRow(OrderStatus.CONFIRMED, 3, new BigDecimal("30.00")),
-                        new AdminOrderStatusCountRow(OrderStatus.PREPARING, 4, new BigDecimal("40.00")),
-                        new AdminOrderStatusCountRow(OrderStatus.DELIVERY, 3, new BigDecimal("30.00")),
-                        new AdminOrderStatusCountRow(OrderStatus.DELIVERED, 35, new BigDecimal("350.00")),
-                        new AdminOrderStatusCountRow(OrderStatus.CANCELLED, 4, new BigDecimal("40.00"))));
+        when(orderRepository.summarizeBusinessPeriod(from, to))
+                .thenReturn(new AdminBusinessPeriodRow(35, 4, new BigDecimal("350.00"), 10));
 
         AdminOrderPeriodSummaryResult result = new GetAdminOrderPeriodSummaryUseCase(orderRepository)
                 .execute(new GetAdminDashboardSummaryCommand(from, to));
@@ -198,8 +196,8 @@ class AdminSalesAnalyticsUseCasesTest {
         assertEquals(10, result.inProcessOrders());
         assertEquals(35, result.deliveredOrders());
         assertEquals(4, result.cancelledOrders());
-        assertEquals(49, result.totalOrders());
-        assertEquals(0, new BigDecimal("450.00").compareTo(result.sales().amount()));
+        assertEquals(39, result.totalOrders());
+        assertEquals(0, new BigDecimal("350.00").compareTo(result.sales().amount()));
         assertEquals("COP", result.sales().currency());
     }
 
@@ -260,5 +258,24 @@ class AdminSalesAnalyticsUseCasesTest {
         assertEquals(0, new BigDecimal("450000.00").compareTo(result.get(0).totalAmount()));
         assertEquals(6, result.get(0).orderCount());
         assertEquals(5, command.limit());
+        assertEquals(GetAdminTopCustomersCommand.SortBy.TOTAL, command.sortBy());
+    }
+
+    @Test
+    void shouldRankCustomersByOrderCountWhenRequested() {
+        GetAdminTopCustomersCommand command =
+                GetAdminTopCustomersCommand.of("2026-05-01", "2026-06-01", 3, "ORDERS");
+        UUID customerId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+        when(orderRepository.findTopCustomersByOrders(command.from(), command.to(), 3))
+                .thenReturn(List.of(new AdminCustomerSalesRow(
+                        customerId, "Ada Lovelace", new BigDecimal("120000.00"), 9)));
+
+        var result = new GetAdminTopCustomersUseCase(orderRepository).execute(command);
+
+        assertEquals(1, result.size());
+        assertEquals(9, result.get(0).orderCount());
+        assertEquals(GetAdminTopCustomersCommand.SortBy.ORDERS, command.sortBy());
+        verify(orderRepository).findTopCustomersByOrders(command.from(), command.to(), 3);
+        verify(orderRepository, never()).findTopCustomersByTotal(any(), any(), anyInt());
     }
 }

@@ -28,6 +28,47 @@ public interface OrderJpaRepository extends JpaRepository<OrderJpaEntity, UUID> 
 
     Page<OrderJpaEntity> findAllByStatusIn(List<OrderStatus> statuses, Pageable pageable);
 
+    Page<OrderJpaEntity> findAllByOrderNumberContainsIgnoreCase(String orderNumber, Pageable pageable);
+
+    Page<OrderJpaEntity> findAllByStatusInAndOrderNumberContainsIgnoreCase(
+            List<OrderStatus> statuses, String orderNumber, Pageable pageable);
+
+    Page<OrderJpaEntity> findAllByCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+            Instant fromInclusive, Instant toExclusive, Pageable pageable);
+
+    Page<OrderJpaEntity> findAllByStatusInAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+            List<OrderStatus> statuses, Instant fromInclusive, Instant toExclusive, Pageable pageable);
+
+    Page<OrderJpaEntity> findAllByOrderNumberContainsIgnoreCaseAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+            String orderNumber, Instant fromInclusive, Instant toExclusive, Pageable pageable);
+
+    Page<OrderJpaEntity>
+            findAllByStatusInAndOrderNumberContainsIgnoreCaseAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                    List<OrderStatus> statuses, String orderNumber, Instant fromInclusive, Instant toExclusive,
+                    Pageable pageable);
+
+    Page<OrderJpaEntity> findAllByCreatedAtGreaterThanEqual(Instant fromInclusive, Pageable pageable);
+
+    Page<OrderJpaEntity> findAllByCreatedAtLessThan(Instant toExclusive, Pageable pageable);
+
+    Page<OrderJpaEntity> findAllByStatusInAndCreatedAtGreaterThanEqual(
+            List<OrderStatus> statuses, Instant fromInclusive, Pageable pageable);
+
+    Page<OrderJpaEntity> findAllByStatusInAndCreatedAtLessThan(
+            List<OrderStatus> statuses, Instant toExclusive, Pageable pageable);
+
+    Page<OrderJpaEntity> findAllByOrderNumberContainsIgnoreCaseAndCreatedAtGreaterThanEqual(
+            String orderNumber, Instant fromInclusive, Pageable pageable);
+
+    Page<OrderJpaEntity> findAllByOrderNumberContainsIgnoreCaseAndCreatedAtLessThan(
+            String orderNumber, Instant toExclusive, Pageable pageable);
+
+    Page<OrderJpaEntity> findAllByStatusInAndOrderNumberContainsIgnoreCaseAndCreatedAtGreaterThanEqual(
+            List<OrderStatus> statuses, String orderNumber, Instant fromInclusive, Pageable pageable);
+
+    Page<OrderJpaEntity> findAllByStatusInAndOrderNumberContainsIgnoreCaseAndCreatedAtLessThan(
+            List<OrderStatus> statuses, String orderNumber, Instant toExclusive, Pageable pageable);
+
     List<OrderJpaEntity> findByStatusInAndConfirmedAtIsNotNull(List<OrderStatus> statuses);
 
     List<OrderJpaEntity> findByCreatedAtGreaterThanEqualAndCreatedAtLessThanAndStatusNotOrderByCreatedAtAsc(
@@ -41,17 +82,19 @@ public interface OrderJpaRepository extends JpaRepository<OrderJpaEntity, UUID> 
                set o.status = :newStatus,
                    o.confirmedAt = :confirmedAt,
                    o.cancelledAt = :cancelledAt,
+                   o.deliveredAt = :deliveredAt,
                    o.updatedAt = :updatedAt
              where o.id = :id
-               and o.status = :confirmedStatus
+               and o.status = :fromStatus
             """)
-    int updateStatusIfConfirmed(
+    int updateStatusIfCurrent(
             @Param("id") UUID id,
+            @Param("fromStatus") OrderStatus fromStatus,
             @Param("newStatus") OrderStatus newStatus,
             @Param("confirmedAt") Instant confirmedAt,
             @Param("cancelledAt") Instant cancelledAt,
-            @Param("updatedAt") Instant updatedAt,
-            @Param("confirmedStatus") OrderStatus confirmedStatus);
+            @Param("deliveredAt") Instant deliveredAt,
+            @Param("updatedAt") Instant updatedAt);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional
@@ -60,14 +103,14 @@ public interface OrderJpaRepository extends JpaRepository<OrderJpaEntity, UUID> 
     @Query(
             value =
                     """
-                    SELECT date_trunc(CAST(:unit AS text), o.created_at AT TIME ZONE 'America/Bogota')
+                    SELECT date_trunc(CAST(:unit AS text), o.delivered_at AT TIME ZONE 'America/Bogota')
                                AT TIME ZONE 'America/Bogota' AS bucket_start,
                            COALESCE(SUM(o.total_amount), 0) AS total_amount,
                            COUNT(*) AS order_count
                       FROM orders.orders o
-                     WHERE o.created_at >= :fromInclusive
-                       AND o.created_at < :toExclusive
-                       AND o.status <> 'CANCELLED'
+                     WHERE o.status = 'DELIVERED'
+                       AND o.delivered_at >= :fromInclusive
+                       AND o.delivered_at < :toExclusive
                      GROUP BY 1
                      ORDER BY 1
                     """,
@@ -80,17 +123,30 @@ public interface OrderJpaRepository extends JpaRepository<OrderJpaEntity, UUID> 
     @Query(
             value =
                     """
-                    SELECT o.status AS status,
-                           COUNT(*) AS order_count,
-                           COALESCE(SUM(o.total_amount), 0) AS total_amount
+                    SELECT
+                        COUNT(*) FILTER (
+                            WHERE o.status = 'DELIVERED'
+                              AND o.delivered_at >= :fromInclusive
+                              AND o.delivered_at < :toExclusive),
+                        COUNT(*) FILTER (
+                            WHERE o.status = 'CANCELLED'
+                              AND o.cancelled_at >= :fromInclusive
+                              AND o.cancelled_at < :toExclusive),
+                        COALESCE(SUM(o.total_amount) FILTER (
+                            WHERE o.status = 'DELIVERED'
+                              AND o.delivered_at >= :fromInclusive
+                              AND o.delivered_at < :toExclusive), 0),
+                        COUNT(*) FILTER (
+                            WHERE o.status IN ('CONFIRMED', 'PREPARING', 'DELIVERY'))
                       FROM orders.orders o
-                     WHERE o.created_at >= :fromInclusive
-                       AND o.created_at < :toExclusive
-                     GROUP BY o.status
                     """,
             nativeQuery = true)
-    List<Object[]> countByStatusBetween(
-            @Param("fromInclusive") Instant fromInclusive, @Param("toExclusive") Instant toExclusive);
+    List<Object[]> summarizeBusinessPeriod(
+            @Param("fromInclusive") Instant fromInclusive,
+            @Param("toExclusive") Instant toExclusive);
+
+    List<OrderJpaEntity> findAllByStatusAndDeliveredAtGreaterThanEqualAndDeliveredAtLessThan(
+            OrderStatus status, Instant fromInclusive, Instant toExclusive);
 
     @Query(
             value =
@@ -130,6 +186,27 @@ public interface OrderJpaRepository extends JpaRepository<OrderJpaEntity, UUID> 
                     """,
             nativeQuery = true)
     List<Object[]> findTopProductsByQuantityAsc(
+            @Param("fromInclusive") Instant fromInclusive,
+            @Param("toExclusive") Instant toExclusive,
+            @Param("limit") int limit);
+
+    @Query(
+            value =
+                    """
+                    SELECT o.customer_id AS customer_id,
+                           MAX(o.shipping_recipient_name) AS customer_name,
+                           COALESCE(SUM(o.total_amount), 0) AS total_amount,
+                           COUNT(*) AS order_count
+                      FROM orders.orders o
+                     WHERE o.created_at >= :fromInclusive
+                       AND o.created_at < :toExclusive
+                       AND o.status <> 'CANCELLED'
+                     GROUP BY o.customer_id
+                     ORDER BY order_count DESC, total_amount DESC, o.customer_id ASC
+                     LIMIT :limit
+                    """,
+            nativeQuery = true)
+    List<Object[]> findTopCustomersByOrderCount(
             @Param("fromInclusive") Instant fromInclusive,
             @Param("toExclusive") Instant toExclusive,
             @Param("limit") int limit);

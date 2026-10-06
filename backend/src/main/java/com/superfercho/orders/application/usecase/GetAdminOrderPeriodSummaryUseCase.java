@@ -1,19 +1,26 @@
 package com.superfercho.orders.application.usecase;
 
+import com.superfercho.orders.application.dto.AdminBusinessPeriodRow;
 import com.superfercho.orders.application.dto.AdminOrderPeriodSummaryResult;
-import com.superfercho.orders.application.dto.AdminOrderStatusCountRow;
 import com.superfercho.orders.application.dto.GetAdminDashboardSummaryCommand;
 import com.superfercho.orders.application.port.OrderRepository;
-import com.superfercho.orders.domain.model.OrderStatus;
 import com.superfercho.platform.money.Money;
-import java.math.BigDecimal;
-import java.util.List;
 import java.util.Objects;
 
 /**
- * Order counters for an arbitrary [from, to) period, aggregated in the database.
- * In process = CONFIRMED + PREPARING + DELIVERY. Sales exclude CANCELLED orders;
- * cancelled orders keep their own counter.
+ * Business summary for an arbitrary [from, to) period:
+ *
+ * <ul>
+ *   <li>sales: DELIVERED orders only, recognized by {@code delivered_at}
+ *       (PaymentStatus is not a criterion; CASH_ON_DELIVERY + PENDING counts
+ *       once delivered).
+ *   <li>delivered: DELIVERED count by {@code delivered_at}.
+ *   <li>cancelled: CANCELLED count by {@code cancelled_at}.
+ *   <li>in process: CURRENT live orders (CONFIRMED + PREPARING + DELIVERY) —
+ *       independent of the period.
+ * </ul>
+ *
+ * totalOrders = delivered + cancelled (orders closed inside the period).
  */
 public final class GetAdminOrderPeriodSummaryUseCase {
 
@@ -25,26 +32,14 @@ public final class GetAdminOrderPeriodSummaryUseCase {
 
     public AdminOrderPeriodSummaryResult execute(GetAdminDashboardSummaryCommand command) {
         Objects.requireNonNull(command, "command");
-        List<AdminOrderStatusCountRow> rows =
-                orderRepository.countByStatusBetween(command.from(), command.to());
-
-        BigDecimal sales = BigDecimal.ZERO.setScale(2);
-        long totalOrders = 0;
-        long inProcessOrders = 0;
-        long deliveredOrders = 0;
-        long cancelledOrders = 0;
-        for (AdminOrderStatusCountRow row : rows) {
-            totalOrders += row.orderCount();
-            switch (row.status()) {
-                case CONFIRMED, PREPARING, DELIVERY -> inProcessOrders += row.orderCount();
-                case DELIVERED -> deliveredOrders += row.orderCount();
-                case CANCELLED -> cancelledOrders += row.orderCount();
-            }
-            if (row.status() != OrderStatus.CANCELLED) {
-                sales = sales.add(row.totalAmount());
-            }
-        }
+        AdminBusinessPeriodRow row =
+                orderRepository.summarizeBusinessPeriod(command.from(), command.to());
+        long closedOrders = row.deliveredOrders() + row.cancelledOrders();
         return new AdminOrderPeriodSummaryResult(
-                Money.cop(sales), totalOrders, inProcessOrders, deliveredOrders, cancelledOrders);
+                Money.cop(row.salesAmount()),
+                closedOrders,
+                row.inProcessOrders(),
+                row.deliveredOrders(),
+                row.cancelledOrders());
     }
 }

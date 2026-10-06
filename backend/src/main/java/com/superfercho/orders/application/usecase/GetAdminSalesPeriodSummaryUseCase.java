@@ -6,7 +6,6 @@ import com.superfercho.orders.application.dto.GetAdminSalesPeriodSummaryCommand;
 import com.superfercho.orders.application.port.ClockProvider;
 import com.superfercho.orders.application.port.OrderRepository;
 import com.superfercho.orders.domain.model.Order;
-import com.superfercho.orders.domain.model.OrderStatus;
 import com.superfercho.orders.domain.model.SalesPeriodGranularity;
 import com.superfercho.platform.money.Money;
 import java.math.BigDecimal;
@@ -25,8 +24,11 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Aggregates non-cancelled order totals for the selected period into fixed buckets.
- * Loads the full period from persistence (not a single paged sample).
+ * LEGACY rolling-window sales summary (no from/to on the request). The Admin UI
+ * no longer consumes it (it uses the [from, to) analytics endpoint), but the
+ * contract keeps the current business rule: a sale is recognized only when the
+ * order is DELIVERED, anchored on {@code delivered_at}. Window edges remain in
+ * UTC for backwards compatibility.
  */
 public final class GetAdminSalesPeriodSummaryUseCase {
 
@@ -50,12 +52,12 @@ public final class GetAdminSalesPeriodSummaryUseCase {
         Objects.requireNonNull(command, "command");
         Instant now = clockProvider.currentTime();
         Range range = rangeFor(command.granularity(), now);
-        List<Order> orders = orderRepository.findCreatedBetweenExcludingStatus(
-                range.fromInclusive(), range.toExclusive(), OrderStatus.CANCELLED);
+        List<Order> orders =
+                orderRepository.findDeliveredBetween(range.fromInclusive(), range.toExclusive());
 
         Map<Instant, Accumulator> buckets = emptyBuckets(command.granularity(), range, now);
         for (Order order : orders) {
-            Instant key = bucketKey(command.granularity(), order.createdAt());
+            Instant key = bucketKey(command.granularity(), order.deliveredAt());
             Accumulator accumulator = buckets.get(key);
             if (accumulator == null) {
                 continue;

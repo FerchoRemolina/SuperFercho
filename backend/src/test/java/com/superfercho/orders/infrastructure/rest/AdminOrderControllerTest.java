@@ -10,12 +10,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.superfercho.orders.application.dto.AdminCustomerSalesRow;
+import com.superfercho.orders.application.dto.AdminOrderDetailResult;
+import com.superfercho.orders.application.dto.AdminOrderListItemResult;
 import com.superfercho.orders.application.dto.AdminOrderPeriodSummaryResult;
 import com.superfercho.orders.application.dto.AdminProductSalesRow;
 import com.superfercho.orders.application.dto.AdminRecentBuyerResult;
 import com.superfercho.orders.application.dto.AdminSalesAnalyticsResult;
 import com.superfercho.orders.application.dto.AdminSalesBucketResult;
 import com.superfercho.orders.application.dto.AdminSalesPeriodSummaryResult;
+import com.superfercho.orders.application.dto.CustomerDirectoryEntry;
 import com.superfercho.orders.application.dto.GetAdminDashboardSummaryCommand;
 import com.superfercho.orders.application.dto.GetAdminSalesPeriodAnalyticsCommand;
 import com.superfercho.orders.application.dto.GetAdminSalesPeriodSummaryCommand;
@@ -101,13 +104,18 @@ class AdminOrderControllerTest {
 
     @Test
     void shouldGetOrderByIdForAnyCustomer() throws Exception {
-        when(getAdminOrderUseCase.execute(new GetOrderCommand(ORDER_ID))).thenReturn(orderResult(cardPayment()));
+        when(getAdminOrderUseCase.execute(new GetOrderCommand(ORDER_ID)))
+                .thenReturn(new AdminOrderDetailResult(orderResult(cardPayment()), customerEntry()));
 
         mockMvc.perform(get("/api/v1/admin/orders/{orderId}", ORDER_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(ORDER_ID.toString()))
                 .andExpect(jsonPath("$.orderNumber").value("ORD-P-1001"))
                 .andExpect(jsonPath("$.customerId").value(CUSTOMER_ID.toString()))
+                .andExpect(jsonPath("$.customer.fullName").value("Ada Lovelace"))
+                .andExpect(jsonPath("$.customer.documentType").value("CC"))
+                .andExpect(jsonPath("$.customer.documentNumber").value("123456789"))
+                .andExpect(jsonPath("$.customer.email").value("ada@example.com"))
                 .andExpect(jsonPath("$.status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.confirmedAt").value(CREATED_AT.toString()))
                 .andExpect(jsonPath("$.items[0].productId").value(PRODUCT_ID.toString()))
@@ -134,6 +142,31 @@ class AdminOrderControllerTest {
     }
 
     @Test
+    void shouldRenderDetailWithoutResolvedCustomer() throws Exception {
+        when(getAdminOrderUseCase.execute(new GetOrderCommand(ORDER_ID)))
+                .thenReturn(new AdminOrderDetailResult(orderResult(null), null));
+
+        mockMvc.perform(get("/api/v1/admin/orders/{orderId}", ORDER_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.customer").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.customerId").value(CUSTOMER_ID.toString()))
+                .andExpect(jsonPath("$.payment").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    void shouldKeepOrderVisibleWhenPaymentIsMissing() throws Exception {
+        when(getAdminOrderUseCase.execute(new GetOrderCommand(ORDER_ID)))
+                .thenReturn(new AdminOrderDetailResult(orderResult(null), customerEntry()));
+
+        mockMvc.perform(get("/api/v1/admin/orders/{orderId}", ORDER_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(ORDER_ID.toString()))
+                .andExpect(jsonPath("$.paymentId").value(PAYMENT_ID.toString()))
+                .andExpect(jsonPath("$.payment").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.customer.fullName").value("Ada Lovelace"));
+    }
+
+    @Test
     void shouldMapUnknownOrderAsNotFound() throws Exception {
         when(getAdminOrderUseCase.execute(any())).thenThrow(new OrderNotFoundException(UNKNOWN_ORDER_ID));
 
@@ -144,26 +177,30 @@ class AdminOrderControllerTest {
 
     @Test
     void shouldListOrdersWithPageAndSize() throws Exception {
-        when(listAdminOrdersUseCase.execute(new ListAdminOrdersCommand(1, 10, List.of())))
-                .thenReturn(new PagedResult<>(List.of(orderResult(null)), 1, 10, 1));
+        when(listAdminOrdersUseCase.execute(new ListAdminOrdersCommand(1, 10, List.of(), null, null, null)))
+                .thenReturn(new PagedResult<>(List.of(listItem()), 1, 10, 1));
 
         mockMvc.perform(get("/api/v1/admin/orders").param("page", "1").param("size", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].id").value(ORDER_ID.toString()))
                 .andExpect(jsonPath("$.items[0].customerId").value(CUSTOMER_ID.toString()))
-                .andExpect(jsonPath("$.items[0].payment").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.items[0].customer.fullName").value("Ada Lovelace"))
+                .andExpect(jsonPath("$.items[0].customer.documentType").value("CC"))
+                .andExpect(jsonPath("$.items[0].items[0].productName").value("Leche entera"))
+                .andExpect(jsonPath("$.items[0].shippingRecipientName").value("Ada Lovelace"))
                 .andExpect(jsonPath("$.page").value(1))
                 .andExpect(jsonPath("$.size").value(10))
                 .andExpect(jsonPath("$.totalElements").value(1));
 
-        verify(listAdminOrdersUseCase).execute(new ListAdminOrdersCommand(1, 10, List.of()));
-        verify(listAdminOrdersUseCase, never()).execute(ListAdminOrdersCommand.of(null, null, null));
+        verify(listAdminOrdersUseCase).execute(new ListAdminOrdersCommand(1, 10, List.of(), null, null, null));
+        verify(listAdminOrdersUseCase, never())
+                .execute(ListAdminOrdersCommand.of(null, null, null, null, null, null));
         verifyNoInteractions(getAdminOrderUseCase);
     }
 
     @Test
     void shouldListOrdersWithoutPaginationParams() throws Exception {
-        when(listAdminOrdersUseCase.execute(ListAdminOrdersCommand.of(null, null, null)))
+        when(listAdminOrdersUseCase.execute(new ListAdminOrdersCommand(null, null, List.of(), null, null, null)))
                 .thenReturn(new PagedResult<>(List.of(), 0, 20, 0));
 
         mockMvc.perform(get("/api/v1/admin/orders"))
@@ -173,13 +210,13 @@ class AdminOrderControllerTest {
                 .andExpect(jsonPath("$.size").value(20))
                 .andExpect(jsonPath("$.totalElements").value(0));
 
-        verify(listAdminOrdersUseCase).execute(ListAdminOrdersCommand.of(null, null, null));
+        verify(listAdminOrdersUseCase).execute(new ListAdminOrdersCommand(null, null, List.of(), null, null, null));
     }
 
     @Test
     void shouldPassSalesStatusFilterToUseCase() throws Exception {
         ListAdminOrdersCommand command = ListAdminOrdersCommand.of(
-                null, null, List.of("CONFIRMED", "PREPARING", "DELIVERY", "DELIVERED"));
+                null, null, List.of("CONFIRMED", "PREPARING", "DELIVERY", "DELIVERED"), null, null, null);
         when(listAdminOrdersUseCase.execute(command)).thenReturn(new PagedResult<>(List.of(), 0, 20, 0));
 
         mockMvc.perform(get("/api/v1/admin/orders")
@@ -194,14 +231,89 @@ class AdminOrderControllerTest {
 
     @Test
     void shouldPassCommaSeparatedStatusFilterToUseCase() throws Exception {
-        ListAdminOrdersCommand command =
-                ListAdminOrdersCommand.of(null, null, List.of("CONFIRMED,PREPARING,DELIVERY,DELIVERED"));
+        ListAdminOrdersCommand command = ListAdminOrdersCommand.of(
+                null, null, List.of("CONFIRMED,PREPARING,DELIVERY,DELIVERED"), null, null, null);
         when(listAdminOrdersUseCase.execute(command)).thenReturn(new PagedResult<>(List.of(), 0, 20, 0));
 
         mockMvc.perform(get("/api/v1/admin/orders").param("status", "CONFIRMED,PREPARING,DELIVERY,DELIVERED"))
                 .andExpect(status().isOk());
 
         verify(listAdminOrdersUseCase).execute(command);
+    }
+
+    @Test
+    void shouldPassOrderNumberSearchToUseCase() throws Exception {
+        ListAdminOrdersCommand command =
+                ListAdminOrdersCommand.of(null, null, null, "ORD-ABC", null, null);
+        when(listAdminOrdersUseCase.execute(command)).thenReturn(new PagedResult<>(List.of(), 0, 20, 0));
+
+        mockMvc.perform(get("/api/v1/admin/orders").param("orderNumber", " ORD-ABC "))
+                .andExpect(status().isOk());
+
+        verify(listAdminOrdersUseCase).execute(command);
+    }
+
+    @Test
+    void shouldPassDateRangeToUseCase() throws Exception {
+        ListAdminOrdersCommand command =
+                ListAdminOrdersCommand.of(null, null, null, null, "2026-03-01", "2026-04-01");
+        when(listAdminOrdersUseCase.execute(command)).thenReturn(new PagedResult<>(List.of(), 0, 20, 0));
+
+        mockMvc.perform(get("/api/v1/admin/orders")
+                        .param("from", "2026-03-01")
+                        .param("to", "2026-04-01"))
+                .andExpect(status().isOk());
+
+        verify(listAdminOrdersUseCase).execute(command);
+    }
+
+    @Test
+    void shouldCombineSearchStatusAndDateRange() throws Exception {
+        ListAdminOrdersCommand command =
+                ListAdminOrdersCommand.of(0, 50, List.of("DELIVERED"), "ORD-1001", "2026-03-01", "2026-04-01");
+        when(listAdminOrdersUseCase.execute(command)).thenReturn(new PagedResult<>(List.of(), 0, 50, 0));
+
+        mockMvc.perform(get("/api/v1/admin/orders")
+                        .param("page", "0")
+                        .param("size", "50")
+                        .param("status", "DELIVERED")
+                        .param("orderNumber", "ORD-1001")
+                        .param("from", "2026-03-01")
+                        .param("to", "2026-04-01"))
+                .andExpect(status().isOk());
+
+        verify(listAdminOrdersUseCase).execute(command);
+    }
+
+    @Test
+    void shouldRejectInvalidDateBound() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/orders").param("from", "01/03/2026"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ORDER"));
+
+        verifyNoInteractions(listAdminOrdersUseCase, getAdminOrderUseCase);
+    }
+
+    @Test
+    void shouldRejectRangeWithFromAfterTo() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/orders")
+                        .param("from", "2026-04-01")
+                        .param("to", "2026-03-01"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ORDER"));
+
+        verifyNoInteractions(listAdminOrdersUseCase, getAdminOrderUseCase);
+    }
+
+    @Test
+    void shouldRenderRowWithoutResolvedCustomer() throws Exception {
+        when(listAdminOrdersUseCase.execute(new ListAdminOrdersCommand(null, null, List.of(), null, null, null)))
+                .thenReturn(new PagedResult<>(List.of(new AdminOrderListItemResult(orderResult(null), null)), 0, 20, 1));
+
+        mockMvc.perform(get("/api/v1/admin/orders"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].customer").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.items[0].customerId").value(CUSTOMER_ID.toString()));
     }
 
     @Test
@@ -365,7 +477,8 @@ class AdminOrderControllerTest {
 
     @Test
     void shouldReturnTopCustomersForArbitraryPeriod() throws Exception {
-        GetAdminTopCustomersCommand command = GetAdminTopCustomersCommand.of("2026-05-01", "2026-06-01", 5);
+        GetAdminTopCustomersCommand command =
+                GetAdminTopCustomersCommand.of("2026-05-01", "2026-06-01", 5, null);
         when(getAdminTopCustomersUseCase.execute(command))
                 .thenReturn(List.of(new AdminCustomerSalesRow(
                         CUSTOMER_ID, "Ada Lovelace", new BigDecimal("450000.00"), 6)));
@@ -380,6 +493,34 @@ class AdminOrderControllerTest {
                 .andExpect(jsonPath("$.items[0].orderCount").value(6));
 
         verify(getAdminTopCustomersUseCase).execute(command);
+    }
+
+    @Test
+    void shouldReturnTopCustomersSortedByOrderCount() throws Exception {
+        GetAdminTopCustomersCommand command =
+                GetAdminTopCustomersCommand.of("2026-05-01", "2026-06-01", 5, "ORDERS");
+        when(getAdminTopCustomersUseCase.execute(command))
+                .thenReturn(List.of(new AdminCustomerSalesRow(
+                        CUSTOMER_ID, "Ada Lovelace", new BigDecimal("120000.00"), 9)));
+
+        mockMvc.perform(get("/api/v1/admin/orders/dashboard/customers/top")
+                        .param("from", "2026-05-01")
+                        .param("to", "2026-06-01")
+                        .param("sort", "ORDERS"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].orderCount").value(9));
+
+        verify(getAdminTopCustomersUseCase).execute(command);
+    }
+
+    private static AdminOrderListItemResult listItem() {
+        return new AdminOrderListItemResult(
+                orderResult(null),
+                new CustomerDirectoryEntry(CUSTOMER_ID, "Ada Lovelace", "CC", "123456789", "ada@example.com", null));
+    }
+
+    private static CustomerDirectoryEntry customerEntry() {
+        return new CustomerDirectoryEntry(CUSTOMER_ID, "Ada Lovelace", "CC", "123456789", "ada@example.com", null);
     }
 
     private static OrderResult orderResult(PaymentResult payment) {

@@ -21,6 +21,10 @@ public final class GetAdminTopCustomersUseCase {
     public List<AdminCustomerSalesRow> execute(GetAdminTopCustomersCommand command) {
         Objects.requireNonNull(command, "command");
         return List.copyOf(
-                orderRepository.findTopCustomersByTotal(command.from(), command.to(), command.limit()));
+                command.sortBy() == GetAdminTopCustomersCommand.SortBy.ORDERS
+                        ? orderRepository.findTopCustomersByOrders(
+                                command.from(), command.to(), command.limit())
+                        : orderRepository.findTopCustomersByTotal(
+                                command.from(), command.to(), command.limit()));
     }
 }
