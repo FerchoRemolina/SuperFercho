@@ -10,8 +10,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.superfercho.identity.application.dto.AdminCustomerAccountResult;
+import com.superfercho.identity.application.dto.AdminCustomerRecordListItem;
 import com.superfercho.identity.application.dto.AdminCustomerRecordResult;
 import com.superfercho.identity.application.dto.AdminNewCustomersResult;
+import com.superfercho.identity.application.dto.AdminCustomerRecordSearchCriteria;
+import com.superfercho.identity.application.dto.AdminCustomerRecordsPage;
 import com.superfercho.identity.application.dto.AdminPagedResult;
 import com.superfercho.identity.application.dto.CustomerCommercialOrderView;
 import com.superfercho.identity.application.dto.CustomerCommercialPaymentView;
@@ -24,6 +27,11 @@ import com.superfercho.identity.application.usecase.GetAdminCustomerRecordUseCas
 import com.superfercho.identity.application.usecase.GetAdminNewCustomersUseCase;
 import com.superfercho.identity.application.usecase.ListAdminCustomerOrdersUseCase;
 import com.superfercho.identity.application.usecase.ListAdminCustomerPaymentsUseCase;
+import com.superfercho.identity.application.usecase.SearchAdminCustomerRecordsUseCase;
+import com.superfercho.identity.application.dto.AdminCustomerRecordSortBy;
+import com.superfercho.identity.application.dto.AdminCustomerRecordSortDir;
+import com.superfercho.identity.application.dto.AdminCustomerRecordStatus;
+import com.superfercho.identity.application.dto.AdminCustomerRecordStatusFilter;
 import com.superfercho.identity.domain.model.UserStatus;
 import com.superfercho.platform.money.Money;
 import java.math.BigDecimal;
@@ -72,6 +80,9 @@ class AdminCustomerControllerTest {
 
     @MockitoBean
     private GetAdminNewCustomersUseCase getAdminNewCustomersUseCase;
+
+    @MockitoBean
+    private SearchAdminCustomerRecordsUseCase searchAdminCustomerRecordsUseCase;
 
     @Test
     void shouldFindByDocument() throws Exception {
@@ -189,6 +200,40 @@ class AdminCustomerControllerTest {
                 .andExpect(jsonPath("$.buckets[0].count").value(4));
 
         verify(getAdminNewCustomersUseCase).execute(command);
+    }
+
+    @Test
+    void shouldListCustomerRecords() throws Exception {
+        var item = new AdminCustomerRecordListItem(
+                RECORD_ID, "CC", "123456789", "Ana", "Gómez",
+                "ana@example.com", "3000000000",
+                AdminCustomerRecordStatus.ACTIVE,
+                2, 1, 1, 0,
+                12, com.superfercho.platform.money.Money.cop(new java.math.BigDecimal("863650")),
+                Instant.parse("2026-09-25T12:00:00Z"), NOW, NOW);
+        when(searchAdminCustomerRecordsUseCase.execute(any())).thenReturn(
+                new AdminCustomerRecordsPage(List.of(item), 0, 20, 1));
+
+        mockMvc.perform(get("/api/v1/admin/customers")
+                        .param("search", "ana")
+                        .param("status", "ALL")
+                        .param("sortBy", "NAME")
+                        .param("sortDir", "ASC")
+                        .param("hasPurchases", "false")
+                        .param("page", "0")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(RECORD_ID.toString()))
+                .andExpect(jsonPath("$.items[0].email").value("ana@example.com"))
+                .andExpect(jsonPath("$.items[0].status").value("ACTIVE"))
+                .andExpect(jsonPath("$.items[0].orderCount").value(12))
+                .andExpect(jsonPath("$.totalElements").value(1));
+
+        var expected = new AdminCustomerRecordSearchCriteria(
+                "ana", AdminCustomerRecordStatusFilter.ALL,
+                AdminCustomerRecordSortBy.NAME,
+                AdminCustomerRecordSortDir.ASC, Boolean.FALSE, 0, 20);
+        verify(searchAdminCustomerRecordsUseCase).execute(expected);
     }
 
     @Test

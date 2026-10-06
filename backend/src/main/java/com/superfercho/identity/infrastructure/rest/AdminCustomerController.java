@@ -4,8 +4,12 @@ import com.superfercho.identity.application.dto.ActivateAdminCustomerAccountComm
 import com.superfercho.identity.application.dto.DeactivateAdminCustomerAccountCommand;
 import com.superfercho.identity.application.dto.FindAdminCustomerByDocumentCommand;
 import com.superfercho.identity.application.dto.GetAdminCustomerRecordCommand;
+import com.superfercho.identity.application.dto.AdminCustomerRecordSearchCriteria;
+import com.superfercho.identity.application.dto.AdminCustomerRecordsPage;
 import com.superfercho.identity.application.dto.GetAdminNewCustomersCommand;
 import com.superfercho.identity.application.dto.ListAdminCustomerCommercialHistoryCommand;
+import com.superfercho.identity.application.usecase.SearchAdminCustomerRecordsUseCase;
+import com.superfercho.identity.infrastructure.rest.dto.AdminCustomerRecordsPageRestResponse;
 import com.superfercho.identity.application.usecase.ActivateAdminCustomerAccountUseCase;
 import com.superfercho.identity.application.usecase.DeactivateAdminCustomerAccountUseCase;
 import com.superfercho.identity.application.usecase.FindAdminCustomerByDocumentUseCase;
@@ -39,6 +43,7 @@ public class AdminCustomerController {
     private final ActivateAdminCustomerAccountUseCase activateAdminCustomerAccountUseCase;
     private final DeactivateAdminCustomerAccountUseCase deactivateAdminCustomerAccountUseCase;
     private final GetAdminNewCustomersUseCase getAdminNewCustomersUseCase;
+    private final SearchAdminCustomerRecordsUseCase searchAdminCustomerRecordsUseCase;
 
     public AdminCustomerController(
             FindAdminCustomerByDocumentUseCase findAdminCustomerByDocumentUseCase,
@@ -47,7 +52,8 @@ public class AdminCustomerController {
             ListAdminCustomerPaymentsUseCase listAdminCustomerPaymentsUseCase,
             ActivateAdminCustomerAccountUseCase activateAdminCustomerAccountUseCase,
             DeactivateAdminCustomerAccountUseCase deactivateAdminCustomerAccountUseCase,
-            GetAdminNewCustomersUseCase getAdminNewCustomersUseCase) {
+            GetAdminNewCustomersUseCase getAdminNewCustomersUseCase,
+            SearchAdminCustomerRecordsUseCase searchAdminCustomerRecordsUseCase) {
         this.findAdminCustomerByDocumentUseCase = findAdminCustomerByDocumentUseCase;
         this.getAdminCustomerRecordUseCase = getAdminCustomerRecordUseCase;
         this.listAdminCustomerOrdersUseCase = listAdminCustomerOrdersUseCase;
@@ -55,6 +61,7 @@ public class AdminCustomerController {
         this.activateAdminCustomerAccountUseCase = activateAdminCustomerAccountUseCase;
         this.deactivateAdminCustomerAccountUseCase = deactivateAdminCustomerAccountUseCase;
         this.getAdminNewCustomersUseCase = getAdminNewCustomersUseCase;
+        this.searchAdminCustomerRecordsUseCase = searchAdminCustomerRecordsUseCase;
     }
 
     /**
@@ -77,6 +84,26 @@ public class AdminCustomerController {
             @RequestParam(required = false) String accountStatus) {
         return AdminCustomerRecordRestResponse.from(findAdminCustomerByDocumentUseCase.execute(
                 FindAdminCustomerByDocumentCommand.of(documentType, documentNumber, accountStatus)));
+    }
+
+    /**
+     * Listado principal «Todos los clientes»: búsqueda, filtro de estado de
+     * cuenta, filtro de compras ({@code hasPurchases}), ordenamiento y
+     * paginación. Los registrados recientemente se obtienen con
+     * {@code sortBy=CREATED_AT&sortDir=DESC}.
+     */
+    @GetMapping
+    public AdminCustomerRecordsPageRestResponse list(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false) String sortDir,
+            @RequestParam(required = false) String hasPurchases,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        return AdminCustomerRecordsPageRestResponse.from(searchAdminCustomerRecordsUseCase.execute(
+                AdminCustomerRecordSearchCriteria.of(
+                        search, status, sortBy, sortDir, hasPurchases, page, size)));
     }
 
     @GetMapping("/{customerRecordId}")

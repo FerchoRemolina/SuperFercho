@@ -1,6 +1,7 @@
 package com.superfercho.identity.application.port;
 
 import com.superfercho.identity.domain.model.User;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -10,6 +11,12 @@ public interface UserRepository {
     User save(User user);
 
     Optional<User> findById(UUID id);
+
+    /**
+     * Batch lookup (includes soft-deleted accounts). Missing ids are silently
+     * omitted; never returns null entries.
+     */
+    List<User> findAllByIds(Collection<UUID> ids);
 
     /**
      * True if a non-deleted user currently owns the email ({@code deletedAt == null}).

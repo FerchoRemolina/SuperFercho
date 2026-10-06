@@ -4,6 +4,7 @@ import com.superfercho.identity.application.port.UserRepository;
 import com.superfercho.identity.domain.model.User;
 import com.superfercho.identity.infrastructure.persistence.mapper.UserPersistenceMapper;
 import com.superfercho.identity.infrastructure.persistence.repository.UserJpaRepository;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,6 +38,16 @@ public class UserPersistenceAdapter implements UserRepository {
     @Override
     public Optional<User> findById(UUID id) {
         return userJpaRepository.findById(id).map(userPersistenceMapper::toDomain);
+    }
+
+    @Override
+    public List<User> findAllByIds(Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return userJpaRepository.findAllById(ids).stream()
+                .map(userPersistenceMapper::toDomain)
+                .toList();
     }
 
     @Override

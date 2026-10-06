@@ -246,6 +246,11 @@ class LocalDevAdminRunnerTest {
         }
 
         @Override
+        public java.util.List<User> findAllByIds(java.util.Collection<UUID> ids) {
+            return delegate.findAllByIds(ids);
+        }
+
+        @Override
         public boolean existsByEmail(String email) {
             return delegate.existsByEmail(email);
         }

@@ -37,6 +37,7 @@ import com.superfercho.identity.application.usecase.ListAddressesUseCase;
 import com.superfercho.identity.application.usecase.ListAdminCustomerOrdersUseCase;
 import com.superfercho.identity.application.usecase.ListAdminCustomerPaymentsUseCase;
 import com.superfercho.identity.application.usecase.RegisterCustomerUseCase;
+import com.superfercho.identity.application.usecase.SearchAdminCustomerRecordsUseCase;
 import com.superfercho.identity.application.usecase.SetDefaultAddressUseCase;
 import com.superfercho.identity.application.usecase.StartStorefrontPreviewUseCase;
 import com.superfercho.identity.application.usecase.UpdateAddressUseCase;
@@ -136,6 +137,13 @@ public class IdentityUseCaseConfiguration {
     FindAdminCustomerByDocumentUseCase findAdminCustomerByDocumentUseCase(
             CustomerRecordRepository customerRecordRepository, UserRepository userRepository) {
         return new FindAdminCustomerByDocumentUseCase(customerRecordRepository, userRepository);
+    }
+
+    @Bean
+    @ConditionalOnBean(CustomerRecordRepository.class)
+    SearchAdminCustomerRecordsUseCase searchAdminCustomerRecordsUseCase(
+            CustomerRecordRepository customerRecordRepository) {
+        return new SearchAdminCustomerRecordsUseCase(customerRecordRepository);
     }
 
     @Bean

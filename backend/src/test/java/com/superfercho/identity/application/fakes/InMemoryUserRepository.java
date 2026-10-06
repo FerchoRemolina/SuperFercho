@@ -2,6 +2,7 @@ package com.superfercho.identity.application.fakes;
 
 import com.superfercho.identity.application.port.UserRepository;
 import com.superfercho.identity.domain.model.User;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,14 @@ public final class InMemoryUserRepository implements UserRepository {
     @Override
     public Optional<User> findById(UUID id) {
         return Optional.ofNullable(users.get(id));
+    }
+
+    @Override
+    public List<User> findAllByIds(Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return ids.stream().map(users::get).filter(user -> user != null).toList();
     }
 
     @Override

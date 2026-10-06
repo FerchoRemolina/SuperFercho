@@ -1,5 +1,8 @@
 package com.superfercho.identity.application.fakes;
 
+import com.superfercho.identity.application.dto.AdminCustomerRecordListItem;
+import com.superfercho.identity.application.dto.AdminCustomerRecordSearchCriteria;
+import com.superfercho.identity.application.dto.AdminCustomerRecordsPage;
 import com.superfercho.identity.application.dto.CustomerRegistrationBucketRow;
 import com.superfercho.identity.application.exception.DocumentAlreadyExistsException;
 import com.superfercho.identity.application.port.CustomerRecordRepository;
@@ -11,6 +14,7 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +44,14 @@ public final class InMemoryCustomerRecordRepository implements CustomerRecordRep
     @Override
     public Optional<CustomerRecord> findById(UUID id) {
         return Optional.ofNullable(byId.get(id));
+    }
+
+    @Override
+    public List<CustomerRecord> findAllByIds(Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return ids.stream().map(byId::get).filter(record -> record != null).toList();
     }
 
     @Override
@@ -78,6 +90,39 @@ public final class InMemoryCustomerRecordRepository implements CustomerRecordRep
                 .map(CustomerRecord::createdAt)
                 .filter(createdAt -> !createdAt.isBefore(fromInclusive) && createdAt.isBefore(toExclusive))
                 .count();
+    }
+
+    @Override
+    public AdminCustomerRecordsPage searchRecords(AdminCustomerRecordSearchCriteria criteria) {        String query = criteria.search().toLowerCase();
+        List<AdminCustomerRecordListItem> items = byId.values().stream()
+                .filter(record -> query.isEmpty()
+                        || record.billingFirstName().toLowerCase().contains(query)
+                        || record.billingLastName().toLowerCase().contains(query)
+                        || record.documentNumber().contains(query))
+                .map(record -> new AdminCustomerRecordListItem(
+                        record.id(),
+                        record.documentType(),
+                        record.documentNumber(),
+                        record.billingFirstName(),
+                        record.billingLastName(),
+                        null,
+                        null,
+                        com.superfercho.identity.application.dto.AdminCustomerRecordStatus.NO_ACCOUNT,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        com.superfercho.platform.money.Money.cop(java.math.BigDecimal.ZERO),
+                        null,
+                        record.createdAt(),
+                        record.updatedAt()))
+                .toList();
+        long from = (long) criteria.page() * criteria.size();
+        long to = Math.min(from + criteria.size(), items.size());
+        List<AdminCustomerRecordListItem> slice =
+                from >= items.size() ? List.of() : items.subList((int) from, (int) to);
+        return new AdminCustomerRecordsPage(slice, criteria.page(), criteria.size(), items.size());
     }
 
     private static Instant bucketStart(BucketGranularity granularity, Instant instant) {
