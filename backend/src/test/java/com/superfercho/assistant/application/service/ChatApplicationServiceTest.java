@@ -17,10 +17,13 @@ import com.superfercho.assistant.application.dto.chat.ExplicitConfirmation;
 import com.superfercho.assistant.application.dto.llm.LlmMessage;
 import com.superfercho.assistant.application.dto.llm.LlmRequest;
 import com.superfercho.assistant.application.dto.llm.LlmResponse;
+import com.superfercho.assistant.application.dto.llm.LlmToolDefinition;
 import com.superfercho.assistant.application.exception.ConversationNotFoundException;
+import com.superfercho.assistant.application.exception.InvalidChatRequestException;
 import com.superfercho.assistant.application.exception.InvalidConfirmationException;
 import com.superfercho.assistant.application.port.out.ClockPort;
 import com.superfercho.assistant.application.port.out.CurrentUserProvider;
+import com.superfercho.assistant.application.service.ChatApplicationService;
 import com.superfercho.assistant.application.tool.AssistantTool;
 import com.superfercho.assistant.application.tool.ToolNames;
 import com.superfercho.assistant.application.tool.ToolRegistry;
@@ -177,6 +180,7 @@ class ChatApplicationServiceTest {
         ChatResponse response = chat.execute(new ChatCommand(null, "ver carrito", null));
 
         assertEquals("Tu carrito está vacío.", response.assistantMessage());
+        assertFalse(response.authenticationRequired());
         verify(getCartUseCase).execute();
         assertEquals(2, llm.requests().size());
         assertEquals(MessageRole.TOOL, llm.requests().get(1).messages().get(2).role());

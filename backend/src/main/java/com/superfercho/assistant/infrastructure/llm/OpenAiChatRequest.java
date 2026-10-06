@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
-record OpenAiChatRequest(String model, List<OpenAiChatMessage> messages, List<OpenAiTool> tools) {}
+record OpenAiChatRequest(String model, List<OpenAiChatMessage> messages, List<OpenAiTool> tools, boolean think) {}
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 record OpenAiChatMessage(

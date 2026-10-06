@@ -17,6 +17,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.expression.WebExpressionAuthorizationManager;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
@@ -150,6 +151,8 @@ public class IdentitySecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/api/v1/orders/{orderId}/cancel")
                         .hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.POST, "/api/v1/assistant/chat")
+                        .access(new WebExpressionAuthorizationManager("!hasRole('ADMIN')"))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/assistant/conversations/*/claim")
                         .hasRole("CUSTOMER")
                         .anyRequest()
                         .denyAll())

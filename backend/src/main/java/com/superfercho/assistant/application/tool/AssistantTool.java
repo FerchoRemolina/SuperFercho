@@ -12,6 +12,10 @@ public interface AssistantTool {
 
     ToolRisk risk();
 
+    default ToolAccess access() {
+        return ToolAccess.CUSTOMER;
+    }
+
     ToolResult execute(ToolArguments arguments);
 
     default LlmToolDefinition definition() {

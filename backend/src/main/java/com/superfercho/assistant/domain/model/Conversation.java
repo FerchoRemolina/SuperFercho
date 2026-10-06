@@ -1,9 +1,11 @@
 package com.superfercho.assistant.domain.model;
 
 import com.superfercho.assistant.domain.exception.InvalidConversationException;
+import com.superfercho.assistant.domain.exception.InvalidMessageException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public final class Conversation {
@@ -14,7 +16,12 @@ public final class Conversation {
     private final Instant createdAt;
     private final Instant updatedAt;
 
-    private Conversation(UUID id, UUID userId, List<Message> messages, Instant createdAt, Instant updatedAt) {
+    private Conversation(
+            UUID id,
+            UUID userId,
+            List<Message> messages,
+            Instant createdAt,
+            Instant updatedAt) {
         this.id = id;
         this.userId = userId;
         this.messages = messages;
@@ -26,9 +33,8 @@ public final class Conversation {
         return of(id, userId, List.of(), createdAt, createdAt);
     }
 
-    public static Conversation reconstitute(
-            UUID id, UUID userId, List<Message> messages, Instant createdAt, Instant updatedAt) {
-        return of(id, userId, messages, createdAt, updatedAt);
+    public boolean isAccessibleByCustomer(UUID userId) {
+        return userId != null && userId.equals(this.userId);
     }
 
     public Conversation append(Message message, Instant currentTime) {

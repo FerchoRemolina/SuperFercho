@@ -13,6 +13,7 @@ import com.superfercho.assistant.application.dto.llm.LlmToolDefinition;
 import com.superfercho.assistant.application.exception.ConversationNotFoundException;
 import com.superfercho.assistant.application.exception.InvalidChatRequestException;
 import com.superfercho.assistant.application.exception.InvalidConfirmationException;
+import com.superfercho.assistant.application.exception.ToolAccessDeniedException;
 import com.superfercho.assistant.application.port.in.ChatUseCase;
 import com.superfercho.assistant.application.port.out.ClockPort;
 import com.superfercho.assistant.application.port.out.ConversationStore;
@@ -20,6 +21,7 @@ import com.superfercho.assistant.application.port.out.CurrentUserProvider;
 import com.superfercho.assistant.application.port.out.LLMPort;
 import com.superfercho.assistant.application.port.out.PendingSensitiveActionStore;
 import com.superfercho.assistant.application.tool.AssistantTool;
+import com.superfercho.assistant.application.tool.ToolAccess;
 import com.superfercho.assistant.application.tool.ToolRegistry;
 import com.superfercho.assistant.application.tool.ToolResult;
 import com.superfercho.assistant.domain.model.Conversation;
@@ -35,10 +37,14 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class ChatApplicationService implements ChatUseCase {
 
     private static final int MAX_TOOL_ROUNDS = 8;
+
+    private static final Logger log = LoggerFactory.getLogger(ChatApplicationService.class);
 
     private final CurrentUserProvider currentUserProvider;
     private final ClockPort clockPort;
@@ -83,7 +89,7 @@ public final class ChatApplicationService implements ChatUseCase {
             throw new InvalidChatRequestException("message cannot be blank");
         }
         conversation = conversationStore.save(conversation.append(Message.user(UUID.randomUUID(), command.message(), now), now));
-        return completeWithTools(conversation, now);
+        return completeWithTools(conversation, userId, now);
     }
 
     private ChatResponse confirm(
@@ -115,15 +121,17 @@ public final class ChatApplicationService implements ChatUseCase {
         pendingSensitiveActionStore.delete(pending.token());
         Conversation updated = conversationStore.save(
                 conversation.append(Message.assistant(UUID.randomUUID(), resultText, now), now));
-        return new ChatResponse(updated.id(), resultText, false, null, null);
+        return new ChatResponse(updated.id(), resultText, false, null, null, false, null);
     }
 
-    private ChatResponse completeWithTools(Conversation conversation, Instant now) {
-        List<LlmToolDefinition> tools =
-                toolRegistry.allowlist().stream().map(AssistantTool::definition).toList();
+    private ChatResponse completeWithTools(Conversation conversation, UUID userId, Instant now) {
+        List<LlmToolDefinition> tools = toolRegistry.definitionsFor(ToolAccess.CUSTOMER);
+        boolean authenticationRequired = false;
         String confirmationToken = null;
         SensitiveActionType confirmationType = null;
         Conversation current = conversation;
+        List<String> executedTools = new ArrayList<>();
+        int roundsUsed = 0;
         for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
             LlmResponse response =
                     llmPort.complete(new LlmRequest(toLlmMessages(current), tools, FerchoSystemPrompt.TEXT));
@@ -131,8 +139,10 @@ public final class ChatApplicationService implements ChatUseCase {
                 String text = response.text().isBlank() ? "I could not produce a response." : response.text();
                 current = conversationStore.save(
                         current.append(Message.assistant(UUID.randomUUID(), text, now), now));
+                roundsUsed = round + 1;
+                log.info("FERCHO_TRACE rounds={} tools={}", roundsUsed, String.join(",", executedTools));
                 return new ChatResponse(
-                        current.id(), text, confirmationToken != null, confirmationToken, confirmationType);
+                        current.id(), text, confirmationToken != null, confirmationToken, confirmationType, authenticationRequired, null);
             }
             List<MessageToolCall> domainCalls = new ArrayList<>();
             List<Message> toolMessages = new ArrayList<>();
@@ -140,9 +150,17 @@ public final class ChatApplicationService implements ChatUseCase {
                 String callId = call.id() == null || call.id().isBlank() ? UUID.randomUUID().toString() : call.id();
                 domainCalls.add(new MessageToolCall(callId, call.name(), call.arguments()));
                 ToolResult result;
+                String status;
                 try {
-                    result = toolRegistry.execute(call.name(), call.arguments());
+                    result = toolRegistry.execute(ToolAccess.CUSTOMER, call.name(), call.arguments());
+                    status = statusOf(result);
+                } catch (ToolAccessDeniedException exception) {
+                    authenticationRequired = true;
+                    status = "ACCESS_DENIED";
+                    result = ToolResult.failure(
+                            "authentication required: this action needs an authenticated customer account");
                 } catch (RuntimeException exception) {
+                    status = "FAILURE";
                     result = ToolResult.failure(
                             exception.getMessage() == null
                                     ? exception.getClass().getSimpleName()
@@ -152,6 +170,8 @@ public final class ChatApplicationService implements ChatUseCase {
                     confirmationToken = result.confirmationToken();
                     confirmationType = confirmationTypeOf(call.name());
                 }
+                log.info("FERCHO_TOOL round={} tool={} status={}", round + 1, call.name(), status);
+                executedTools.add(call.name());
                 toolMessages.add(Message.toolResult(
                         UUID.randomUUID(), callId, call.name(), result.content(), now));
             }
@@ -163,7 +183,15 @@ public final class ChatApplicationService implements ChatUseCase {
         }
         String fallback = "Too many tool calls were requested in this turn.";
         current = conversationStore.save(current.append(Message.assistant(UUID.randomUUID(), fallback, now), now));
-        return new ChatResponse(current.id(), fallback, confirmationToken != null, confirmationToken, confirmationType);
+        log.info("FERCHO_TRACE rounds={} tools={}", MAX_TOOL_ROUNDS, String.join(",", executedTools));
+        return new ChatResponse(current.id(), fallback, confirmationToken != null, confirmationToken, confirmationType, authenticationRequired, null);
+    }
+
+    private static String statusOf(ToolResult result) {
+        if (result.awaitsConfirmation()) {
+            return "CONFIRMATION_REQUIRED";
+        }
+        return result.success() ? "SUCCESS" : "FAILURE";
     }
 
     private Conversation loadOrStart(UUID conversationId, UUID userId, Instant now) {
@@ -173,7 +201,7 @@ public final class ChatApplicationService implements ChatUseCase {
         Conversation conversation = conversationStore
                 .findById(conversationId)
                 .orElseThrow(ConversationNotFoundException::new);
-        if (!conversation.userId().equals(userId)) {
+        if (!conversation.isAccessibleByCustomer(userId)) {
             throw new ConversationNotFoundException();
         }
         return conversation;

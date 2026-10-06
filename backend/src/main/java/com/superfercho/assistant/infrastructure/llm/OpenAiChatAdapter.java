@@ -77,7 +77,7 @@ public final class OpenAiChatAdapter implements LLMPort {
         List<OpenAiTool> tools = request.tools().isEmpty() ? null : request.tools().stream()
                 .map(this::toProviderTool)
                 .toList();
-        return new OpenAiChatRequest(properties.model(), List.copyOf(messages), tools);
+        return new OpenAiChatRequest(properties.model(), List.copyOf(messages), tools, false);
     }
 
     private OpenAiChatMessage toProviderMessage(LlmMessage message) {

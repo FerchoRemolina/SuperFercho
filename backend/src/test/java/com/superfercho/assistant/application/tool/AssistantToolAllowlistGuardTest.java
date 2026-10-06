@@ -62,7 +62,16 @@ class AssistantToolAllowlistGuardTest {
 
     @Test
     void registeredToolsMatchTheExpectedContract() {
-        ToolRegistry registry = AssistantToolAllowlist.create(
+        List<String> names = registry().allowlist().stream().map(AssistantTool::name).toList();
+
+        assertThat(names)
+                .hasSize(EXPECTED_TOOL_COUNT)
+                .doesNotHaveDuplicates()
+                .containsExactlyInAnyOrderElementsOf(EXPECTED_TOOL_NAMES);
+    }
+
+    private ToolRegistry registry() {
+        return AssistantToolAllowlist.create(
                 mock(SearchProductsUseCase.class),
                 mock(GetProductUseCase.class),
                 mock(ListProductsUseCase.class),
@@ -87,12 +96,20 @@ class AssistantToolAllowlistGuardTest {
                 mock(PendingSensitiveActionStore.class),
                 mock(ListAddressesUseCase.class),
                 mock(SearchKnowledgeUseCase.class));
+    }
 
-        List<String> names = registry.allowlist().stream().map(AssistantTool::name).toList();
+    @Test
+    void onlyCatalogToolsArePublic() {
+        ToolRegistry registry = registry();
 
-        assertThat(names)
-                .hasSize(EXPECTED_TOOL_COUNT)
-                .doesNotHaveDuplicates()
-                .containsExactlyInAnyOrderElementsOf(EXPECTED_TOOL_NAMES);
+        List<String> publicNames = registry.allowlist().stream()
+                .filter(tool -> tool.access() == ToolAccess.PUBLIC)
+                .map(AssistantTool::name)
+                .toList();
+
+        assertThat(publicNames).containsExactlyInAnyOrder(
+                "search_products", "get_product", "list_products", "list_categories");
+        assertThat(registry.allowlist())
+                .allSatisfy(tool -> assertThat(tool.access()).isIn(ToolAccess.PUBLIC, ToolAccess.CUSTOMER));
     }
 }

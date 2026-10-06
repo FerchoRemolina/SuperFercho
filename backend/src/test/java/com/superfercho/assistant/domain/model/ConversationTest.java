@@ -58,4 +58,12 @@ class ConversationTest {
     void shouldRejectNullConversationId() {
         assertThrows(InvalidConversationException.class, () -> Conversation.start(null, USER_ID, NOW));
     }
+
+    @Test
+    void shouldExposeCustomerConversationOnlyToItsOwner() {
+        Conversation conversation = Conversation.start(CONVERSATION_ID, USER_ID, NOW);
+
+        assertEquals(true, conversation.isAccessibleByCustomer(USER_ID));
+        assertEquals(false, conversation.isAccessibleByCustomer(UUID.fromString("22222222-2222-2222-2222-222222222222")));
+    }
 }

@@ -24,6 +24,6 @@ public final class InMemoryConversationStore implements ConversationStore {
 
     @Override
     public void deleteByUserId(UUID userId) {
-        conversations.values().removeIf(conversation -> conversation.userId().equals(userId));
+        conversations.values().removeIf(conversation -> userId != null && userId.equals(conversation.userId()));
     }
 }

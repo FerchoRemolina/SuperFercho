@@ -255,6 +255,7 @@ class OpenAiChatAdapterTest {
         return """
                 {
                   "model": "gpt-4o-mini",
+                  "think": false,
                   "messages": [
                     {"role":"system","content":"Eres Fercho, asistente de SuperFercho."},
                     {"role":"user","content":"hola"}
@@ -267,6 +268,7 @@ class OpenAiChatAdapterTest {
         return """
                 {
                   "model": "gpt-4o-mini",
+                  "think": false,
                   "messages": [{"role":"user","content":"busca leche"}],
                   "tools": [{
                     "type": "function",
@@ -290,6 +292,7 @@ class OpenAiChatAdapterTest {
         return """
                 {
                   "model": "gpt-4o-mini",
+                  "think": false,
                   "messages": [
                     {"role":"user","content":"ver carrito"},
                     {"role":"assistant","tool_calls":[{"id":"c1","type":"function","function":{"name":"get_cart","arguments":"{}"}}]},

@@ -8,4 +8,6 @@ public record ChatResponse(
         String assistantMessage,
         boolean awaitingConfirmation,
         String confirmationToken,
-        SensitiveActionType confirmationType) {}
+        SensitiveActionType confirmationType,
+        boolean authenticationRequired,
+        String visitorToken) {}

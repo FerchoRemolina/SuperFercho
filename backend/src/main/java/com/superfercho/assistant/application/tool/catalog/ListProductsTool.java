@@ -2,6 +2,7 @@ package com.superfercho.assistant.application.tool.catalog;
 
 import com.superfercho.assistant.application.tool.AssistantTool;
 import com.superfercho.assistant.application.tool.ToolArguments;
+import com.superfercho.assistant.application.tool.ToolAccess;
 import com.superfercho.assistant.application.tool.ToolNames;
 import com.superfercho.assistant.application.tool.ToolParameter;
 import com.superfercho.assistant.application.tool.ToolResult;
@@ -37,6 +38,11 @@ public final class ListProductsTool implements AssistantTool {
     @Override
     public ToolRisk risk() {
         return ToolRisk.QUERY;
+    }
+
+    @Override
+    public ToolAccess access() {
+        return ToolAccess.PUBLIC;
     }
 
     @Override

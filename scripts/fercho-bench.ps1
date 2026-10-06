@@ -221,6 +221,29 @@ if ($leches.Count -lt 2) {
     Log "[OK] Ya existen $($leches.Count) productos 'leche' activos (contexto de desambiguacion real)"
 }
 
+$benchAlfa = @(Find-Products "BenchDairy Alfa") | Where-Object { $_.status -eq "ACTIVE" } | Select-Object -First 1
+if (-not $benchAlfa) {
+    $created = Invoke-ApiJson -Method "POST" -Path "/api/v1/products" -Token $adminToken -Body @{
+        productTypeId = $PRODUCT_A.productTypeId
+        productVariantId = $PRODUCT_A.productVariantId
+        presentation = @{ quantity = 1.000; unit = "UNIT" }
+        barcode = $null
+        name = "Leche Bench Alfa 1L"
+        brand = "BenchDairy Alfa"
+        description = "Experimento C3: nombre unico, sin colision con el catalogo"
+        price = @{ amount = 4800.00; currency = "COP" }
+        stock = 25
+        imageUrl = $null
+    }
+    if (-not $created.Ok) { Log "FALLO creando Leche Bench Alfa: $($created.Raw)"; $script:Report | Out-File $ReportPath -Encoding utf8; exit 1 }
+    $benchAlfa = @($created.Body)
+    Log "[OK] Creado producto sin ambiguedad: Leche Bench Alfa 1L ($($benchAlfa.id))"
+} else {
+    Log "[OK] Reutilizando producto sin ambiguedad: $($benchAlfa.name) ($($benchAlfa.id))"
+}
+$BENCH_ALFA_ID = $benchAlfa.id.ToString()
+$BENCH_ALFA_NAME = $benchAlfa.name
+
 $unicornio = @(Find-Products "unicornio")
 if ($unicornio.Count -gt 0) {
     Log "FALLO: 'unicornio' deberia no existir en el catalogo y aparecio $($unicornio.Count) vez/veces"
@@ -295,27 +318,36 @@ if ($c2.Result.Ok) {
     $CASES.Add(@{ Id = "C2"; Outcome = "ERROR"; Class = "excepcion no capturada"; Latency = $swC2.ElapsedMilliseconds })
 }
 
-LogStep "CASO 3 - Agregar al carrito"
+LogStep "CASO 3 - Agregar al carrito (producto sin ambiguedad)"
 Ensure-Session
 $swC3 = [System.Diagnostics.Stopwatch]::StartNew()
 try {
-$cartBefore = Get-CartQuantities $TOKEN
-Log "carrito antes: $($cartBefore.Keys.Count) productos"
-$c3 = Invoke-Chat -Token $TOKEN -ConversationId $conv -Message "Agrega dos unidades de $PRODUCT_A_NAME al carrito."
-$cartAfter = Get-CartQuantities $TOKEN
-$expectedAfter = $cartBefore[$PRODUCT_A_ID] + 2
-$gotQty = 0
-if ($cartAfter.ContainsKey($PRODUCT_A_ID)) { $gotQty = $cartAfter[$PRODUCT_A_ID] }
-if ($c3.Result.Ok -and $gotQty -eq $expectedAfter) {
-    Log "C3 | SUCCESS | carrito: producto A cantidad=$gotQty (esperado $expectedAfter) | latencia=$($c3.LatencyMs) ms"
-    $CASES.Add(@{ Id = "C3"; Outcome = "SUCCESS"; Class = "-"; Latency = $c3.LatencyMs })
-} elseif (-not $c3.Result.Ok) {
-    Log "C3 | ERROR HTTP $($c3.Result.Status): $($c3.Result.Raw) | latencia=$($c3.LatencyMs) ms"
-    $CASES.Add(@{ Id = "C3"; Outcome = "ERROR"; Class = "infra/modelo"; Latency = $c3.LatencyMs })
+$cartPre = Invoke-ApiJson -Method "GET" -Path "/api/v1/cart" -Token $TOKEN
+if (@($cartPre.Body.items).Count -gt 0) {
+    $null = Invoke-ApiJson -Method "DELETE" -Path "/api/v1/cart" -Token $TOKEN
+    Log "carrito no vacio: limpiado por API para estado controlado"
+}
+$cartCheck = Invoke-ApiJson -Method "GET" -Path "/api/v1/cart" -Token $TOKEN
+if (@($cartCheck.Body.items).Count -ne 0) {
+    Log "C3 | ERROR | el carrito no quedo vacio tras la limpieza"
+    $CASES.Add(@{ Id = "C3"; Outcome = "ERROR"; Class = "infra"; Latency = 0 })
 } else {
-    $respText = if ($null -ne $c3.Result.Body) { $c3.Result.Body.assistantMessage } else { "N/A" }
-    Log "C3 | MODEL-FAIL | qty=$gotQty esperado=$expectedAfter | respuesta: $respText | latencia=$($c3.LatencyMs) ms"
-    $CASES.Add(@{ Id = "C3"; Outcome = "MODEL-FAIL"; Class = "modelo: estado del carrito incorrecto"; Latency = $c3.LatencyMs })
+    Log "carrito antes: VACIO (verificado por API)"
+    $c3 = Invoke-Chat -Token $TOKEN -ConversationId $conv -Message "Agrega una Leche Bench Alfa 1L a mi carrito."
+    $cartAfter = Get-CartQuantities $TOKEN
+    $exacto = ($cartAfter.Count -eq 1) -and $cartAfter.ContainsKey($BENCH_ALFA_ID) -and ($cartAfter[$BENCH_ALFA_ID] -eq 1)
+    if ($c3.Result.Ok -and $exacto) {
+        Log "C3 | SUCCESS | carrito exacto: $BENCH_ALFA_NAME x1 | latencia=$($c3.LatencyMs) ms"
+        $CASES.Add(@{ Id = "C3"; Outcome = "SUCCESS"; Class = "-"; Latency = $c3.LatencyMs })
+    } elseif (-not $c3.Result.Ok) {
+        Log "C3 | ERROR HTTP $($c3.Result.Status): $($c3.Result.Raw) | latencia=$($c3.LatencyMs) ms"
+        $CASES.Add(@{ Id = "C3"; Outcome = "ERROR"; Class = "infra/modelo"; Latency = $c3.LatencyMs })
+    } else {
+        $respText = if ($null -ne $c3.Result.Body) { $c3.Result.Body.assistantMessage } else { "N/A" }
+        $cartDump = ($cartAfter.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join ", "
+        Log "C3 | MODEL-FAIL | carrito real [$cartDump] esperado [$BENCH_ALFA_ID=1] | respuesta: $respText | latencia=$($c3.LatencyMs) ms"
+        $CASES.Add(@{ Id = "C3"; Outcome = "MODEL-FAIL"; Class = "modelo: estado del carrito incorrecto"; Latency = $c3.LatencyMs })
+    }
 }
 } catch {
     Log "C3 | ERROR | excepcion: $($_.Exception.Message) | latencia=$($swC3.ElapsedMilliseconds) ms"
@@ -328,9 +360,9 @@ $swC4 = [System.Diagnostics.Stopwatch]::StartNew()
 try {
 $c4 = Invoke-Chat -Token $TOKEN -ConversationId $conv -Message "Que tengo en mi carrito?"
 $cartNow = Get-CartQuantities $TOKEN
-if ($c4.Result.Ok -and $cartNow.ContainsKey($PRODUCT_A_ID) -and $cartNow[$PRODUCT_A_ID] -eq $expectedAfter) {
+if ($c4.Result.Ok -and $cartNow.ContainsKey($BENCH_ALFA_ID) -and $cartNow[$BENCH_ALFA_ID] -eq 1) {
     $text = $c4.Result.Body.assistantMessage
-    $mentionsProduct = $text -match "Deslactosada|deslactosada"
+    $mentionsProduct = $text -match "Bench|Alfa"
     Log "respuesta: $text"
     if ($mentionsProduct) {
         Log "C4 | SUCCESS | respuesta consistente con estado real | latencia=$($c4.LatencyMs) ms"
@@ -358,7 +390,7 @@ $text5 = ""
 if ($c5.Result.Ok) { $text5 = $c5.Result.Body.assistantMessage; Log "respuesta: $text5" } else { Log "HTTP $($c5.Result.Status): $($c5.Result.Raw) | latencia=$($c5.LatencyMs) ms" }
 $inventedPrice = $text5 -match "\$\s?\d|\d+\s?(mil|pesos)"
 $cartUnchanged = $true
-if (-not $cartAfter5.ContainsKey($PRODUCT_A_ID) -or $cartAfter5[$PRODUCT_A_ID] -lt $expectedAfter) { $cartUnchanged = $false }
+if (-not $cartAfter5.ContainsKey($BENCH_ALFA_ID) -or $cartAfter5[$BENCH_ALFA_ID] -lt 1) { $cartUnchanged = $false }
 $noInvent = ($text5 -match "no (encontre|encontr)|no (tengo|contamos)|sin resultados|no disponible|no hay") -and -not ($text5 -match "Agregad[oa]|agregue|agregado al carrito")
 if ($c5.Result.Ok -and $noInvent -and $text5 -notmatch "unicornio.*(hay|disponible|tenemos).*\d") {
     Log "C5 | SUCCESS | communicate no-encontrado sin inventar | latencia=$($c5.LatencyMs) ms"
@@ -386,14 +418,21 @@ $cartDelta6 = 0
 foreach ($k in $cartPost6.Keys) { $before = 0; if ($cartPre6.ContainsKey($k)) { $before = $cartPre6[$k] }; $cartDelta6 += ($cartPost6[$k] - $before) }
 $text6 = ""
 if ($c6.Result.Ok) { $text6 = $c6.Result.Body.assistantMessage; Log "respuesta: $text6" } else { Log "HTTP $($c6.Result.Status): $($c6.Result.Raw) | latencia=$($c6.LatencyMs) ms" }
-if ($c6.Result.Ok -and $cartDelta6 -eq 0 -and ($text6 -match "\?" -or $text6 -match "(?i)(cual|cuales|aclar|especifica|referir)")) {
-    Log "C6 | SUCCESS | pidio aclaracion sin mutar el carrito | latencia=$($c6.LatencyMs) ms"
+$t6n = $text6.ToLower().Replace("í","i").Replace("á","a").Replace("é","e").Replace("ó","o").Replace("ú","u")
+$candidatesMentioned = @($leches | Where-Object {
+    $token = if ($_.brand) { $_.brand } else { $_.name }
+    $token -and $t6n -match [regex]::Escape($token.ToLower())
+} | Select-Object -ExpandProperty id -Unique)
+$multiEvidence = $candidatesMentioned.Count -ge 2
+$invitation = ($t6n -match "\?") -or ($t6n -match "(?i)(indicame|prefier|elig|escog|opcion|elija|selecciona|dime cual)")
+if ($c6.Result.Ok -and $cartDelta6 -eq 0 -and $multiEvidence -and $invitation) {
+    Log "C6 | SUCCESS | pidio elegir entre $($candidatesMentioned.Count) candidatos (multi-option) sin mutar el carrito | latencia=$($c6.LatencyMs) ms"
     $CASES.Add(@{ Id = "C6"; Outcome = "SUCCESS"; Class = "-"; Latency = $c6.LatencyMs })
 } elseif ($c6.Result.Ok -and $cartDelta6 -ne 0) {
     Log "C6 | MODEL-FAIL | asumio arbitrariamente: carrito delta=$cartDelta6 sin aclaracion | latencia=$($c6.LatencyMs) ms"
     $CASES.Add(@{ Id = "C6"; Outcome = "MODEL-FAIL"; Class = "modelo: desambiguacion ignorada"; Latency = $c6.LatencyMs })
 } elseif ($c6.Result.Ok) {
-    Log "C6 | MODEL-FAIL | no pidio aclaracion ni actuo (ambiguo) | latencia=$($c6.LatencyMs) ms"
+    Log "C6 | MODEL-FAIL | no evidencio ambiguedad (candidatos=$($candidatesMentioned.Count)) ni actuo | latencia=$($c6.LatencyMs) ms"
     $CASES.Add(@{ Id = "C6"; Outcome = "MODEL-FAIL"; Class = "modelo"; Latency = $c6.LatencyMs })
 } else {
     Log "C6 | ERROR HTTP $($c6.Result.Status) | latencia=$($c6.LatencyMs) ms"

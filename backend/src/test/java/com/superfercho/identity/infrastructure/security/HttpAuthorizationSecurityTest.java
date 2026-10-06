@@ -793,13 +793,13 @@ class HttpAuthorizationSecurityTest {
     }
 
     @Test
-    void shouldRejectAssistantChatWithoutJwt() throws Exception {
+    void shouldAllowVisitorAssistantChat() throws Exception {
         mockMvc.perform(post("/api/v1/assistant/chat")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"message": "hola"}
                                 """))
-                .andExpect(unauthenticated());
+                .andExpect(notBlockedBySecurity());
     }
 
     @Test
@@ -833,6 +833,38 @@ class HttpAuthorizationSecurityTest {
                                 {"message": "hola"}
                                 """))
                 .andExpect(unauthenticated());
+    }
+
+    @Test
+    void shouldRejectVisitorClaimConversation() throws Exception {
+        mockMvc.perform(post("/api/v1/assistant/conversations/{conversationId}/claim", DOCUMENT_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"visitorToken": "cualquier-token"}
+                                """))
+                .andExpect(unauthenticated());
+    }
+
+    @Test
+    void shouldRejectAdminClaimConversation() throws Exception {
+        mockMvc.perform(post("/api/v1/assistant/conversations/{conversationId}/claim", DOCUMENT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"visitorToken": "cualquier-token"}
+                                """))
+                .andExpect(accessDenied());
+    }
+
+    @Test
+    void shouldAllowCustomerClaimConversationPastSecurity() throws Exception {
+        mockMvc.perform(post("/api/v1/assistant/conversations/{conversationId}/claim", DOCUMENT_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"visitorToken": "cualquier-token"}
+                                """))
+                .andExpect(notBlockedBySecurity());
     }
 
     private String bearer(Role role) {
