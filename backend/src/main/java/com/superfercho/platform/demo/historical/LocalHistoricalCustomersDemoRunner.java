@@ -4,12 +4,14 @@ import com.superfercho.catalog.application.port.ProductRepository;
 import com.superfercho.catalog.application.port.ProductVariantRepository;
 import com.superfercho.catalog.domain.model.Product;
 import com.superfercho.identity.application.port.AddressRepository;
+import com.superfercho.identity.application.port.CustomerRecordRepository;
 import com.superfercho.identity.application.port.PasswordHasher;
 import com.superfercho.identity.application.port.PasswordRecoveryTokenRepository;
 import com.superfercho.identity.application.port.UserRepository;
 import com.superfercho.identity.application.validation.CustomerRegistrationRules;
 import com.superfercho.identity.domain.model.Address;
 import com.superfercho.identity.domain.model.AddressStatus;
+import com.superfercho.identity.domain.model.CustomerRecord;
 import com.superfercho.identity.domain.model.Role;
 import com.superfercho.identity.domain.model.User;
 import com.superfercho.identity.domain.model.UserStatus;
@@ -66,6 +68,11 @@ import org.springframework.stereotype.Component;
  *
  * <p>Physical cleanup + recreate (idempotent). Does not touch Product.stock, checkout,
  * lifecycle jobs, cancel/refund use cases, or the catalog demo runner.
+ *
+ * <p>CustomerRecord is resolved by document the same way as
+ * {@link com.superfercho.identity.application.usecase.RegisterCustomerUseCase}: reuse the
+ * existing commercial record when present; otherwise create one. Demo Users are always
+ * saved with {@code customerRecordId} set.
  */
 @Component
 @Profile("local")
@@ -78,6 +85,7 @@ public class LocalHistoricalCustomersDemoRunner implements ApplicationRunner {
     private static final Duration CANCELLED_LAG = Duration.ofMinutes(1);
 
     private final UserRepository userRepository;
+    private final CustomerRecordRepository customerRecordRepository;
     private final AddressRepository addressRepository;
     private final PasswordHasher passwordHasher;
     private final PasswordRecoveryTokenRepository passwordRecoveryTokenRepository;
@@ -94,6 +102,7 @@ public class LocalHistoricalCustomersDemoRunner implements ApplicationRunner {
 
     public LocalHistoricalCustomersDemoRunner(
             UserRepository userRepository,
+            CustomerRecordRepository customerRecordRepository,
             AddressRepository addressRepository,
             PasswordHasher passwordHasher,
             PasswordRecoveryTokenRepository passwordRecoveryTokenRepository,
@@ -108,6 +117,7 @@ public class LocalHistoricalCustomersDemoRunner implements ApplicationRunner {
             Clock clock,
             @Value("${superfercho.dev.demo-seed.enabled:true}") boolean enabled) {
         this.userRepository = userRepository;
+        this.customerRecordRepository = customerRecordRepository;
         this.addressRepository = addressRepository;
         this.passwordHasher = passwordHasher;
         this.passwordRecoveryTokenRepository = passwordRecoveryTokenRepository;
@@ -246,6 +256,7 @@ public class LocalHistoricalCustomersDemoRunner implements ApplicationRunner {
     }
 
     private User createCustomer(CustomerSpec spec, String passwordHash, Instant now) {
+        UUID customerRecordId = resolveCustomerRecordId(spec, now);
         User user = User.create(
                 UUID.randomUUID(),
                 HistoricalDemoBlueprint.DOCUMENT_TYPE,
@@ -257,9 +268,33 @@ public class LocalHistoricalCustomersDemoRunner implements ApplicationRunner {
                 passwordHash,
                 Role.CUSTOMER,
                 UserStatus.ACTIVE,
+                customerRecordId,
+                null,
                 now,
                 now);
         return userRepository.save(user);
+    }
+
+    /**
+     * Mirrors {@code RegisterCustomerUseCase}: reuse the commercial record by document when it
+     * already exists (e.g. V17 backfill / prior seed); never overwrite billing fields; create only
+     * when missing. CustomerRecords are not deleted by {@link #cleanupDemoCustomers()}.
+     */
+    private UUID resolveCustomerRecordId(CustomerSpec spec, Instant now) {
+        Optional<CustomerRecord> existing = customerRecordRepository.findByDocument(
+                HistoricalDemoBlueprint.DOCUMENT_TYPE, spec.documentNumber());
+        if (existing.isPresent()) {
+            return existing.get().id();
+        }
+        CustomerRecord created = customerRecordRepository.save(CustomerRecord.create(
+                UUID.randomUUID(),
+                HistoricalDemoBlueprint.DOCUMENT_TYPE,
+                spec.documentNumber(),
+                spec.firstName(),
+                spec.lastName(),
+                now,
+                now));
+        return created.id();
     }
 
     private Address createAddresses(User user, CustomerSpec spec, Instant now) {
@@ -391,6 +426,7 @@ public class LocalHistoricalCustomersDemoRunner implements ApplicationRunner {
                 createdAt,
                 createdAt,
                 null,
+                updatedAt,
                 updatedAt);
         orderRepository.save(order);
     }
@@ -442,6 +478,7 @@ public class LocalHistoricalCustomersDemoRunner implements ApplicationRunner {
                 createdAt,
                 null,
                 cancelledAt,
+                null,
                 cancelledAt);
         orderRepository.save(order);
     }

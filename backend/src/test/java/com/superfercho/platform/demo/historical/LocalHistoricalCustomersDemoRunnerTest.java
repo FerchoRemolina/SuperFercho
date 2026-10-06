@@ -15,12 +15,14 @@ import com.superfercho.identity.application.dto.AuthenticateUserCommand;
 import com.superfercho.identity.application.dto.AuthenticationResult;
 import com.superfercho.identity.application.fakes.FakePasswordHasher;
 import com.superfercho.identity.application.fakes.InMemoryAddressRepository;
+import com.superfercho.identity.application.fakes.InMemoryCustomerRecordRepository;
 import com.superfercho.identity.application.fakes.InMemoryPasswordRecoveryTokenRepository;
 import com.superfercho.identity.application.fakes.InMemoryUserRepository;
 import com.superfercho.identity.application.port.AccessTokenIssuer;
 import com.superfercho.identity.application.port.IssuedAccessToken;
 import com.superfercho.identity.application.usecase.AuthenticateUserUseCase;
 import com.superfercho.identity.application.validation.CustomerRegistrationRules;
+import com.superfercho.identity.domain.model.CustomerRecord;
 import com.superfercho.identity.domain.model.Role;
 import com.superfercho.identity.domain.model.User;
 import com.superfercho.identity.domain.model.UserStatus;
@@ -68,6 +70,7 @@ class LocalHistoricalCustomersDemoRunnerTest {
     private static final UUID TYPE_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
     private InMemoryUserRepository userRepository;
+    private InMemoryCustomerRecordRepository customerRecordRepository;
     private InMemoryAddressRepository addressRepository;
     private FakePasswordHasher passwordHasher;
     private InMemoryPasswordRecoveryTokenRepository tokenRepository;
@@ -85,6 +88,7 @@ class LocalHistoricalCustomersDemoRunnerTest {
     @BeforeEach
     void setUp() {
         userRepository = new InMemoryUserRepository();
+        customerRecordRepository = new InMemoryCustomerRecordRepository();
         addressRepository = new InMemoryAddressRepository();
         passwordHasher = new FakePasswordHasher();
         tokenRepository = new InMemoryPasswordRecoveryTokenRepository();
@@ -100,6 +104,7 @@ class LocalHistoricalCustomersDemoRunnerTest {
         initialStock = snapshotStock();
         runner = new LocalHistoricalCustomersDemoRunner(
                 userRepository,
+                customerRecordRepository,
                 addressRepository,
                 passwordHasher,
                 tokenRepository,
@@ -123,6 +128,7 @@ class LocalHistoricalCustomersDemoRunnerTest {
         assertEquals(32, result.orders());
         assertEquals(32, result.delivered() + result.cancelled());
         assertEquals(10, countDemoCustomers());
+        assertEquals(10, countDemoCustomerRecords());
         assertEquals(32, orderRepository.all().size());
         assertEquals(
                 0,
@@ -133,6 +139,16 @@ class LocalHistoricalCustomersDemoRunnerTest {
         assertTrue(orderRepository.all().stream()
                 .allMatch(order -> order.items().stream()
                         .allMatch(item -> productRepository.findById(item.productId()).isPresent())));
+        for (var spec : HistoricalDemoBlueprint.customers()) {
+            User user = userRepository.findByEmail(spec.email()).orElseThrow();
+            assertTrue(user.customerRecordId() != null);
+            assertEquals(
+                    customerRecordRepository
+                            .findByDocument(HistoricalDemoBlueprint.DOCUMENT_TYPE, spec.documentNumber())
+                            .orElseThrow()
+                            .id(),
+                    user.customerRecordId());
+        }
         assertEquals(initialStock, snapshotStock());
         assertEquals(HistoricalDemoBlueprint.PASSWORD, passwordHasher.lastRawPassword());
         assertEquals("SuperF123!", HistoricalDemoBlueprint.PASSWORD);
@@ -144,6 +160,7 @@ class LocalHistoricalCustomersDemoRunnerTest {
         BCryptPasswordHasher bcrypt = new BCryptPasswordHasher(new BCryptPasswordEncoder());
         LocalHistoricalCustomersDemoRunner bcryptRunner = new LocalHistoricalCustomersDemoRunner(
                 userRepository,
+                customerRecordRepository,
                 addressRepository,
                 bcrypt,
                 tokenRepository,
@@ -200,6 +217,42 @@ class LocalHistoricalCustomersDemoRunnerTest {
         assertEquals(initialStock, snapshotStock());
     }
 
+    @Test
+    void shouldLinkEachDemoUserToExistingCustomerRecordByDocument() {
+        Map<String, UUID> preexistingRecordIds = new LinkedHashMap<>();
+        for (var spec : HistoricalDemoBlueprint.customers()) {
+            UUID recordId = UUID.randomUUID();
+            preexistingRecordIds.put(spec.documentNumber(), recordId);
+            customerRecordRepository.save(CustomerRecord.create(
+                    recordId,
+                    HistoricalDemoBlueprint.DOCUMENT_TYPE,
+                    spec.documentNumber(),
+                    "Billing",
+                    "Preserved",
+                    NOW.minusSeconds(3600),
+                    NOW.minusSeconds(3600)));
+        }
+
+        runner.seed();
+        runner.seed();
+
+        assertEquals(10, countDemoCustomerRecords());
+        for (var spec : HistoricalDemoBlueprint.customers()) {
+            User user = userRepository.findByEmail(spec.email()).orElseThrow();
+            assertEquals(UserStatus.ACTIVE, user.status());
+            assertEquals(spec.documentNumber(), user.documentNumber());
+            assertEquals(spec.phone(), user.phone());
+            assertEquals(preexistingRecordIds.get(spec.documentNumber()), user.customerRecordId());
+
+            CustomerRecord record = customerRecordRepository
+                    .findByDocument(HistoricalDemoBlueprint.DOCUMENT_TYPE, spec.documentNumber())
+                    .orElseThrow();
+            assertEquals(preexistingRecordIds.get(spec.documentNumber()), record.id());
+            assertEquals("Billing", record.billingFirstName());
+            assertEquals("Preserved", record.billingLastName());
+        }
+    }
+
     private void seedCatalogFromDataset() {
         Map<String, DatasetProduct> dataset = LocalDemoDataRunner.loadDatasetProducts().stream()
                 .collect(java.util.stream.Collectors.toMap(DatasetProduct::id, item -> item, (a, b) -> a));
@@ -249,6 +302,14 @@ class LocalHistoricalCustomersDemoRunnerTest {
     private long countDemoCustomers() {
         return HistoricalDemoBlueprint.customers().stream()
                 .filter(spec -> userRepository.findByEmail(spec.email()).isPresent())
+                .count();
+    }
+
+    private long countDemoCustomerRecords() {
+        return HistoricalDemoBlueprint.customers().stream()
+                .filter(spec -> customerRecordRepository
+                        .findByDocument(HistoricalDemoBlueprint.DOCUMENT_TYPE, spec.documentNumber())
+                        .isPresent())
                 .count();
     }
 
@@ -437,7 +498,7 @@ class LocalHistoricalCustomersDemoRunnerTest {
         }
 
         @Override
-        public Optional<Order> saveIfConfirmed(Order order) {
+        public Optional<Order> saveIfCurrent(Order order, OrderStatus fromStatus) {
             throw new UnsupportedOperationException();
         }
 
@@ -472,14 +533,10 @@ class LocalHistoricalCustomersDemoRunnerTest {
         }
 
         @Override
-        public PagedResult<Order> findAll(PageRequest pageRequest) {
-            return page(List.copyOf(orders.values()), pageRequest);
-        }
-
-        @Override
-        public PagedResult<Order> findByStatuses(List<OrderStatus> statuses, PageRequest pageRequest) {
+        public PagedResult<Order> findByAdminFilter(
+                com.superfercho.orders.application.dto.AdminOrderFilter filter, PageRequest pageRequest) {
             List<Order> items = orders.values().stream()
-                    .filter(order -> statuses.contains(order.status()))
+                    .filter(order -> !filter.hasStatuses() || filter.statuses().contains(order.status()))
                     .toList();
             return page(items, pageRequest);
         }
@@ -514,8 +571,13 @@ class LocalHistoricalCustomersDemoRunnerTest {
         }
 
         @Override
-        public List<com.superfercho.orders.application.dto.AdminOrderStatusCountRow> countByStatusBetween(
+        public com.superfercho.orders.application.dto.AdminBusinessPeriodRow summarizeBusinessPeriod(
                 Instant fromInclusive, Instant toExclusive) {
+            return new com.superfercho.orders.application.dto.AdminBusinessPeriodRow(0, 0, java.math.BigDecimal.ZERO, 0);
+        }
+
+        @Override
+        public List<Order> findDeliveredBetween(Instant fromInclusive, Instant toExclusive) {
             return List.of();
         }
 
@@ -527,6 +589,12 @@ class LocalHistoricalCustomersDemoRunnerTest {
 
         @Override
         public List<com.superfercho.orders.application.dto.AdminCustomerSalesRow> findTopCustomersByTotal(
+                Instant fromInclusive, Instant toExclusive, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public List<com.superfercho.orders.application.dto.AdminCustomerSalesRow> findTopCustomersByOrders(
                 Instant fromInclusive, Instant toExclusive, int limit) {
             return List.of();
         }
