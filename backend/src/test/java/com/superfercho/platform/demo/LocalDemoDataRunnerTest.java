@@ -29,6 +29,7 @@ import com.superfercho.catalog.application.usecase.CreateProductUseCase;
 import com.superfercho.catalog.application.usecase.CreateProductVariantUseCase;
 import com.superfercho.catalog.application.usecase.DeactivateProductUseCase;
 import com.superfercho.catalog.domain.model.Category;
+import com.superfercho.catalog.domain.model.CategoryIcon;
 import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.domain.model.Presentation;
 import com.superfercho.catalog.domain.model.PresentationUnit;
@@ -193,7 +194,7 @@ class LocalDemoDataRunnerTest {
         when(productVariantRepository.findByIds(any())).thenReturn(almostComplete.variants());
         when(categoryRepository.findAll())
                 .thenReturn(List.of(Category.create(
-                        categoryId, sf127.category(), null, CategoryStatus.ACTIVE, NOW, NOW)));
+                        categoryId, sf127.category(), null, CategoryIcon.OTHER, CategoryStatus.ACTIVE, NOW, NOW)));
         when(productTypeRepository.findByCategoryId(categoryId))
                 .thenReturn(List.of(ProductType.create(
                         productTypeId,
@@ -326,7 +327,7 @@ class LocalDemoDataRunnerTest {
                         UUID.randomUUID(),
                         "Categoria",
                         null,
-                        com.superfercho.catalog.domain.model.CategoryStatus.ACTIVE,
+                        com.superfercho.catalog.domain.model.CategoryIcon.OTHER, com.superfercho.catalog.domain.model.CategoryStatus.ACTIVE,
                         NOW,
                         NOW));
         when(productTypeRepository.save(any(ProductType.class)))
@@ -413,7 +414,7 @@ class LocalDemoDataRunnerTest {
                         UUID.randomUUID(),
                         "Categoria",
                         null,
-                        com.superfercho.catalog.domain.model.CategoryStatus.ACTIVE,
+                        com.superfercho.catalog.domain.model.CategoryIcon.OTHER, com.superfercho.catalog.domain.model.CategoryStatus.ACTIVE,
                         NOW,
                         NOW));
         when(productTypeRepository.save(any(ProductType.class)))
@@ -482,7 +483,7 @@ class LocalDemoDataRunnerTest {
                         UUID.randomUUID(),
                         "Categoria",
                         null,
-                        com.superfercho.catalog.domain.model.CategoryStatus.ACTIVE,
+                        com.superfercho.catalog.domain.model.CategoryIcon.OTHER, com.superfercho.catalog.domain.model.CategoryStatus.ACTIVE,
                         NOW,
                         NOW));
         when(productTypeRepository.save(any(ProductType.class)))

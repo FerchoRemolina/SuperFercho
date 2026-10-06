@@ -12,6 +12,7 @@ import com.superfercho.catalog.application.port.ProductRepository;
 import com.superfercho.catalog.application.port.ProductTypeRepository;
 import com.superfercho.catalog.application.port.ProductVariantRepository;
 import com.superfercho.catalog.application.usecase.FindProductPriceUseCase;
+import com.superfercho.catalog.domain.model.CategoryIcon;
 import com.superfercho.catalog.domain.model.Category;
 import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.domain.model.Presentation;
@@ -212,7 +213,7 @@ class InactiveProductShoppingAvailabilityTest {
     }
 
     private static Category category(CategoryStatus status) {
-        return Category.create(CATEGORY_ID, "Lácteos", null, status, CREATED_AT, CREATED_AT);
+        return Category.create(CATEGORY_ID, "Lácteos", null, CategoryIcon.OTHER, status, CREATED_AT, CREATED_AT);
     }
 
     private static Product product(ProductStatus status) {

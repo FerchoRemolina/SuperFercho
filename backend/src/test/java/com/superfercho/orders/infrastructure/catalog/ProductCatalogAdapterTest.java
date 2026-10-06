@@ -13,6 +13,7 @@ import com.superfercho.catalog.application.port.ProductRepository;
 import com.superfercho.catalog.application.port.ProductTypeRepository;
 import com.superfercho.catalog.application.port.ProductVariantRepository;
 import com.superfercho.catalog.application.usecase.FindProductPriceUseCase;
+import com.superfercho.catalog.domain.model.CategoryIcon;
 import com.superfercho.catalog.domain.model.Category;
 import com.superfercho.catalog.domain.model.CategoryStatus;
 import com.superfercho.catalog.domain.model.Presentation;
@@ -179,7 +180,7 @@ class ProductCatalogAdapterTest {
     }
 
     private static Category category(CategoryStatus status) {
-        return Category.create(CATEGORY_ID, "Lácteos", null, status, NOW, NOW);
+        return Category.create(CATEGORY_ID, "Lácteos", null, CategoryIcon.OTHER, status, NOW, NOW);
     }
 
     private static Product product(UUID id, ProductStatus status, int stock) {
