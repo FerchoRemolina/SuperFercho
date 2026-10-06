@@ -288,6 +288,9 @@ export function AdminCategoriesPageContent() {
     /* Contenido ~12% más ancho que max-w-7xl: más aire para la tabla sin
        perder los márgenes laterales ni el fondo visible. */
     <main className="mx-auto w-full max-w-[90rem] px-4 py-6 md:px-8 md:py-8">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-sf-muted">
+        Inventario
+      </p>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <span

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  analyticsSalesKpis,
   analyticsShortRangeLabel,
   isValidAnalyticsDateInput,
   resolveAnalyticsPeriod,
@@ -166,5 +167,56 @@ describe("mergeAdminProductsFilters (filtro Categoria - Todas)", () => {
     );
     expect(merged.categoryId).toBe("cat-2");
     expect(merged.status).toBeUndefined();
+  });
+});
+
+describe("analyticsSalesKpis (monto de ventas por bucket)", () => {
+  const points = [
+    { label: "25 may", value: 0 },
+    { label: "26 may", value: 85 },
+    { label: "27 may", value: 35 },
+  ];
+
+  it("deriva mejor día, menor día y promedio incluyendo buckets en cero", () => {
+    const kpis = analyticsSalesKpis(points, "DAY");
+    expect(kpis).not.toBeNull();
+    expect(kpis?.best).toEqual({
+      label: "Mejor día",
+      detail: "26 may",
+      value: 85,
+    });
+    expect(kpis?.worst).toEqual({
+      label: "Menor día",
+      detail: "25 may",
+      value: 0,
+    });
+    expect(kpis?.averageValue).toBeCloseTo(40, 5);
+    expect(kpis?.averageLabel).toBe("Promedio diario");
+  });
+
+  it("usa etiquetas por granularidad (hora/mes) y calcula promedio", () => {
+    const hourly = analyticsSalesKpis(
+      [
+        { label: "08:00", value: 10 },
+        { label: "09:00", value: 30 },
+      ],
+      "HOUR",
+    );
+    expect(hourly?.best.label).toBe("Mejor hora");
+    expect(hourly?.worst.label).toBe("Menor hora");
+    expect(hourly?.averageLabel).toBe("Promedio por hora");
+    expect(hourly?.averageValue).toBe(20);
+
+    const monthly = analyticsSalesKpis(
+      [{ label: "ene 2026", value: 900 }],
+      "MONTH",
+    );
+    expect(monthly?.best.label).toBe("Mejor mes");
+    expect(monthly?.worst.label).toBe("Menor mes");
+    expect(monthly?.averageValue).toBe(900);
+  });
+
+  it("devuelve null sin buckets", () => {
+    expect(analyticsSalesKpis([], "DAY")).toBeNull();
   });
 });

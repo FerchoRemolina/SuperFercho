@@ -17,9 +17,11 @@ import {
 } from "@/features/admin/hooks";
 import {
   analyticsPresetLabel,
+  analyticsSalesKpis,
   analyticsShortRangeLabel,
   isValidAnalyticsDateInput,
   resolveAnalyticsPeriod,
+  type AnalyticsGranularity,
   type AnalyticsPresetId,
   type AnalyticsPeriodSelection,
 } from "@/features/admin/analytics-period";
@@ -357,6 +359,7 @@ export function AnalyticsCard() {
         <AnalyticsBody
           metricId={metricId}
           periodLabel={resolvedPeriod.label}
+          granularity={resolvedPeriod.granularity}
           isSeries={isSeries}
           salesSeriesQuery={salesSeriesQuery}
           newCustomersQuery={newCustomersQuery}
@@ -372,6 +375,7 @@ export function AnalyticsCard() {
 function AnalyticsBody({
   metricId,
   periodLabel,
+  granularity,
   isSeries,
   salesSeriesQuery,
   newCustomersQuery,
@@ -381,6 +385,7 @@ function AnalyticsBody({
 }: {
   metricId: AnalyticsMetricId;
   periodLabel: string;
+  granularity: AnalyticsGranularity;
   isSeries: boolean;
   salesSeriesQuery: ReturnType<typeof useAdminAnalyticsSalesQuery>;
   newCustomersQuery: ReturnType<typeof useAdminAnalyticsNewCustomersQuery>;
@@ -439,6 +444,9 @@ function AnalyticsBody({
     if (points.length === 0 || total === 0) {
       return <EmptyState />;
     }
+    const kpis = isSales
+      ? analyticsSalesKpis(points, granularity)
+      : null;
     return (
       <AnalyticsResult
         headline={isSales ? analyticsMoney(total) : String(total)}
@@ -450,6 +458,24 @@ function AnalyticsBody({
           mode={isSales ? "area" : "bars"}
           formatValue={isSales ? analyticsMoney : String}
         />
+        {kpis ? (
+          <div className="grid gap-2 sm:grid-cols-3">
+            <SalesKpiTile
+              label={kpis.best.label}
+              detail={kpis.best.detail}
+              value={analyticsMoney(kpis.best.value)}
+            />
+            <SalesKpiTile
+              label={kpis.worst.label}
+              detail={kpis.worst.detail}
+              value={analyticsMoney(kpis.worst.value)}
+            />
+            <SalesKpiTile
+              label={kpis.averageLabel}
+              value={analyticsMoney(kpis.averageValue)}
+            />
+          </div>
+        ) : null}
       </AnalyticsResult>
     );
   }
@@ -516,6 +542,28 @@ function RankingSkeleton() {
     <div className="px-4 py-4 md:px-5">
       <HeadlineSkeleton />
       <Skeleton className="h-48 w-full md:h-56" />
+    </div>
+  );
+}
+
+function SalesKpiTile({
+  label,
+  detail,
+  value,
+}: {
+  label: string;
+  detail?: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-lg bg-sf-bg px-3 py-2.5">
+      <p className="text-xs font-semibold text-sf-muted">{label}</p>
+      <p className="mt-0.5 text-sm font-bold tabular-nums text-sf-ink">
+        {value}
+      </p>
+      {detail ? (
+        <p className="mt-0.5 text-xs text-sf-muted">{detail}</p>
+      ) : null}
     </div>
   );
 }

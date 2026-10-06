@@ -188,10 +188,6 @@ export function AdminCategoryDetailPageContent({
 
         <AdminProductTypeSection categoryId={category.id} />
       </div>
-
-      <div className="mt-8">
-        <BackLink href="/admin/categories" />
-      </div>
     </Container>
   );
 }

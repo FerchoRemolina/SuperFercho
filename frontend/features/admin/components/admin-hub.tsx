@@ -9,15 +9,15 @@ import {
   getAdminProduct,
   getAdminProductVariant,
   type AdminProduct,
-  type OrderStatus,
 } from "@/features/admin/api";
 import {
+  useAdminBusinessSummaryQuery,
   useAdminOrdersQuery,
   useAdminProductsQuery,
   useAdminRecentBuyersQuery,
-  useAdminSalesPeriodSummaryQuery,
 } from "@/features/admin/hooks";
 import { AnalyticsCard } from "@/features/admin/components/admin-analytics-card";
+import { resolveAnalyticsPeriod } from "@/features/admin/analytics-period";
 import {
   adminInventoryHref,
   adminOrderDetailHref,
@@ -30,7 +30,7 @@ import {
   withDisambiguatedRecentlySoldLabels,
 } from "@/features/admin/presentation";
 import { orderStatusLabel } from "@/features/orders/api";
-import { formatMoney, type Money } from "@/shared/money/money";
+import { formatMoney } from "@/shared/money/money";
 import { useSession } from "@/shared/session/session-provider";
 import { buttonClassName } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
@@ -49,12 +49,6 @@ const RECENT_BUYERS_LIMIT = 5;
 const SOLD_SAMPLE_SIZE = 20;
 const SOLD_RANK_LIMIT = 5;
 
-const IN_PROCESS_ORDER_STATUSES: readonly OrderStatus[] = [
-  "CONFIRMED",
-  "PREPARING",
-  "DELIVERY",
-] as const;
-
 export function AdminHub() {
   return (
     <main className="px-4 py-4 md:px-8 md:py-5">
@@ -63,8 +57,7 @@ export function AdminHub() {
           Inicio
         </h1>
         <p className="mt-1 text-sm leading-relaxed text-sf-muted md:text-[0.95rem]">
-          Centro operativo de SuperFercho: inventario, pedidos, ventas del
-          período y clientes con compras recientes.
+          Resumen operativo de inventario, pedidos, ventas y clientes.
         </p>
       </header>
 
@@ -223,70 +216,46 @@ function MetricTile({
 
 /**
  * C. Resumen general: estado real de la operación con datos del API.
- * - "En proceso" = CONFIRMED + PREPARING + DELIVERY (activos, sin entregar ni
- *   cancelar). Los conteos de pedidos son totales acumulados (no existe hoy
- *   un endpoint de conteos por período); ventas es la cifra de la semana.
- * Pendientes futuros (sin endpoint hoy): conteos por período, KPI de pagos.
+ * - "En proceso" = estado ACTUAL (CONFIRMED + PREPARING + DELIVERY), sin rango.
+ * - Entregados / Cancelados / Ventas = "Esta semana" (lunes 00:00 → ahora,
+ *   America/Bogota). Ventas solo reconoce órdenes DELIVERED (por delivered_at);
+ *   el PaymentStatus (p. ej. COD + PENDING) no afecta.
  */
 function BusinessSummaryStrip() {
-  const inProcessQuery = useAdminOrdersQuery({
-    page: 0,
-    size: 1,
-    status: [...IN_PROCESS_ORDER_STATUSES],
-  });
-  const deliveredQuery = useAdminOrdersQuery({
-    page: 0,
-    size: 1,
-    status: ["DELIVERED"],
-  });
-  const cancelledQuery = useAdminOrdersQuery({
-    page: 0,
-    size: 1,
-    status: ["CANCELLED"],
-  });
-  const weekSalesQuery = useAdminSalesPeriodSummaryQuery("WEEK");
+  const week = resolveAnalyticsPeriod({ kind: "preset", id: "thisWeek" });
+  const summaryQuery = useAdminBusinessSummaryQuery(week.from, week.to);
+  const summary = summaryQuery.data;
 
-  const weekTotal = useMemo(
-    () =>
-      (weekSalesQuery.data?.buckets ?? []).reduce(
-        (sum, bucket) => sum + moneyAmount(bucket.total),
-        0,
-      ),
-    [weekSalesQuery.data?.buckets],
-  );
-
-  function orderCount(
-    query: typeof inProcessQuery | typeof deliveredQuery | typeof cancelledQuery,
-  ): string | null {
+  function count(query: typeof summaryQuery, value: number): string | null {
     if (query.isPending) {
       return null;
     }
-    return query.isError ? "—" : String(query.data?.totalElements ?? 0);
+    return query.isError ? "—" : String(value ?? 0);
   }
 
   const metrics = [
     {
       label: "Pedidos en proceso",
-      value: orderCount(inProcessQuery),
-      caption: "Requieren gestión",
+      value: count(summaryQuery, summary?.inProcessOrders ?? 0),
+      caption: "Ahora",
     },
     {
       label: "Pedidos entregados",
-      value: orderCount(deliveredQuery),
-      caption: "Completados",
+      value: count(summaryQuery, summary?.deliveredOrders ?? 0),
+      caption: "Esta semana",
     },
     {
       label: "Pedidos cancelados",
-      value: orderCount(cancelledQuery),
-      caption: "Cancelados",
+      value: count(summaryQuery, summary?.cancelledOrders ?? 0),
+      caption: "Esta semana",
     },
     {
       label: "Ventas",
-      value: weekSalesQuery.isPending
+      value: summaryQuery.isPending
         ? null
-        : weekSalesQuery.isError
+        : summaryQuery.isError || !summary
           ? "—"
-          : formatMoney({ amount: weekTotal, currency: "COP" }),
+          : formatMoney(summary.sales),
       caption: "Esta semana",
     },
   ];
@@ -708,9 +677,4 @@ function buyerInitials(name: string): string {
     return parts[0]!.slice(0, 2).toUpperCase();
   }
   return `${parts[0]!.charAt(0)}${parts[1]!.charAt(0)}`.toUpperCase();
-}
-
-function moneyAmount(money: Money | { amount: number | string }): number {
-  const raw = money.amount;
-  return typeof raw === "number" ? raw : Number(raw);
 }

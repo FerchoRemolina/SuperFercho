@@ -20,16 +20,13 @@ import {
   validateUpdateAdminProduct,
 } from "@/features/admin/payloads";
 import { formatAdminInstant, adminProductsListHrefFromSearchParams } from "@/features/admin/presentation";
-import { productAvailabilityLabel } from "@/features/catalog/quantity";
 import { ProductImage } from "@/features/catalog/components/product-image";
 import { isApiError } from "@/shared/errors/api-problem";
 import { messageForApiProblem } from "@/shared/errors/messages";
-import { formatMoney } from "@/shared/money/money";
 import { Alert } from "@/shared/ui/alert";
 import { buttonClassName } from "@/shared/ui/button";
 import { BackLink } from "@/shared/ui/back-link";
 import { Card } from "@/shared/ui/card";
-import { Container } from "@/shared/ui/container";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { Skeleton } from "@/shared/ui/skeleton";
 
@@ -76,10 +73,10 @@ export function AdminProductDetailPageContent({
 
   if (productQuery.isPending) {
     return (
-      <Container as="main" className="py-10 md:py-16">
+      <main className="mx-auto w-full max-w-[90rem] px-4 py-6 md:px-8 md:py-8">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="mt-8 h-96 w-full" />
-      </Container>
+      </main>
     );
   }
 
@@ -88,7 +85,7 @@ export function AdminProductDetailPageContent({
       isApiError(productQuery.error) &&
       productQuery.error.problem.code === "PRODUCT_NOT_FOUND";
     return (
-      <Container as="main" className="py-10 md:py-16">
+      <main className="mx-auto w-full max-w-[90rem] px-4 py-6 md:px-8 md:py-8">
         {notFound ? (
           <EmptyState
             title="No encontramos este producto"
@@ -108,21 +105,21 @@ export function AdminProductDetailPageContent({
             )}
           </Alert>
         )}
-      </Container>
+      </main>
     );
   }
 
   if (!product || !values) {
     return (
-      <Container as="main" className="py-10 md:py-16">
+      <main className="mx-auto w-full max-w-[90rem] px-4 py-6 md:px-8 md:py-8">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="mt-8 h-96 w-full" />
-      </Container>
+      </main>
     );
   }
 
   return (
-    <Container as="main" className="py-10 md:py-16">
+    <main className="mx-auto w-full max-w-[90rem] px-4 py-6 md:px-8 md:py-8">
       <BackLink href={listHref} className="mb-4">Volver al listado</BackLink>
 
       {created ? (
@@ -133,69 +130,41 @@ export function AdminProductDetailPageContent({
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-sf-muted">
+            Inventario · Productos
+          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-sf-ink md:text-3xl">
             {product.name}
           </h1>
-          <p className="mt-2 text-base text-sf-muted">
-            {product.brand ?? "Sin marca"}
-            {categoryName ? ` · ${categoryName}` : null}
+          <p className="mt-2 text-sm text-sf-muted">
+            {[product.brand ?? "Sin marca", categoryName]
+              .filter((part): part is string => Boolean(part))
+              .join(" · ")}
+          </p>
+          <p className="mt-1 text-xs text-sf-muted">
+            Creado {formatAdminInstant(product.createdAt)} · Actualizado{" "}
+            {formatAdminInstant(product.updatedAt)}
+            {product.barcode ? ` · Código: ${product.barcode}` : ""}
           </p>
         </div>
         <ProductStatusBadge status={product.status} />
       </div>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,20rem)_1fr]">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[16rem_1fr]">
         <ProductImage
           src={product.imageUrl}
           alt={product.name}
           className="max-w-xs"
         />
-        <div className="grid gap-6">
-          <Card className="grid gap-3 text-sm">
-            <h2 className="text-lg font-semibold text-sf-ink">
-              Información actual
-            </h2>
-            <dl className="grid gap-2 sm:grid-cols-2">
-              <div>
-                <dt className="text-sf-muted">Precio</dt>
-                <dd className="font-semibold text-sf-ink">
-                  {formatMoney(product.price)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sf-muted">Stock</dt>
-                <dd className="font-semibold text-sf-ink">
-                  {product.stock} ·{" "}
-                  {productAvailabilityLabel(product.status, product.stock)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sf-muted">Código de barras</dt>
-                <dd className="text-sf-ink">{product.barcode ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-sf-muted">Creado</dt>
-                <dd className="text-sf-ink">
-                  {formatAdminInstant(product.createdAt)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sf-muted">Actualizado</dt>
-                <dd className="text-sf-ink">
-                  {formatAdminInstant(product.updatedAt)}
-                </dd>
-              </div>
-            </dl>
-          </Card>
-
+        <div className="grid content-start gap-5">
           <ProductPricePanel product={product} />
 
           <ProductStockPanel product={product} />
 
           <Card className="grid gap-4">
-            <h2 className="text-xl font-semibold text-sf-ink">Ficha</h2>
+            <h2 className="text-lg font-semibold text-sf-ink">Ficha</h2>
             {saved ? (
               <p className="text-sm font-semibold text-sf-success">
                 Cambios guardados correctamente.
@@ -233,15 +202,11 @@ export function AdminProductDetailPageContent({
           </Card>
 
           <Card className="grid gap-3">
-            <h2 className="text-xl font-semibold text-sf-ink">Estado</h2>
+            <h2 className="text-lg font-semibold text-sf-ink">Estado</h2>
             <ProductStatusActions product={product} />
           </Card>
         </div>
       </div>
-
-      <div className="mt-8">
-        <BackLink href={listHref} />
-      </div>
-    </Container>
+    </main>
   );
 }

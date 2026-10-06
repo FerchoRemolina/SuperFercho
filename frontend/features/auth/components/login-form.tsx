@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  homePathForRole,
+  landingPathForRole,
   login,
   sessionFromAuthentication,
 } from "@/features/auth/api";
@@ -33,7 +33,7 @@ export function LoginForm() {
 
   useEffect(() => {
     if (session) {
-      router.replace(nextPath ?? homePathForRole(session.role));
+      router.replace(landingPathForRole(session.role, nextPath));
     }
   }, [nextPath, router, session]);
 
@@ -55,7 +55,7 @@ export function LoginForm() {
           // The intent is already cleared; the user can retry from the catalog.
         }
       }
-      router.replace(nextPath ?? homePathForRole(response.role));
+      router.replace(landingPathForRole(response.role, nextPath));
     } catch (cause) {
       if (isApiError(cause)) {
         if (

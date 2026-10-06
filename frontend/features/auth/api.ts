@@ -1,4 +1,5 @@
 import { request } from "@/shared/api/client";
+import { safeNextPath } from "@/shared/auth/safe-next-path";
 import type { Role, Session } from "@/shared/session/session";
 
 /** Mirrors AuthenticateUserRequest. */
@@ -114,4 +115,23 @@ export function sessionFromAuthentication(
 
 export function homePathForRole(role: Role): string {
   return role === "ADMIN" ? "/admin" : "/";
+}
+
+/**
+ * Destino tras autenticarse. Honra `next` solo cuando es compatible con el
+ * rol: un ADMIN no aterriza en contexto CUSTOMER y viceversa.
+ */
+export function landingPathForRole(
+  role: Role,
+  nextPath: string | null | undefined,
+): string {
+  const next = safeNextPath(nextPath);
+  if (!next) {
+    return homePathForRole(role);
+  }
+  const nextIsAdmin = next.startsWith("/admin");
+  if (role === "ADMIN") {
+    return nextIsAdmin ? next : homePathForRole(role);
+  }
+  return nextIsAdmin ? homePathForRole(role) : next;
 }

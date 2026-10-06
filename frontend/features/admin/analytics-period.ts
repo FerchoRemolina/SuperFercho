@@ -225,3 +225,51 @@ export function analyticsPresetLabel(id: AnalyticsPresetId): string {
       return "Este año";
   }
 }
+
+export type AnalyticsBucketKpi = {
+  label: string;
+  detail: string;
+  value: number;
+};
+
+export type AnalyticsSalesKpis = {
+  best: AnalyticsBucketKpi;
+  worst: AnalyticsBucketKpi;
+  averageLabel: string;
+  averageValue: number;
+};
+
+/**
+ * KPIs de ventas derivados client-side de buckets YA RELLENADOS por backend:
+ * un bucket sin ventas permanece en 0 y participa en el promedio cuando
+ * corresponde al período. KPIs de MONTO: mejor/menor por valor de venta,
+ * no por cantidad de pedidos.
+ */
+export function analyticsSalesKpis(
+  points: readonly { label: string; value: number }[],
+  granularity: AnalyticsGranularity,
+): AnalyticsSalesKpis | null {
+  if (points.length === 0) {
+    return null;
+  }
+  let best = points[0]!;
+  let worst = points[0]!;
+  let total = 0;
+  for (const point of points) {
+    if (point.value > best.value) {
+      best = point;
+    }
+    if (point.value < worst.value) {
+      worst = point;
+    }
+    total += point.value;
+  }
+  const unit = granularity === "HOUR" ? "hora" : granularity === "MONTH" ? "mes" : "día";
+  const averageLabel = granularity === "HOUR" ? "Promedio por hora" : "Promedio diario";
+  return {
+    best: { label: `Mejor ${unit}`, detail: best.label, value: best.value },
+    worst: { label: `Menor ${unit}`, detail: worst.label, value: worst.value },
+    averageLabel,
+    averageValue: total / points.length,
+  };
+}

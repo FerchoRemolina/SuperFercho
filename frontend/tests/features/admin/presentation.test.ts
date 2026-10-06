@@ -7,6 +7,8 @@ import {
   adminKnowledgeHref,
   adminKnowledgeNewHref,
   adminKnowledgeSearchQueryFromSearchParams,
+  adminOrderCustomerPrimaryLabel,
+  adminOrderCustomerSecondaryLabel,
   adminOrderDetailErrorKind,
   adminOrderDetailHref,
   adminOrdersFilterSelectValue,
@@ -41,6 +43,8 @@ import {
   listQueryFromSearchParams,
   parseAdminKnowledgeSearchLimit,
   parseAdminOrderStatus,
+  parseAdminOrdersDateBound,
+  parseAdminOrdersOrderNumber,
   parseAdminOrdersPage,
   parseAdminOrdersStatusFilter,
   partitionAdminStockAttention,
@@ -343,6 +347,79 @@ describe("admin orders presentation", () => {
     );
   });
 
+  it("parses orderNumber search trimming and ignoring blanks", () => {
+    expect(parseAdminOrdersOrderNumber("  ORD-ABC  ")).toBe("ORD-ABC");
+    expect(parseAdminOrdersOrderNumber("   ")).toBeUndefined();
+    expect(parseAdminOrdersOrderNumber(null)).toBeUndefined();
+    expect(
+      adminOrdersListQueryFromSearchParams({ orderNumber: " ORD-1 " })
+        .orderNumber,
+    ).toBe("ORD-1");
+  });
+
+  it("accepts only YYYY-MM-DD date bounds", () => {
+    expect(parseAdminOrdersDateBound("2026-03-01")).toBe("2026-03-01");
+    expect(parseAdminOrdersDateBound(" 2026-03-01 ")).toBe("2026-03-01");
+    expect(parseAdminOrdersDateBound("01/03/2026")).toBeUndefined();
+    expect(parseAdminOrdersDateBound("2026-3-1")).toBeUndefined();
+    expect(parseAdminOrdersDateBound("2026-03-01T05:00:00Z")).toBeUndefined();
+    expect(parseAdminOrdersDateBound("")).toBeUndefined();
+    expect(
+      adminOrdersListQueryFromSearchParams({ from: "2026-03-01", to: "junk" }),
+    ).toEqual({
+      page: 0,
+      size: 20,
+      status: undefined,
+      orderNumber: undefined,
+      from: "2026-03-01",
+      to: undefined,
+    });
+  });
+
+  it("serializes orderNumber and date bounds into the orders href", () => {
+    expect(
+      adminOrdersHref({
+        page: 1,
+        status: "DELIVERED",
+        orderNumber: "ORD-ABC",
+        from: "2026-03-01",
+        to: "2026-04-01",
+      }),
+    ).toBe(
+      "/admin/orders?page=1&status=DELIVERED&orderNumber=ORD-ABC&from=2026-03-01&to=2026-04-01",
+    );
+    expect(
+      adminOrdersHref({ orderNumber: "  ", from: "", to: undefined }),
+    ).toBe("/admin/orders");
+  });
+
+  it("labels the commercial customer without confusing it with the recipient", () => {
+    const resolved = {
+      customer: {
+        fullName: "Ana Gómez",
+        documentType: "CC",
+        documentNumber: "123456789",
+      },
+    };
+    expect(adminOrderCustomerPrimaryLabel(resolved)).toBe("Ana Gómez");
+    expect(adminOrderCustomerSecondaryLabel(resolved)).toBe("CC 123456789");
+
+    const withoutDocument = {
+      customer: { fullName: "Ana Gómez", documentType: null, documentNumber: null },
+    };
+    expect(adminOrderCustomerSecondaryLabel(withoutDocument)).toBeNull();
+
+    const unresolved = { customer: null };
+    expect(adminOrderCustomerPrimaryLabel(unresolved)).toBe("—");
+    expect(adminOrderCustomerSecondaryLabel(unresolved)).toBeNull();
+
+    const blankName = {
+      customer: { fullName: "", documentType: "CC", documentNumber: "1" },
+    };
+    expect(adminOrderCustomerPrimaryLabel(blankName)).toBe("—");
+    expect(adminOrderCustomerSecondaryLabel(blankName)).toBe("CC 1");
+  });
+
   it("maps select values to and from Ventas and single statuses", () => {
     expect(adminOrdersFilterSelectValue(undefined)).toBe("");
     expect(adminOrdersFilterSelectValue("CONFIRMED")).toBe("CONFIRMED");
@@ -568,7 +645,7 @@ describe("admin knowledge presentation", () => {
   });
 
   it("maps payment status tones without inventing REFUNDED", () => {
-    expect(paymentStatusTone("APPROVED")).toBe("primary");
+    expect(paymentStatusTone("APPROVED")).toBe("success");
     expect(paymentStatusTone("PENDING")).toBe("accent");
     expect(paymentStatusTone("DECLINED")).toBe("danger");
   });

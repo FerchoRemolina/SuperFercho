@@ -23,6 +23,7 @@ import { buttonClassName } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import {
   CheckCircleIcon,
+  ChevronIcon,
   PackageIcon,
   WarningIcon,
 } from "@/shared/ui/icons";
@@ -71,21 +72,21 @@ export function AdminStockAttentionPanel({
     >
       <div
         className={cx(
-          "rounded-3xl border border-sf-border/90 bg-sf-bg/90 p-4",
-          "shadow-[0_2px_10px_rgba(23,33,27,0.04)] md:p-6",
+          "rounded-2xl border border-sf-border bg-sf-surface p-4",
+          "shadow-[0_1px_2px_rgba(23,33,27,0.05)] md:p-5",
         )}
       >
         {showHeading ? (
-          <div className="mb-5 flex items-center gap-3 px-1">
+          <div className="mb-4 flex items-center gap-3 px-1">
             <span
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-800 ring-1 ring-amber-200/80"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-800"
               aria-hidden="true"
             >
-              <PackageIcon className="h-6 w-6" />
+              <PackageIcon className="h-5 w-5" />
             </span>
             <h2
               id="admin-stock-heading"
-              className="text-xl font-bold tracking-tight text-sf-ink md:text-2xl"
+              className="text-lg font-semibold text-sf-ink"
             >
               Control de inventario
             </h2>
@@ -117,6 +118,7 @@ export function AdminStockAttentionPanel({
                 emptyMessage={ADMIN_STOCK_LOW_EMPTY_MESSAGE}
                 products={buckets.lowStock}
                 categoriesById={categoriesById}
+                showLink={focus === "all"}
               />
             ) : null}
             {showOut ? (
@@ -127,6 +129,7 @@ export function AdminStockAttentionPanel({
                 emptyMessage={ADMIN_STOCK_OUT_EMPTY_MESSAGE}
                 products={buckets.outOfStock}
                 categoriesById={categoriesById}
+                showLink={focus === "all"}
               />
             ) : null}
           </div>
@@ -143,6 +146,7 @@ function StockAttentionSection({
   emptyMessage,
   products,
   categoriesById,
+  showLink = false,
 }: {
   kind: StockSectionKind;
   title: string;
@@ -150,6 +154,7 @@ function StockAttentionSection({
   emptyMessage: string;
   products: AdminProduct[];
   categoriesById: Map<string, string>;
+  showLink?: boolean;
 }) {
   const isLow = kind === "low";
   const countLabel =
@@ -159,25 +164,16 @@ function StockAttentionSection({
     <Card
       className={cx(
         "overflow-hidden p-0 transition-shadow duration-200 hover:shadow-[0_8px_20px_rgba(23,33,27,0.06)]",
-        isLow
-          ? "border-amber-200/90 bg-amber-50/40 shadow-[0_1px_2px_rgba(181,71,8,0.05)]"
-          : "border-red-200/90 bg-red-50/35 shadow-[0_1px_2px_rgba(217,45,32,0.05)]",
+        "border-sf-border bg-sf-surface shadow-[0_1px_2px_rgba(23,33,27,0.05)]",
       )}
     >
-      <div
-        className={cx(
-          "flex items-center justify-between gap-3 border-b px-4 py-4 md:px-5",
-          isLow
-            ? "border-amber-100/90 bg-amber-50/80"
-            : "border-red-100/90 bg-red-50/70",
-        )}
-      >
+      <div className="flex items-center justify-between gap-3 border-b border-sf-border px-4 py-4 md:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <span
             className={cx(
-              "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
               isLow
-                ? "bg-amber-100 text-amber-700"
+                ? "bg-amber-100 text-amber-800"
                 : "bg-red-100 text-red-700",
             )}
             aria-hidden="true"
@@ -196,8 +192,8 @@ function StockAttentionSection({
           className={cx(
             "inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums",
             isLow
-              ? "bg-amber-100 text-amber-800"
-              : "bg-red-100 text-red-800",
+              ? "bg-amber-50 text-amber-800"
+              : "bg-red-50 text-red-700",
           )}
         >
           {countLabel}
@@ -211,7 +207,7 @@ function StockAttentionSection({
           message={emptyMessage}
         />
       ) : (
-        <ul className="divide-y divide-sf-border/70 bg-sf-surface/90">
+        <ul className="divide-y divide-sf-border/70">
           {products.map((product) => (
             <StockAttentionRow
               key={product.id}
@@ -222,6 +218,21 @@ function StockAttentionSection({
           ))}
         </ul>
       )}
+
+      {showLink ? (
+        <div className="border-t border-sf-border px-4 py-3 md:px-5">
+          <Link
+            href={isLow ? "/admin/inventory/low" : "/admin/inventory/out"}
+            className={cx(
+              "inline-flex items-center gap-1 text-sm font-semibold text-sf-primary",
+              "underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sf-primary",
+            )}
+          >
+            {isLow ? "Ver próximos a agotarse" : "Ver productos agotados"}
+            <ChevronIcon className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      ) : null}
     </Card>
   );
 }
@@ -240,7 +251,7 @@ function StockEmptyState({
     <div
       className={cx(
         "flex min-h-[16rem] flex-col items-center justify-center px-5 py-10 text-center md:min-h-[17rem] md:px-8",
-        isLow ? "bg-amber-50/30" : "bg-red-50/20",
+        "bg-sf-bg/40",
       )}
     >
       {isLow ? (

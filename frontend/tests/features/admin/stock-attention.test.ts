@@ -30,7 +30,7 @@ describe("admin stock attention panel", () => {
     expect(hub).toContain("Productos más vendidos recientemente");
     expect(hub).toContain("Ventas");
     expect(hub).toContain("AnalyticsCard");
-    expect(hub).toContain("useAdminSalesPeriodSummaryQuery");
+    expect(hub).toContain("useAdminBusinessSummaryQuery");
     expect(hub).toContain("Clientes con compras recientes");
     expect(hub).toContain("useAdminRecentBuyersQuery");
     expect(hub).toContain("aggregateRecentlySoldProducts");

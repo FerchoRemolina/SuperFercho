@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   homePathForRole,
+  landingPathForRole,
   login,
   REGISTER_DOCUMENT_TYPES,
   registerCustomer,
@@ -115,6 +116,18 @@ describe("auth api", () => {
   it("sends ADMIN to /admin and CUSTOMER to home", () => {
     expect(homePathForRole("ADMIN")).toBe("/admin");
     expect(homePathForRole("CUSTOMER")).toBe("/");
+  });
+
+  it("routes the post-login landing by role without breaking valid next paths", () => {
+    expect(landingPathForRole("ADMIN", null)).toBe("/admin");
+    expect(landingPathForRole("ADMIN", undefined)).toBe("/admin");
+    expect(landingPathForRole("CUSTOMER", null)).toBe("/");
+    expect(landingPathForRole("CUSTOMER", "/cart")).toBe("/cart");
+    expect(landingPathForRole("ADMIN", "/admin/orders")).toBe("/admin/orders");
+    expect(landingPathForRole("ADMIN", "/cart")).toBe("/admin");
+    expect(landingPathForRole("ADMIN", "/")).toBe("/admin");
+    expect(landingPathForRole("CUSTOMER", "/admin/orders")).toBe("/");
+    expect(landingPathForRole("ADMIN", "https://externo.test")).toBe("/admin");
   });
 
   it("posts password recovery anonymously and returns the generic message", async () => {

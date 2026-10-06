@@ -628,11 +628,11 @@ describe("admin orders api", () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).not.toContain("status=");
   });
 
-  it("uses admin orders query keys with page size and status", () => {
+  it("uses admin orders query keys with page size status search and dates", () => {
     expect(adminKeys().ordersRoot()).toEqual(["admin", "orders"]);
     expect(
       adminKeys().orders({ page: 0, size: 20, status: "DELIVERY" }),
-    ).toEqual(["admin", "orders", "list", 0, 20, "DELIVERY"]);
+    ).toEqual(["admin", "orders", "list", 0, 20, "DELIVERY", "", "", ""]);
     expect(adminKeys().orders({ page: 2, size: 20 })).toEqual([
       "admin",
       "orders",
@@ -640,6 +640,9 @@ describe("admin orders api", () => {
       2,
       20,
       "all",
+      "",
+      "",
+      "",
     ]);
     expect(
       adminKeys().orders({
@@ -647,9 +650,13 @@ describe("admin orders api", () => {
         size: 20,
         status: ADMIN_SALES_ORDER_STATUSES,
       }),
-    ).toEqual(["admin", "orders", "list", 0, 20, "sales"]);
+    ).toEqual(["admin", "orders", "list", 0, 20, "sales", "", "", ""]);
     expect(
-      adminKeys().orders({ page: 0, size: 20, status: "CONFIRMED" }),
+      adminKeys().orders({
+        page: 0,
+        size: 20,
+        status: "CONFIRMED",
+      }),
     ).not.toEqual(
       adminKeys().orders({
         page: 0,
@@ -657,6 +664,64 @@ describe("admin orders api", () => {
         status: ADMIN_SALES_ORDER_STATUSES,
       }),
     );
+    expect(
+      adminKeys().orders({
+        page: 0,
+        size: 20,
+        orderNumber: "ORD-ABC",
+        from: "2026-03-01",
+        to: "2026-04-01",
+      }),
+    ).toEqual(["admin", "orders", "list", 0, 20, "all", "ORD-ABC", "2026-03-01", "2026-04-01"]);
+    expect(
+      adminKeys().orders({ page: 0, size: 20, orderNumber: "ORD-ABC" }),
+    ).not.toEqual(adminKeys().orders({ page: 0, size: 20 }));
+  });
+
+  it("sends orderNumber search trimmed and omits it when blank", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() =>
+        Promise.resolve(jsonResponse({ items: [], page: 0, size: 20, totalElements: 0 })),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listAdminOrders({ page: 0, size: 20, orderNumber: "  ORD-ABC123  " });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "http://localhost:8080/api/v1/admin/orders?page=0&size=20&orderNumber=ORD-ABC123",
+    );
+
+    await listAdminOrders({ page: 0, size: 20, orderNumber: "   " });
+
+    expect(String(fetchMock.mock.calls[1]?.[0])).not.toContain("orderNumber=");
+  });
+
+  it("sends from/to date range params only when present", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() =>
+        Promise.resolve(jsonResponse({ items: [], page: 0, size: 20, totalElements: 0 })),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listAdminOrders({
+      page: 0,
+      size: 20,
+      status: "DELIVERED",
+      from: "2026-03-01",
+      to: "2026-04-01",
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "http://localhost:8080/api/v1/admin/orders?page=0&size=20&status=DELIVERED&from=2026-03-01&to=2026-04-01",
+    );
+
+    await listAdminOrders({ page: 0, size: 20, from: "", to: "" });
+
+    const url = String(fetchMock.mock.calls[1]?.[0]);
+    expect(url).not.toContain("from=");
+    expect(url).not.toContain("to=");
   });
 
   it("propagates RFC7807 errors from GET /admin/orders", async () => {

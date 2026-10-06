@@ -186,10 +186,18 @@ export function AdminProductsPageContent() {
   return (
     /* Ancho moderadamente mayor que Container por defecto (max-w-6xl → 7xl). */
     <main className="mx-auto w-full max-w-7xl px-4 py-6 md:px-8 md:py-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold tracking-tight text-sf-ink">
-          Productos
-        </h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-sf-muted">
+            Inventario
+          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-sf-ink">
+            Productos
+          </h1>
+          <p className="mt-1 text-sm text-sf-muted">
+            Catálogo del supermercado: precio, stock y estado.
+          </p>
+        </div>
         <Link href="/admin/products/new" className={buttonClassName("primary")}>
           Crear producto
         </Link>

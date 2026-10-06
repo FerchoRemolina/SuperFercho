@@ -1,9 +1,15 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  activateAdminCategory,
-  activateAdminProduct,
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import {
+   activateAdminCategory,
+   activateAdminCustomerAccount,
+   activateAdminProduct,
   activateAdminProductType,
   activateAdminProductVariant,
   adjustAdminProductStock,
@@ -15,19 +21,22 @@ import {
   createAdminProduct,
   createAdminProductType,
   createAdminProductVariant,
-  deactivateAdminCategory,
-  deactivateAdminKnowledgeDocument,
+   deactivateAdminCategory,
+   deactivateAdminCustomerAccount,
+   deactivateAdminKnowledgeDocument,
   deactivateAdminProduct,
   deactivateAdminProductType,
   deactivateAdminProductVariant,
-  getAdminCategory,
-  getAdminKnowledgeDocument,
+   getAdminCategory,
+   getAdminCustomerRecord,
+   getAdminKnowledgeDocument,
   getAdminOrder,
   getAdminPayment,
   getAdminProduct,
   getAdminProductType,
   getAdminProductVariant,
-  getAdminSalesPeriodSummary,
+  getAdminBusinessSummary,
+ getAdminSalesPeriodSummary,
   getAdminSalesAnalytics,
   getAdminNewCustomers,
   getAdminTopProducts,
@@ -38,8 +47,12 @@ import {
   listAdminProducts,
   listAdminProductTypes,
   listAdminProductVariants,
-  listAdminRecentBuyers,
-  processAdminKnowledgeDocument,
+   listAdminRecentBuyers,
+  findAdminCustomerByDocument,
+  listAdminCustomers,
+  listAdminCustomerOrders,
+  listAdminCustomerPayments,
+   processAdminKnowledgeDocument,
   reactivateAdminKnowledgeDocument,
   restoreAdminProduct,
   replaceAdminKnowledgeDocumentContent,
@@ -51,12 +64,14 @@ import {
   updateAdminProductVariant,
    type AdjustAdminProductStockRequest,
    type AnalyticsGranularity,
+   type AdminCustomerAccountStatusFilter,
    type ChangeAdminProductPriceRequest,
   type CreateAdminCategoryRequest,
   type CreateAdminKnowledgeDocumentRequest,
   type CreateAdminProductRequest,
   type CreateAdminProductTypeRequest,
   type CreateAdminProductVariantRequest,
+  type ListAdminCustomersQuery,
   type ListAdminOrdersQuery,
   type ListAdminProductsQuery,
   type ReplaceAdminKnowledgeDocumentContentRequest,
@@ -489,6 +504,16 @@ export function useAdminOrdersQuery(query: ListAdminOrdersQuery) {
   });
 }
 
+export function useAdminBusinessSummaryQuery(from: string, to: string, enabled = true) {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.businessSummary(from, to),
+    queryFn: () => getAdminBusinessSummary(from, to),
+    enabled: isAdminRole(session?.role) && enabled,
+  });
+}
+
 export function useAdminSalesPeriodSummaryQuery(
   granularity: SalesPeriodGranularity,
   enabled = true,
@@ -710,3 +735,118 @@ export function useAdminKnowledgeSearchQuery(query: SearchAdminKnowledgeQuery) {
   });
 }
 
+/** ===== Admin > Clientes: Gestión de clientes ===== */
+
+export function useAdminCustomersQuery(query: ListAdminCustomersQuery) {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.customers(query),
+    queryFn: () => listAdminCustomers(query),
+    enabled: isAdminRole(session?.role),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useAdminCustomerByDocumentQuery(
+  params: {
+    documentType: string;
+    documentNumber: string;
+    accountStatus?: AdminCustomerAccountStatusFilter;
+  },
+  enabled = true,
+) {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.customerByDocument(
+      params.documentType,
+      params.documentNumber,
+      params.accountStatus ?? "ALL",
+    ),
+    queryFn: () => findAdminCustomerByDocument(params),
+    enabled: isAdminRole(session?.role) && enabled,
+  });
+}
+
+export function useAdminCustomerRecordQuery(
+  customerRecordId: string,
+  accountStatus?: AdminCustomerAccountStatusFilter,
+  enabled = true,
+) {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.customerRecord(customerRecordId, accountStatus ?? "ALL"),
+    queryFn: () => getAdminCustomerRecord(customerRecordId, accountStatus),
+    enabled: isAdminRole(session?.role) && enabled,
+  });
+}
+
+export function useAdminCustomerOrdersQuery(
+  customerRecordId: string,
+  page: number,
+  size: number,
+  enabled = true,
+) {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.customerOrders(customerRecordId, page, size),
+    queryFn: () => listAdminCustomerOrders(customerRecordId, page, size),
+    enabled: isAdminRole(session?.role) && enabled,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useAdminCustomerPaymentsQuery(
+  customerRecordId: string,
+  page: number,
+  size: number,
+  enabled = true,
+) {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.customerPayments(customerRecordId, page, size),
+    queryFn: () => listAdminCustomerPayments(customerRecordId, page, size),
+    enabled: isAdminRole(session?.role) && enabled,
+    placeholderData: keepPreviousData,
+  });
+}
+
+function invalidateAdminCustomerRecords(queryClient: {
+  invalidateQueries: (options: { queryKey: string[] }) => void;
+}) {
+  void queryClient.invalidateQueries({ queryKey: ["admin", "customers"] });
+}
+
+export function useActivateAdminCustomerAccountMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      customerRecordId,
+      userId,
+    }: {
+      customerRecordId: string;
+      userId: string;
+    }) => activateAdminCustomerAccount(customerRecordId, userId),
+    onSuccess: () => invalidateAdminCustomerRecords(queryClient),
+  });
+}
+
+export function useDeactivateAdminCustomerAccountMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      customerRecordId,
+      userId,
+    }: {
+      customerRecordId: string;
+      userId: string;
+    }) => deactivateAdminCustomerAccount(customerRecordId, userId),
+    onSuccess: () => invalidateAdminCustomerRecords(queryClient),
+  });
+}

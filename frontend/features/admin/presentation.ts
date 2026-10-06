@@ -318,14 +318,69 @@ export function parseAdminOrdersPage(value: string | null | undefined): number {
   return parsed;
 }
 
+/** Número de pedido: se recorta; vacío = sin filtro. */
+export function parseAdminOrdersOrderNumber(
+  value: string | null | undefined,
+): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+const ADMIN_ORDER_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Límite de fecha "YYYY-MM-DD"; cualquier otro valor se ignora. */
+export function parseAdminOrdersDateBound(
+  value: string | null | undefined,
+): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed && ADMIN_ORDER_DATE_PATTERN.test(trimmed) ? trimmed : undefined;
+}
+
+export type AdminOrderCustomerView = {
+  customer: { fullName: string | null; documentType: string | null; documentNumber: string | null } | null;
+};
+
+/** Etiqueta principal del cliente: nombre comercial del record; "—" cuando
+ *  la cuenta no se pudo resolver. El destinatario de envío es otro dato y no
+ *  se usa como reemplazo. */
+export function adminOrderCustomerPrimaryLabel(
+  order: AdminOrderCustomerView,
+): string {
+  const fullName = order.customer?.fullName;
+  return fullName != null && fullName !== "" ? fullName : "—";
+}
+
+/** Etiqueta secundaria: documento comercial "CC 123456789" o null. */
+export function adminOrderCustomerSecondaryLabel(
+  order: AdminOrderCustomerView,
+): string | null {
+  const documentType = order.customer?.documentType;
+  const documentNumber = order.customer?.documentNumber;
+  if (
+    documentType != null &&
+    documentType !== "" &&
+    documentNumber != null &&
+    documentNumber !== ""
+  ) {
+    return `${documentType} ${documentNumber}`;
+  }
+  return null;
+}
+
 export function adminOrdersListQueryFromSearchParams(params: {
   page?: string | null;
   status?: string | null;
+  orderNumber?: string | null;
+  from?: string | null;
+  to?: string | null;
 }): ListAdminOrdersQuery {
   return {
     page: parseAdminOrdersPage(params.page),
     size: ADMIN_ORDERS_DEFAULT_SIZE,
     status: parseAdminOrdersStatusFilter(params.status),
+    orderNumber: parseAdminOrdersOrderNumber(params.orderNumber),
+    from: parseAdminOrdersDateBound(params.from),
+    to: parseAdminOrdersDateBound(params.to),
   };
 }
 
@@ -358,6 +413,9 @@ export function adminOrdersStatusFromSelectValue(
 export function adminOrdersHref(query: {
   page?: number;
   status?: ListAdminOrdersQuery["status"] | "";
+  orderNumber?: string;
+  from?: string;
+  to?: string;
 }): string {
   const search = new URLSearchParams();
   const page = query.page ?? ADMIN_ORDERS_DEFAULT_PAGE;
@@ -370,6 +428,16 @@ export function adminOrdersHref(query: {
       : serializeAdminOrdersStatusParam(query.status);
   if (statusParam) {
     search.set("status", statusParam);
+  }
+  const orderNumber = query.orderNumber?.trim();
+  if (orderNumber) {
+    search.set("orderNumber", orderNumber);
+  }
+  if (query.from) {
+    search.set("from", query.from);
+  }
+  if (query.to) {
+    search.set("to", query.to);
   }
   const encoded = search.toString();
   return encoded ? `/admin/orders?${encoded}` : "/admin/orders";
@@ -579,12 +647,12 @@ export function adminPaymentDetailErrorKind(
   return "error";
 }
 
-export type PaymentStatusTone = "neutral" | "primary" | "accent" | "danger";
+export type PaymentStatusTone = "neutral" | "primary" | "success" | "accent" | "danger";
 
 export function paymentStatusTone(status: PaymentStatus): PaymentStatusTone {
   switch (status) {
     case "APPROVED":
-      return "primary";
+      return "success";
     case "PENDING":
       return "accent";
     case "DECLINED":
@@ -918,10 +986,24 @@ export function adminBreadcrumbsForPath(pathname: string): AdminBreadcrumbItem[]
   if (pathname === "/admin" || pathname === "/admin/") {
     return [{ label: "Inicio" }];
   }
+  if (/^\/admin\/products\/[^/]+$/.test(pathname)) {
+    return [
+      { label: "Inventario", href: "/admin/products" },
+      { label: "Productos", href: "/admin/products" },
+      { label: "Detalle" },
+    ];
+  }
   if (pathname.startsWith("/admin/products")) {
     return [
       { label: "Inventario", href: "/admin/products" },
       { label: "Productos" },
+    ];
+  }
+  if (/^\/admin\/categories\/[^/]+$/.test(pathname)) {
+    return [
+      { label: "Inventario", href: "/admin/categories" },
+      { label: "Categorías", href: "/admin/categories" },
+      { label: "Detalle" },
     ];
   }
   if (pathname.startsWith("/admin/categories")) {
@@ -950,10 +1032,24 @@ export function adminBreadcrumbsForPath(pathname: string): AdminBreadcrumbItem[]
       { label: "Control de inventario" },
     ];
   }
+  if (/^\/admin\/orders\/[^/]+$/.test(pathname)) {
+    return [
+      { label: "Ventas", href: "/admin/orders" },
+      { label: "Pedidos", href: "/admin/orders" },
+      { label: "Detalle" },
+    ];
+  }
   if (pathname.startsWith("/admin/orders")) {
     return [
       { label: "Ventas", href: "/admin/orders" },
       { label: "Pedidos" },
+    ];
+  }
+  if (pathname.startsWith("/admin/customers/")) {
+    return [
+      { label: "Clientes", href: "/admin/customers" },
+      { label: "Gestión de clientes", href: "/admin/customers" },
+      { label: "Detalle" },
     ];
   }
   if (pathname.startsWith("/admin/customers")) {
@@ -967,6 +1063,9 @@ export function adminBreadcrumbsForPath(pathname: string): AdminBreadcrumbItem[]
       { label: "Fercho", href: "/admin/knowledge" },
       { label: "Gestión del conocimiento" },
     ];
+  }
+  if (/^\/admin\/payments\/[^/]+$/.test(pathname)) {
+    return [{ label: "Pagos" }, { label: "Detalle" }];
   }
   if (pathname.startsWith("/admin/payments")) {
     return [{ label: "Pagos" }];

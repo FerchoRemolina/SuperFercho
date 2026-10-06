@@ -7,6 +7,7 @@ import type {
 } from "@/features/catalog/api";
 import type {
   Order,
+  OrderItem,
   OrderStatus,
   PagedOrders,
   PaymentMethod,
@@ -224,6 +225,11 @@ export type ListAdminOrdersQuery = {
   size: number;
   /** One status, or the Ventas multi-status set. */
   status?: OrderStatus | readonly OrderStatus[];
+  /** Case-insensitive contains filter on the order number. */
+  orderNumber?: string;
+  /** Creation range [from, to); both are "YYYY-MM-DD" (America/Bogota). */
+  from?: string;
+  to?: string;
 };
 
 export function adminOrdersStatusQueryKey(
@@ -295,8 +301,13 @@ export function adminKeys() {
         query.page,
         query.size,
         adminOrdersStatusQueryKey(query.status),
+        query.orderNumber ?? "",
+        query.from ?? "",
+        query.to ?? "",
       ] as const,
     order: (orderId: string) => ["admin", "order", orderId] as const,
+    businessSummary: (from: string, to: string) =>
+      ["admin", "orders", "dashboard", "summary", from, to] as const,
     salesPeriod: (granularity: SalesPeriodGranularity) =>
       ["admin", "orders", "dashboard", "sales", granularity] as const,
     analyticsSales: (from: string, to: string, granularity: AnalyticsGranularity) =>
@@ -310,6 +321,42 @@ export function adminKeys() {
       ["admin", "analytics", "topProducts", from, to, sort] as const,
     analyticsTopCustomers: (from: string, to: string) =>
       ["admin", "analytics", "topCustomers", from, to] as const,
+    customers: (query: ListAdminCustomersQuery) =>
+      [
+        "admin",
+        "customers",
+        "list",
+        query.search ?? "",
+        query.status ?? "ALL",
+        query.sortBy ?? "CREATED_AT",
+        query.sortDir ?? "DESC",
+        query.hasPurchases === undefined
+          ? "any"
+          : query.hasPurchases
+            ? "yes"
+            : "no",
+        query.page,
+        query.size,
+      ] as const,
+    customerByDocument: (
+      documentType: string,
+      documentNumber: string,
+      accountStatus: string,
+    ) =>
+      [
+        "admin",
+        "customers",
+        "by-document",
+        documentType,
+        documentNumber,
+        accountStatus,
+      ] as const,
+    customerRecord: (recordId: string, accountStatus: string) =>
+      ["admin", "customers", "record", recordId, accountStatus] as const,
+    customerOrders: (recordId: string, page: number, size: number) =>
+      ["admin", "customers", "orders", recordId, page, size] as const,
+    customerPayments: (recordId: string, page: number, size: number) =>
+      ["admin", "customers", "payments", recordId, page, size] as const,
     recentBuyers: (limit: number) =>
       ["admin", "orders", "dashboard", "recent-buyers", limit] as const,
     knowledgeRoot: () => ["admin", "knowledge"] as const,
@@ -586,15 +633,55 @@ export async function lookupProductByBarcode(
   );
 }
 
+/** Mirrors AdminOrderCustomerRestResponse. Resolved via the Identity
+ *  directory port; null when the account cannot be resolved. */
+export type AdminOrderCustomer = {
+  userId: string;
+  fullName: string | null;
+  documentType: string | null;
+  documentNumber: string | null;
+  email: string | null;
+  phone: string | null;
+};
+
+/** Mirrors AdminOrderListItemRestResponse (admin list row, no payment object). */
+export type AdminOrderListItem = {
+  id: string;
+  orderNumber: string;
+  customerId: string;
+  customer: AdminOrderCustomer | null;
+  status: OrderStatus;
+  subtotal: Money;
+  total: Money;
+  items: OrderItem[];
+  shippingRecipientName: string | null;
+  paymentId: string | null;
+  createdAt: string;
+  confirmedAt: string | null;
+  cancelledAt: string | null;
+  updatedAt: string;
+};
+
+/** Mirrors PagedAdminOrdersRestResponse. */
+export type AdminOrdersPage = {
+  items: AdminOrderListItem[];
+  page: number;
+  size: number;
+  totalElements: number;
+};
+
 /** GET /api/v1/admin/orders — ADMIN; no reutilizar GET /api/v1/orders. */
 export async function listAdminOrders(
   query: ListAdminOrdersQuery,
-): Promise<PagedOrders> {
-  return request<PagedOrders>(
+): Promise<AdminOrdersPage> {
+  return request<AdminOrdersPage>(
     `/admin/orders${toQuery({
       page: String(query.page),
       size: String(query.size),
       status: serializeAdminOrdersStatusParam(query.status),
+      orderNumber: query.orderNumber?.trim() || undefined,
+      from: query.from || undefined,
+      to: query.to || undefined,
     })}`,
   );
 }
@@ -708,9 +795,15 @@ export async function getAdminTopCustomers(params: {
  * Legacy rolling-window sales summary (kept for the operational summary strip).
  */
 
+/** Mirrors OrderRestResponse del detalle admin: Order + cliente enriquecido
+ *  (null cuando la cuenta no se puede resolver). */
+export type AdminOrderDetail = Order & {
+  customer: AdminOrderCustomer | null;
+};
+
 /** GET /api/v1/admin/orders/{orderId} — ADMIN; no reutilizar GET /api/v1/orders/{orderId}. */
-export async function getAdminOrder(orderId: string): Promise<Order> {
-  return request<Order>(`/admin/orders/${encodeURIComponent(orderId)}`);
+export async function getAdminOrder(orderId: string): Promise<AdminOrderDetail> {
+  return request<AdminOrderDetail>(`/admin/orders/${encodeURIComponent(orderId)}`);
 }
 
 export type SalesPeriodGranularity = "DAY" | "WEEK" | "MONTH" | "YEAR";
@@ -747,6 +840,30 @@ export type AdminRecentBuyer = {
 export type AdminRecentBuyers = {
   items: AdminRecentBuyer[];
 };
+
+/** Mirrors AdminDashboardSummaryRestResponse (GET /admin/orders/dashboard/summary).
+ *  Ventas = SUM(total) de órdenes DELIVERED por delivered_at; en proceso es el
+ *  conteo ACTUAL (CONFIRMED+PREPARING+DELIVERY, sin rango); entregados y
+ *  cancelados cuentan por delivered_at / cancelled_at dentro de [from, to). */
+export type AdminBusinessSummary = {
+  from: string;
+  to: string;
+  sales: Money;
+  totalOrders: number;
+  inProcessOrders: number;
+  deliveredOrders: number;
+  cancelledOrders: number;
+};
+
+/** GET /api/v1/admin/orders/dashboard/summary — ADMIN. [from, to) ISO-8601. */
+export async function getAdminBusinessSummary(
+  from: string,
+  to: string,
+): Promise<AdminBusinessSummary> {
+  return request<AdminBusinessSummary>(
+    `/admin/orders/dashboard/summary${toQuery({ from, to })}`,
+  );
+}
 
 /** GET /api/v1/admin/orders/dashboard/sales — ADMIN Hub period sales. */
 export async function getAdminSalesPeriodSummary(
@@ -958,4 +1075,234 @@ function toQuery(params: Record<string, string | undefined>): string {
   }
   const encoded = search.toString();
   return encoded ? `?${encoded}` : "";
+}
+
+/** ===== Admin > Clientes: CustomerRecord + cuentas + historial comercial ===== */
+
+export type AdminCustomerAccountStatus = "ACTIVE" | "INACTIVE" | "DELETED";
+
+/** Filtro de cuentas en el detalle (no confundir con el listado). */
+export type AdminCustomerAccountStatusFilter =
+  | "ALL"
+  | "ACTIVE"
+  | "INACTIVE"
+  | "DELETED";
+
+/** Estado derivado del CustomerRecord en el listado admin. */
+export type AdminCustomerRecordStatus = "ACTIVE" | "INACTIVE";
+
+/** Filtro del listado GET /api/v1/admin/customers. */
+export type AdminCustomerRecordStatusFilter =
+  | "ALL"
+  | "ACTIVE"
+  | "INACTIVE";
+
+export type AdminCustomerSortBy =
+  | "CREATED_AT"
+  | "NAME"
+  | "DOCUMENT"
+  | "ORDERS"
+  | "TOTAL_SPENT"
+  | "LAST_ORDER_AT";
+
+export type AdminCustomerSortDir = "ASC" | "DESC";
+
+/** Query de GET /api/v1/admin/customers (listado). */
+export type ListAdminCustomersQuery = {
+  search?: string;
+  status?: AdminCustomerRecordStatusFilter;
+  sortBy?: AdminCustomerSortBy;
+  sortDir?: AdminCustomerSortDir;
+  hasPurchases?: boolean;
+  page: number;
+  size: number;
+};
+
+/** Mirrors AdminCustomerRecordListItemRestResponse. */
+export type AdminCustomerRecordListItem = {
+  id: string;
+  documentType: string;
+  documentNumber: string;
+  billingFirstName: string;
+  billingLastName: string;
+  email: string | null;
+  phone: string | null;
+  status: AdminCustomerRecordStatus;
+  accountCount: number;
+  activeAccounts: number;
+  inactiveAccounts: number;
+  deletedAccounts: number;
+  orderCount: number;
+  totalSpent: Money;
+  lastOrderAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** Mirrors AdminCustomerRecordsPageRestResponse. */
+export type AdminCustomerRecordsPage = {
+  items: AdminCustomerRecordListItem[];
+  page: number;
+  size: number;
+  totalElements: number;
+};
+
+/** Mirrors AdminCustomerAccountRestResponse. deletedAt distingue las cuentas
+ *  eliminadas (UserStatus solo cubre ACTIVE/INACTIVE). */
+export type AdminCustomerAccount = {
+  id: string;
+  email: string;
+  phone: string | null;
+  status: "ACTIVE" | "INACTIVE";
+  deletedAt: string | null;
+  createdAt: string;
+  customerRecordId: string;
+};
+
+/** Mirrors AdminCustomerRecordRestResponse. */
+export type AdminCustomerRecord = {
+  id: string;
+  documentType: string;
+  documentNumber: string;
+  billingFirstName: string;
+  billingLastName: string;
+  createdAt: string;
+  updatedAt: string;
+  accounts: AdminCustomerAccount[];
+};
+
+/** Mirrors AdminCustomerOrderRestResponse (historial comercial del record). */
+export type AdminCustomerOrder = {
+  id: string;
+  orderNumber: string;
+  customerId: string;
+  status: OrderStatus;
+  subtotal: Money;
+  total: Money;
+  paymentId: string | null;
+  createdAt: string;
+  confirmedAt: string | null;
+  cancelledAt: string | null;
+  updatedAt: string;
+};
+
+export type AdminCustomerOrdersPage = {
+  items: AdminCustomerOrder[];
+  page: number;
+  size: number;
+  totalElements: number;
+};
+
+/** Mirrors AdminCustomerPaymentRestResponse. */
+export type AdminCustomerPayment = {
+  id: string;
+  orderId: string;
+  amount: Money;
+  paymentMethod: PaymentMethod;
+  status: PaymentStatus;
+  providerReference: string | null;
+  createdAt: string;
+  updatedAt: string;
+  refundedAt: string | null;
+};
+
+export type AdminCustomerPaymentsPage = {
+  items: AdminCustomerPayment[];
+  page: number;
+  size: number;
+  totalElements: number;
+};
+
+/** GET /api/v1/admin/customers — listado paginado de CustomerRecords. */
+export async function listAdminCustomers(
+  query: ListAdminCustomersQuery,
+): Promise<AdminCustomerRecordsPage> {
+  return request<AdminCustomerRecordsPage>(
+    `/admin/customers${toQuery({
+      search: query.search?.trim() || undefined,
+      status:
+        query.status && query.status !== "ALL" ? query.status : undefined,
+      sortBy: query.sortBy,
+      sortDir: query.sortDir,
+      hasPurchases:
+        query.hasPurchases === undefined
+          ? undefined
+          : query.hasPurchases
+            ? "true"
+            : "false",
+      page: String(query.page),
+      size: String(query.size),
+    })}`,
+  );
+}
+
+export async function findAdminCustomerByDocument(params: {
+  documentType: string;
+  documentNumber: string;
+  accountStatus?: AdminCustomerAccountStatusFilter;
+}): Promise<AdminCustomerRecord> {
+  return request<AdminCustomerRecord>(
+    `/admin/customers/by-document${toQuery({
+      documentType: params.documentType,
+      documentNumber: params.documentNumber,
+      accountStatus: params.accountStatus ?? "",
+    })}`,
+  );
+}
+
+export async function getAdminCustomerRecord(
+  customerRecordId: string,
+  accountStatus?: AdminCustomerAccountStatusFilter,
+): Promise<AdminCustomerRecord> {
+  return request<AdminCustomerRecord>(
+    `/admin/customers/${encodeURIComponent(customerRecordId)}${toQuery({
+      accountStatus: accountStatus ?? "",
+    })}`,
+  );
+}
+
+export async function listAdminCustomerOrders(
+  customerRecordId: string,
+  page: number,
+  size: number,
+): Promise<AdminCustomerOrdersPage> {
+  return request<AdminCustomerOrdersPage>(
+    `/admin/customers/${encodeURIComponent(customerRecordId)}/orders${toQuery({
+      page: String(page),
+      size: String(size),
+    })}`,
+  );
+}
+
+export async function listAdminCustomerPayments(
+  customerRecordId: string,
+  page: number,
+  size: number,
+): Promise<AdminCustomerPaymentsPage> {
+  return request<AdminCustomerPaymentsPage>(
+    `/admin/customers/${encodeURIComponent(customerRecordId)}/payments${toQuery({
+      page: String(page),
+      size: String(size),
+    })}`,
+  );
+}
+
+export async function activateAdminCustomerAccount(
+  customerRecordId: string,
+  userId: string,
+): Promise<AdminCustomerAccount> {
+  return request<AdminCustomerAccount>(
+    `/admin/customers/${encodeURIComponent(customerRecordId)}/accounts/${encodeURIComponent(userId)}/activate`,
+    { method: "POST" },
+  );
+}
+
+export async function deactivateAdminCustomerAccount(
+  customerRecordId: string,
+  userId: string,
+): Promise<AdminCustomerAccount> {
+  return request<AdminCustomerAccount>(
+    `/admin/customers/${encodeURIComponent(customerRecordId)}/accounts/${encodeURIComponent(userId)}/deactivate`,
+    { method: "POST" },
+  );
 }
