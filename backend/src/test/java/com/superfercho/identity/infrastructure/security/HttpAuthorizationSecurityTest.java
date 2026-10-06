@@ -224,6 +224,9 @@ class HttpAuthorizationSecurityTest {
     private GetAdminNewCustomersUseCase getAdminNewCustomersUseCase;
 
     @MockitoBean
+    private com.superfercho.identity.application.usecase.SearchAdminCustomerRecordsUseCase searchAdminCustomerRecordsUseCase;
+
+    @MockitoBean
     private GetAdminSalesPeriodAnalyticsUseCase getAdminSalesPeriodAnalyticsUseCase;
 
     @MockitoBean
@@ -251,7 +254,8 @@ class HttpAuthorizationSecurityTest {
         when(listOrdersUseCase.execute(any())).thenReturn(new PagedResult<>(List.of(), 0, 20, 0));
         when(getOrderUseCase.execute(any())).thenReturn(orderResult());
         when(listAdminOrdersUseCase.execute(any())).thenReturn(new PagedResult<>(List.of(), 0, 20, 0));
-        when(getAdminOrderUseCase.execute(any())).thenReturn(orderResult());
+        when(getAdminOrderUseCase.execute(any()))
+                .thenReturn(new com.superfercho.orders.application.dto.AdminOrderDetailResult(orderResult(), null));
         when(transactionalCheckoutUseCase.execute(any())).thenReturn(checkoutResult());
         when(transactionalCancelOrderUseCase.execute(any())).thenReturn(orderResult());
         when(findAdminCustomerByDocumentUseCase.execute(any())).thenReturn(adminCustomerRecordResult());
@@ -935,7 +939,13 @@ class HttpAuthorizationSecurityTest {
 
     private static CategoryResult categoryResult() {
         return new CategoryResult(
-                CATEGORY_ID, "Lácteos", "Leche y derivados", CategoryStatus.ACTIVE, NOW, NOW);
+                CATEGORY_ID,
+                "Lácteos",
+                "Leche y derivados",
+                com.superfercho.catalog.domain.model.CategoryIcon.OTHER,
+                CategoryStatus.ACTIVE,
+                NOW,
+                NOW);
     }
 
     private static OrderResult orderResult() {
