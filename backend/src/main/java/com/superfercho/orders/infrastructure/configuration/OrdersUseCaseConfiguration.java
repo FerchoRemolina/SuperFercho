@@ -4,6 +4,7 @@ import com.superfercho.catalog.application.port.InventoryPort;
 import com.superfercho.orders.application.port.ClockProvider;
 import com.superfercho.orders.application.port.CurrentUserProvider;
 import com.superfercho.orders.application.port.CustomerAddressPort;
+import com.superfercho.orders.application.port.CustomerDirectoryPort;
 import com.superfercho.orders.application.port.IdempotencyPort;
 import com.superfercho.orders.application.port.OrderRepository;
 import com.superfercho.orders.application.port.PaymentPort;
@@ -101,13 +102,17 @@ public class OrdersUseCaseConfiguration {
     }
 
     @Bean
-    GetAdminOrderUseCase getAdminOrderUseCase(OrderRepository orderRepository, PaymentPort paymentPort) {
-        return new GetAdminOrderUseCase(orderRepository, paymentPort);
+    GetAdminOrderUseCase getAdminOrderUseCase(
+            OrderRepository orderRepository,
+            PaymentPort paymentPort,
+            CustomerDirectoryPort customerDirectoryPort) {
+        return new GetAdminOrderUseCase(orderRepository, paymentPort, customerDirectoryPort);
     }
 
     @Bean
-    ListAdminOrdersUseCase listAdminOrdersUseCase(OrderRepository orderRepository) {
-        return new ListAdminOrdersUseCase(orderRepository);
+    ListAdminOrdersUseCase listAdminOrdersUseCase(
+            OrderRepository orderRepository, CustomerDirectoryPort customerDirectoryPort) {
+        return new ListAdminOrdersUseCase(orderRepository, customerDirectoryPort);
     }
 
     @Bean

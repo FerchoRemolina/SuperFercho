@@ -1,7 +1,8 @@
 package com.superfercho.orders.infrastructure.persistence;
 
+import com.superfercho.orders.application.dto.AdminBusinessPeriodRow;
 import com.superfercho.orders.application.dto.AdminCustomerSalesRow;
-import com.superfercho.orders.application.dto.AdminOrderStatusCountRow;
+import com.superfercho.orders.application.dto.AdminOrderFilter;
 import com.superfercho.orders.application.dto.AdminProductSalesRow;
 import com.superfercho.orders.application.dto.AdminSalesBucketRow;
 import com.superfercho.orders.application.dto.PageRequest;
@@ -101,14 +102,62 @@ public class OrderPersistenceAdapter implements OrderRepository {
     }
 
     @Override
-    public PagedResult<Order> findAll(PageRequest pageRequest) {
-        return toPagedResult(orderJpaRepository.findAll(toSpringPage(pageRequest)), pageRequest);
-    }
+    public PagedResult<Order> findByAdminFilter(AdminOrderFilter filter, PageRequest pageRequest) {
+        boolean byStatus = filter.hasStatuses();
+        boolean bySearch = filter.hasSearch();
+        boolean byRange = filter.fromInclusive() != null && filter.toExclusive() != null;
+        boolean fromOnly = filter.fromInclusive() != null && filter.toExclusive() == null;
+        boolean toOnly = filter.fromInclusive() == null && filter.toExclusive() != null;
 
-    @Override
-    public PagedResult<Order> findByStatuses(List<OrderStatus> statuses, PageRequest pageRequest) {
-        return toPagedResult(
-                orderJpaRepository.findAllByStatusIn(statuses, toSpringPage(pageRequest)), pageRequest);
+        Page<OrderJpaEntity> page;
+        if (byStatus && bySearch && byRange) {
+            page = orderJpaRepository.findAllByStatusInAndOrderNumberContainsIgnoreCaseAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                    filter.statuses(), filter.orderNumberContains(), filter.fromInclusive(), filter.toExclusive(),
+                    toSpringPage(pageRequest));
+        } else if (byStatus && bySearch && fromOnly) {
+            page = orderJpaRepository.findAllByStatusInAndOrderNumberContainsIgnoreCaseAndCreatedAtGreaterThanEqual(
+                    filter.statuses(), filter.orderNumberContains(), filter.fromInclusive(), toSpringPage(pageRequest));
+        } else if (byStatus && bySearch && toOnly) {
+            page = orderJpaRepository.findAllByStatusInAndOrderNumberContainsIgnoreCaseAndCreatedAtLessThan(
+                    filter.statuses(), filter.orderNumberContains(), filter.toExclusive(), toSpringPage(pageRequest));
+        } else if (byStatus && bySearch) {
+            page = orderJpaRepository.findAllByStatusInAndOrderNumberContainsIgnoreCase(
+                    filter.statuses(), filter.orderNumberContains(), toSpringPage(pageRequest));
+        } else if (byStatus && byRange) {
+            page = orderJpaRepository.findAllByStatusInAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                    filter.statuses(), filter.fromInclusive(), filter.toExclusive(), toSpringPage(pageRequest));
+        } else if (byStatus && fromOnly) {
+            page = orderJpaRepository.findAllByStatusInAndCreatedAtGreaterThanEqual(
+                    filter.statuses(), filter.fromInclusive(), toSpringPage(pageRequest));
+        } else if (byStatus && toOnly) {
+            page = orderJpaRepository.findAllByStatusInAndCreatedAtLessThan(
+                    filter.statuses(), filter.toExclusive(), toSpringPage(pageRequest));
+        } else if (byStatus) {
+            page = orderJpaRepository.findAllByStatusIn(filter.statuses(), toSpringPage(pageRequest));
+        } else if (bySearch && byRange) {
+            page = orderJpaRepository.findAllByOrderNumberContainsIgnoreCaseAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                    filter.orderNumberContains(), filter.fromInclusive(), filter.toExclusive(), toSpringPage(pageRequest));
+        } else if (bySearch && fromOnly) {
+            page = orderJpaRepository.findAllByOrderNumberContainsIgnoreCaseAndCreatedAtGreaterThanEqual(
+                    filter.orderNumberContains(), filter.fromInclusive(), toSpringPage(pageRequest));
+        } else if (bySearch && toOnly) {
+            page = orderJpaRepository.findAllByOrderNumberContainsIgnoreCaseAndCreatedAtLessThan(
+                    filter.orderNumberContains(), filter.toExclusive(), toSpringPage(pageRequest));
+        } else if (bySearch) {
+            page = orderJpaRepository.findAllByOrderNumberContainsIgnoreCase(
+                    filter.orderNumberContains(), toSpringPage(pageRequest));
+        } else if (byRange) {
+            page = orderJpaRepository.findAllByCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                    filter.fromInclusive(), filter.toExclusive(), toSpringPage(pageRequest));
+        } else if (fromOnly) {
+            page = orderJpaRepository.findAllByCreatedAtGreaterThanEqual(
+                    filter.fromInclusive(), toSpringPage(pageRequest));
+        } else if (toOnly) {
+            page = orderJpaRepository.findAllByCreatedAtLessThan(filter.toExclusive(), toSpringPage(pageRequest));
+        } else {
+            page = orderJpaRepository.findAll(toSpringPage(pageRequest));
+        }
+        return toPagedResult(page, pageRequest);
     }
 
     @Override
@@ -146,10 +195,24 @@ public class OrderPersistenceAdapter implements OrderRepository {
     }
 
     @Override
-    public List<AdminOrderStatusCountRow> countByStatusBetween(Instant fromInclusive, Instant toExclusive) {
-        return orderJpaRepository.countByStatusBetween(fromInclusive, toExclusive).stream()
-                .map(row -> new AdminOrderStatusCountRow(
-                        OrderStatus.valueOf(String.valueOf(row[0])), requireLong(row[1]), requireBigDecimal(row[2])))
+    public AdminBusinessPeriodRow summarizeBusinessPeriod(Instant fromInclusive, Instant toExclusive) {
+        List<Object[]> rows =
+                orderJpaRepository.summarizeBusinessPeriod(fromInclusive, toExclusive);
+        Object[] row = rows.get(0);
+        return new AdminBusinessPeriodRow(
+                requireLong(row[0]),
+                requireLong(row[1]),
+                requireBigDecimal(row[2]),
+                requireLong(row[3]));
+    }
+
+    @Override
+    public List<Order> findDeliveredBetween(Instant fromInclusive, Instant toExclusive) {
+        return orderJpaRepository
+                .findAllByStatusAndDeliveredAtGreaterThanEqualAndDeliveredAtLessThan(
+                        OrderStatus.DELIVERED, fromInclusive, toExclusive)
+                .stream()
+                .map(orderPersistenceMapper::toDomain)
                 .toList();
     }
 
@@ -162,6 +225,17 @@ public class OrderPersistenceAdapter implements OrderRepository {
         return rows.stream()
                 .map(row -> new AdminProductSalesRow(
                         (UUID) row[0], String.valueOf(row[1]), requireLong(row[2])))
+                .toList();
+    }
+
+    @Override
+    public List<AdminCustomerSalesRow> findTopCustomersByOrders(
+            Instant fromInclusive, Instant toExclusive, int limit) {
+        return orderJpaRepository
+                .findTopCustomersByOrderCount(fromInclusive, toExclusive, limit)
+                .stream()
+                .map(row -> new AdminCustomerSalesRow(
+                        (UUID) row[0], String.valueOf(row[1]), requireBigDecimal(row[2]), requireLong(row[3])))
                 .toList();
     }
 

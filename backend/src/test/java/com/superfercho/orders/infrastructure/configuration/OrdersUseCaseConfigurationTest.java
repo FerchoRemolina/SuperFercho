@@ -6,6 +6,7 @@ import com.superfercho.catalog.application.port.InventoryPort;
 import com.superfercho.orders.application.port.ClockProvider;
 import com.superfercho.orders.application.port.CurrentUserProvider;
 import com.superfercho.orders.application.port.CustomerAddressPort;
+import com.superfercho.orders.application.port.CustomerDirectoryPort;
 import com.superfercho.orders.application.port.IdempotencyPort;
 import com.superfercho.orders.application.port.OrderRepository;
 import com.superfercho.orders.application.port.PaymentPort;
@@ -57,6 +58,11 @@ class OrdersUseCaseConfigurationTest {
         @Bean
         CustomerAddressPort customerAddressPort() {
             return Mockito.mock(CustomerAddressPort.class);
+        }
+
+        @Bean
+        CustomerDirectoryPort customerDirectoryPort() {
+            return Mockito.mock(CustomerDirectoryPort.class);
         }
 
         @Bean

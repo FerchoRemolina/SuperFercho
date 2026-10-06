@@ -1,7 +1,8 @@
 package com.superfercho.orders.application.port;
 
+import com.superfercho.orders.application.dto.AdminBusinessPeriodRow;
 import com.superfercho.orders.application.dto.AdminCustomerSalesRow;
-import com.superfercho.orders.application.dto.AdminOrderStatusCountRow;
+import com.superfercho.orders.application.dto.AdminOrderFilter;
 import com.superfercho.orders.application.dto.AdminProductSalesRow;
 import com.superfercho.orders.application.dto.AdminSalesBucketRow;
 import com.superfercho.orders.application.dto.PageRequest;
@@ -39,9 +40,12 @@ public interface OrderRepository {
     PagedResult<Order> findOrdersWithPaymentByCustomerIds(
             Collection<UUID> customerIds, PageRequest pageRequest);
 
-    PagedResult<Order> findAll(PageRequest pageRequest);
-
-    PagedResult<Order> findByStatuses(List<OrderStatus> statuses, PageRequest pageRequest);
+    /**
+     * Admin orders list page. Applies optional status set, order-number search
+     * (case-insensitive contains) and creation {@code [from, to)} range. Always
+     * sorted createdAt DESC, id ASC with a correct {@code totalElements}.
+     */
+    PagedResult<Order> findByAdminFilter(AdminOrderFilter filter, PageRequest pageRequest);
 
     /** In-progress orders eligible for automatic lifecycle progression. */
     List<Order> findInProgressForLifecycle();
@@ -63,9 +67,15 @@ public interface OrderRepository {
             BucketGranularity granularity, Instant fromInclusive, Instant toExclusive);
 
     /**
-     * Order count and sales amount per status over {@code [fromInclusive, toExclusive)}.
+     * Business counters for {@code [fromInclusive, toExclusive)}: delivered by
+     * {@code delivered_at}, cancelled by {@code cancelled_at}, sales = DELIVERED
+     * totals by {@code delivered_at}, and in-process as the CURRENT live count
+     * (no period). Aggregated in the database.
      */
-    List<AdminOrderStatusCountRow> countByStatusBetween(Instant fromInclusive, Instant toExclusive);
+    AdminBusinessPeriodRow summarizeBusinessPeriod(Instant fromInclusive, Instant toExclusive);
+
+    /** DELIVERED orders whose {@code delivered_at} falls in {@code [fromInclusive, toExclusive)}. */
+    List<Order> findDeliveredBetween(Instant fromInclusive, Instant toExclusive);
 
     /**
      * Units sold per product (CANCELLED excluded) over {@code [fromInclusive, toExclusive)},
@@ -78,6 +88,8 @@ public interface OrderRepository {
      * Purchased value per customer (CANCELLED excluded) over
      * {@code [fromInclusive, toExclusive)}, ordered by total desc. Limited to {@code limit} rows.
      */
+    List<AdminCustomerSalesRow> findTopCustomersByOrders(java.time.Instant fromInclusive, java.time.Instant toExclusive, int limit);
+
     List<AdminCustomerSalesRow> findTopCustomersByTotal(
             Instant fromInclusive, Instant toExclusive, int limit);
 }

@@ -4,7 +4,6 @@ import com.superfercho.identity.application.dto.AdminPagedResult;
 import com.superfercho.identity.application.dto.CustomerCommercialOrderView;
 import com.superfercho.identity.application.dto.CustomerCommercialPaymentView;
 import com.superfercho.identity.application.port.CustomerCommercialHistoryPort;
-import com.superfercho.orders.application.dto.PageRequest;
 import com.superfercho.orders.application.dto.PagedResult;
 import com.superfercho.orders.application.dto.PaymentResult;
 import com.superfercho.orders.application.port.OrderRepository;
@@ -21,6 +20,7 @@ import org.springframework.stereotype.Component;
 @Profile("!test")
 public class CustomerCommercialHistoryAdapter implements CustomerCommercialHistoryPort {
 
+
     private final OrderRepository orderRepository;
     private final PaymentPort paymentPort;
 
@@ -32,7 +32,8 @@ public class CustomerCommercialHistoryAdapter implements CustomerCommercialHisto
     @Override
     public AdminPagedResult<CustomerCommercialOrderView> findOrdersByCustomerIds(
             Collection<UUID> customerIds, Integer page, Integer size) {
-        PageRequest pageRequest = PageRequest.of(page, size);
+        // PageRequest.of applies defaults/caps; JPA sorts by createdAt DESC, id ASC.
+        var pageRequest = com.superfercho.orders.application.dto.PageRequest.of(page, size);
         if (customerIds == null || customerIds.isEmpty()) {
             return AdminPagedResult.empty(pageRequest.page(), pageRequest.size());
         }
@@ -45,7 +46,8 @@ public class CustomerCommercialHistoryAdapter implements CustomerCommercialHisto
     @Override
     public AdminPagedResult<CustomerCommercialPaymentView> findPaymentsByCustomerIds(
             Collection<UUID> customerIds, Integer page, Integer size) {
-        PageRequest pageRequest = PageRequest.of(page, size);
+        // Same deterministic order as orders (order.createdAt DESC, id) for stable pages.
+        var pageRequest = com.superfercho.orders.application.dto.PageRequest.of(page, size);
         if (customerIds == null || customerIds.isEmpty()) {
             return AdminPagedResult.empty(pageRequest.page(), pageRequest.size());
         }

@@ -3,7 +3,9 @@ package com.superfercho.orders.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.superfercho.orders.application.dto.AdminOrderFilter;
 import com.superfercho.orders.application.dto.PageRequest;
+import com.superfercho.orders.application.dto.PagedResult;
 import com.superfercho.orders.application.port.OrderRepository;
 import com.superfercho.orders.domain.model.Order;
 import com.superfercho.orders.domain.model.OrderItem;
@@ -115,7 +117,9 @@ class OrderPersistenceAdapterTest {
         Order own = orderRepository.save(confirmedOrder("ORD-P-ALL-1", customerId, PAYMENT_ID));
         Order other = orderRepository.save(confirmedOrder("ORD-P-ALL-2", otherCustomerId, PAYMENT_ID));
 
-        assertThat(orderRepository.findAll(PageRequest.of(0, 20)).items())
+        assertThat(orderRepository
+                        .findByAdminFilter(new AdminOrderFilter(List.of(), null, null, null), PageRequest.of(0, 20))
+                        .items())
                 .extracting(Order::id)
                 .contains(own.id(), other.id());
     }
@@ -133,8 +137,10 @@ class OrderPersistenceAdapterTest {
                 .markDelivered(at));
 
         var sales = List.of(OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.DELIVERY, OrderStatus.DELIVERED);
-        var allSales = orderRepository.findByStatuses(sales, PageRequest.of(0, 100));
-        var firstPage = orderRepository.findByStatuses(sales, new PageRequest(0, 1));
+        var allSales = orderRepository.findByAdminFilter(
+                new AdminOrderFilter(sales, null, null, null), PageRequest.of(0, 100));
+        var firstPage = orderRepository.findByAdminFilter(
+                new AdminOrderFilter(sales, null, null, null), new PageRequest(0, 1));
 
         assertThat(allSales.items())
                 .extracting(Order::id)
@@ -145,6 +151,63 @@ class OrderPersistenceAdapterTest {
         assertThat(firstPage.size()).isEqualTo(1);
         assertThat(firstPage.totalElements()).isEqualTo(allSales.totalElements());
         assertThat(firstPage.totalElements()).isGreaterThan(firstPage.items().size());
+    }
+
+    @Test
+    void shouldSearchOrdersByPartialCaseInsensitiveOrderNumber() {
+        Order target = orderRepository.save(confirmedOrder("ORD-P-SEARCH-42", CUSTOMER_ID, PAYMENT_ID));
+        orderRepository.save(confirmedOrder("ORD-P-OTHER", CUSTOMER_ID, PAYMENT_ID));
+
+        PagedResult<Order> result = orderRepository.findByAdminFilter(
+                new AdminOrderFilter(List.of(), "search-42", null, null), PageRequest.of(0, 100));
+
+        assertThat(result.items()).extracting(Order::id).containsExactly(target.id());
+        assertThat(result.totalElements()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldFindOrdersByCreationRangeHalfOpen() {
+        UUID customerId = UUID.randomUUID();
+        Instant rangeStart = CREATED_AT.minusSeconds(3600);
+        Order inside = orderRepository.save(orderAt("ORD-P-RANGE-1", customerId, CREATED_AT));
+        Order before = orderRepository.save(orderAt("ORD-P-RANGE-0", customerId, rangeStart));
+        Order after = orderRepository.save(orderAt(
+                "ORD-P-RANGE-2", customerId, CREATED_AT.plusSeconds(7200)));
+
+        PagedResult<Order> bounded = orderRepository.findByAdminFilter(
+                new AdminOrderFilter(List.of(), null, rangeStart, CREATED_AT.plusSeconds(3600)),
+                PageRequest.of(0, 100));
+        PagedResult<Order> fromOnly = orderRepository.findByAdminFilter(
+                new AdminOrderFilter(List.of(), null, CREATED_AT, null), PageRequest.of(0, 100));
+        PagedResult<Order> toOnly = orderRepository.findByAdminFilter(
+                new AdminOrderFilter(List.of(), null, null, CREATED_AT), PageRequest.of(0, 100));
+
+        assertThat(bounded.items())
+                .extracting(Order::id)
+                .contains(inside.id(), before.id())
+                .doesNotContain(after.id());
+        assertThat(fromOnly.items()).extracting(Order::id).doesNotContain(before.id());
+        assertThat(toOnly.items()).extracting(Order::id).doesNotContain(inside.id(), after.id());
+    }
+
+    @Test
+    void shouldCombineStatusSearchAndRangeWithCorrectTotalElements() {
+        UUID customerId = UUID.randomUUID();
+        Instant at = CREATED_AT.plusSeconds(60);
+        Order deliveredMatch = orderRepository.save(confirmedOrder("ORD-P-COMBO-1", customerId, PAYMENT_ID)
+                .startPreparation(at)
+                .startDelivery(at)
+                .markDelivered(at));
+        orderRepository.save(confirmedOrder("ORD-P-COMBO-2", customerId, PAYMENT_ID));
+        orderRepository.save(
+                confirmedOrder("ORD-P-COMBO-3", customerId, PAYMENT_ID).cancel(CREATED_AT.plusSeconds(30)));
+
+        PagedResult<Order> result = orderRepository.findByAdminFilter(
+                new AdminOrderFilter(List.of(OrderStatus.DELIVERED), "COMBO", CREATED_AT, CREATED_AT.plusSeconds(3600)),
+                PageRequest.of(0, 100));
+
+        assertThat(result.items()).extracting(Order::id).containsExactly(deliveredMatch.id());
+        assertThat(result.totalElements()).isEqualTo(1);
     }
 
     @Test
