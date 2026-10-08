@@ -2,22 +2,23 @@
 #
 # SuperFercho - setup de Fercho AI (100% local) con Ollama.
 # Idempotente y no destructivo: verifica prerequisitos, detecta/arranca Ollama,
-# descarga el modelo segun el hardware, crea el modelo "fercho" con contexto
-# ampliado, escribe la configuracion local en .env (sin pisar valores no vacios)
-# y ejecuta un probe de tool calling.
+# descarga el modelo oficial qwen2.5:7b-instruct (Qwen2.5 7B Instruct), crea el
+# modelo derivado "fercho-qwen" con contexto ampliado, escribe la configuracion
+# local en .env (sin pisar valores no vacios) y ejecuta un probe de tool calling.
 #
 # Nunca lee credenciales de OpenCode, nunca descarga ni copia API keys y nunca
 # elimina procesos ni archivos del usuario.
 #
 # Uso:
 #   ./scripts/setup-fercho.sh
-#   ./scripts/setup-fercho.sh --model granite4.1:8b
+#   ./scripts/setup-fercho.sh --model qwen2.5:14b-instruct
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OLLAMA_BASE="http://localhost:11434"
 NUM_CTX=16384
-FERCHO_MODEL="fercho"
+DEFAULT_BASE_MODEL="qwen2.5:7b-instruct"
+FERCHO_MODEL="fercho-qwen"
 MODEL_OVERRIDE=""
 
 SUMMARY_OK=()
@@ -129,26 +130,19 @@ fi
 log_step "Seleccion de modelo"
 if [[ -n "$MODEL_OVERRIDE" ]]; then
   BASE_MODEL="$MODEL_OVERRIDE"
-  printf '  Modelo seleccionado manualmente: %s\n' "$BASE_MODEL"
-  if (( RAM_GB > 0 && RAM_GB < 16 )) && [[ "$BASE_MODEL" == gpt-oss:20b* ]]; then
-    log_warn "Elegiste $BASE_MODEL con menos de 16 GB de RAM. Puede quedarse sin memoria o ser muy lento. Considera granite4.1:8b."
-  fi
-elif (( RAM_GB >= 16 )); then
-  BASE_MODEL="gpt-oss:20b"
-  printf '  RAM %s GB >= 16 GB -> candidato: %s (Apache 2.0, tool calling nativo)\n' "$RAM_GB" "$BASE_MODEL"
-elif (( RAM_GB > 0 )); then
-  BASE_MODEL="granite4.1:8b"
-  printf '  RAM %s GB < 16 GB -> candidato ligero: %s (Apache 2.0, multilingue)\n' "$RAM_GB" "$BASE_MODEL"
-  log_warn "Con menos de 16 GB la calidad y velocidad del razonamiento seran menores."
+  printf '  Modelo seleccionado manualmente (override): %s\n' "$BASE_MODEL"
 else
-  BASE_MODEL="granite4.1:8b"
-  log_warn "No se pudo detectar la RAM; se usa el candidato ligero $BASE_MODEL. Usa --model para elegir otro."
+  BASE_MODEL="$DEFAULT_BASE_MODEL"
+  printf '  Modelo oficial de Fercho: %s (Qwen2.5 7B Instruct)\n' "$BASE_MODEL"
 fi
-printf '  Nota: ningun modelo esta aprobado de antemano; el probe y el benchmark deciden.\n'
+if (( RAM_GB > 0 && RAM_GB < 8 )); then
+  log_warn "RAM total $RAM_GB GB (< 8 GB). Ejecutar un 7B puede quedar ajustado o lento; considera un modelo menor con --model."
+fi
+printf '  El probe de tool calling valida que el modelo cumpla el requisito de Fercho.\n'
 
+# qwen2.5:7b-instruct (Q4_K_M) ocupa ~5 GB en disco.
 case "$BASE_MODEL" in
-  gpt-oss:20b) NEED_GB=16 ;;
-  granite4.1:8b) NEED_GB=8 ;;
+  qwen2.5:7b-instruct) NEED_GB=7 ;;
   *) NEED_GB=25; log_warn "No conocemos el tamano de '$BASE_MODEL'; exigimos 25 GB libres por seguridad." ;;
 esac
 
@@ -179,7 +173,7 @@ else
   log_ok "$BASE_MODEL descargado"
 fi
 
-# --- 11-12. Modelfile y modelo derivado "fercho" ---------------------------------
+# --- 11-12. Modelfile y modelo derivado "fercho-qwen" -----------------------------
 log_step "Modelo derivado '$FERCHO_MODEL' (contexto $NUM_CTX tokens)"
 NEEDS_CREATE=1
 CURRENT_MODELFILE=$(ollama show "$FERCHO_MODEL" --modelfile 2>/dev/null || true)
@@ -291,8 +285,8 @@ else
   log_warn "El modelo '$FERCHO_MODEL' NO devolvio tool_calls en el probe."
   printf '\n  Este modelo NO pasa la prueba de tool calling, requisito de Fercho.\n' >&2
   printf '  Opciones:\n' >&2
-  printf '    1. Ejecuta de nuevo con otro modelo: ./scripts/setup-fercho.sh --model granite4.1:8b\n' >&2
-  printf '    2. O con: ./scripts/setup-fercho.sh --model gpt-oss:20b (requiere ~16 GB de RAM)\n' >&2
+  printf '    1. Verifica que el modelo descargado soporte tool calling (Qwen2.5 7B Instruct lo soporta).\n' >&2
+  printf '    2. Si usaste --model con un tag sin tools, repite con el oficial: ./scripts/setup-fercho.sh\n' >&2
   fail "El modelo no pasó la prueba de tool calling."
 fi
 
@@ -301,8 +295,9 @@ log_step "Resumen del setup"
 for MSG in ${SUMMARY_OK[@]+"${SUMMARY_OK[@]}"};   do printf '  [OK] %s\n' "$MSG"; done
 for MSG in ${SUMMARY_WARN[@]+"${SUMMARY_WARN[@]}"}; do printf '  [AVISO] %s\n' "$MSG"; done
 printf '\nFercho AI quedo configurado en modo LOCAL (modelo '"'"'%s'"'"' = %s, num_ctx %s).\n' "$FERCHO_MODEL" "$BASE_MODEL" "$NUM_CTX"
+printf 'Modelo oficial de Fercho: Qwen2.5 7B Instruct (qwen2.5:7b-instruct) via Ollama.\n'
 printf '\nSiguientes pasos:\n'
-printf '  1. Levanta la aplicacion:  ./scripts/dev.sh (o el equivalente de tu sistema)\n'
+printf '  1. Levanta la aplicacion (Windows):  scripts\\dev.ps1\n'
 printf '  2. Registrate como cliente y habla con Fercho en la ruta /assistant\n'
-printf '  3. (Opcional) Benchmark: scripts/fercho-bench.sh cuando este disponible\n'
+printf '  3. (Opcional) Benchmark: scripts/fercho-bench.ps1 (Windows)\n'
 printf '\nRecuerda: OpenCode es solo una herramienta de desarrollo; nunca es parte del runtime de SuperFercho.\n'

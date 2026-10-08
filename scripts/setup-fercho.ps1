@@ -5,20 +5,21 @@
 
 .DESCRIPTION
     Idempotente y no destructivo: verifica prerequisitos, detecta/arranca Ollama,
-    descarga el modelo segun el hardware disponible, crea el modelo "fercho" con
-    contexto ampliado, escribe la configuracion local en .env (sin pisar valores
-    no vacios) y ejecuta un probe de tool calling contra el modelo.
+    descarga el modelo oficial qwen2.5:7b-instruct (Qwen2.5 7B Instruct), crea el
+    modelo derivado "fercho-qwen" con contexto ampliado, escribe la configuracion
+    local en .env (sin pisar valores no vacios) y ejecuta un probe de tool calling
+    contra el modelo.
 
     Nunca lee credenciales de OpenCode, nunca descarga ni copia API keys y nunca
     elimina procesos ni archivos del usuario.
 
 .PARAMETER Model
-    Tag de Ollama a usar (ejemplo: gpt-oss:20b, granite4.1:8b). Si se omite, se
-    selecciona segun la RAM disponible.
+    Tag de Ollama a usar en lugar del modelo oficial. Si se omite, se usa
+    qwen2.5:7b-instruct.
 
 .EXAMPLE
     .\scripts\setup-fercho.ps1
-    .\scripts\setup-fercho.ps1 -Model granite4.1:8b
+    .\scripts\setup-fercho.ps1 -Model qwen2.5:14b-instruct
 #>
 [CmdletBinding()]
 param(
@@ -31,7 +32,8 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 $OllamaBase = "http://localhost:11434"
 $NumCtx = 16384
-$FerchoModel = "fercho"
+$DefaultBaseModel = "qwen2.5:7b-instruct"
+$FerchoModel = "fercho-qwen"
 
 $script:Summary = New-Object System.Collections.Generic.List[string]
 
@@ -236,24 +238,18 @@ Write-Step "Seleccion de modelo"
 
 if ($Model -ne "") {
     $baseModel = $Model
-    Write-Host "  Modelo seleccionado manualmente: $baseModel"
-    if ($totalRamGb -gt 0 -and $totalRamGb -lt 16 -and $baseModel -match "gpt-oss:20b") {
-        Write-Warn2 "Elegiste $baseModel con menos de 16 GB de RAM. Puede quedarse sin memoria o ser muy lento. Considera granite4.1:8b."
-    }
-} elseif ($totalRamGb -ge 16) {
-    $baseModel = "gpt-oss:20b"
-    Write-Host "  RAM ${totalRamGb} GB >= 16 GB -> candidato: $baseModel (Apache 2.0, tool calling nativo)"
-} elseif ($totalRamGb -gt 0) {
-    $baseModel = "granite4.1:8b"
-    Write-Host "  RAM ${totalRamGb} GB < 16 GB -> candidato ligero: $baseModel (Apache 2.0, multilingue)"
-    Write-Warn2 "Con menos de 16 GB la calidad y velocidad del razonamiento seran menores."
+    Write-Host "  Modelo seleccionado manualmente (override): $baseModel"
 } else {
-    $baseModel = "granite4.1:8b"
-    Write-Warn2 "No se pudo detectar la RAM; se usa el candidato ligero $baseModel. Usa -Model para elegir otro."
+    $baseModel = $DefaultBaseModel
+    Write-Host "  Modelo oficial de Fercho: $baseModel (Qwen2.5 7B Instruct)"
 }
-Write-Host "  Nota: ningun modelo esta aprobado de antemano; el probe y el benchmark deciden."
+if ($totalRamGb -gt 0 -and $totalRamGb -lt 8) {
+    Write-Warn2 "RAM total ${totalRamGb} GB (< 8 GB). Ejecutar un 7B puede quedar ajustado o lento; considera un modelo menor con -Model."
+}
+Write-Host "  El probe de tool calling valida que el modelo cumpla el requisito de Fercho."
 
-$modelSizesGb = @{ "gpt-oss:20b" = 14; "granite4.1:8b" = 6 }
+# qwen2.5:7b-instruct (Q4_K_M) ocupa ~5 GB en disco.
+$modelSizesGb = @{ "qwen2.5:7b-instruct" = 5 }
 if ($modelSizesGb.ContainsKey($baseModel)) {
     $needGb = $modelSizesGb[$baseModel] + 2
 } else {
@@ -294,7 +290,7 @@ if ($existingModels -contains $baseModel) {
     Write-Ok "$baseModel descargado"
 }
 
-# --- 10-11. Modelfile y modelo derivado "fercho" (num_ctx) ---
+# --- 10-11. Modelfile y modelo derivado "fercho-qwen" (num_ctx) ---
 Write-Step "Modelo derivado '$FerchoModel' (contexto $NumCtx tokens)"
 $modelfileContent = "FROM $baseModel`nPARAMETER num_ctx $NumCtx`n"
 $needsCreate = $true
@@ -423,8 +419,8 @@ if ($probeOk) {
     Write-Host ""
     Write-Host "  Este modelo NO pasa la prueba de tool calling, requisito de Fercho." -ForegroundColor Red
     Write-Host "  Opciones:" -ForegroundColor Yellow
-    Write-Host "    1. Ejecuta de nuevo con otro modelo: .\scripts\setup-fercho.ps1 -Model granite4.1:8b"
-    Write-Host "    2. O con: .\scripts\setup-fercho.ps1 -Model gpt-oss:20b (requiere ~16 GB de RAM)"
+    Write-Host "    1. Verifica que el modelo descargado soporte tool calling (Qwen2.5 7B Instruct lo soporta)."
+    Write-Host "    2. Si usaste -Model con un tag sin tools, repite con el oficial: .\scripts\setup-fercho.ps1"
     Stop-WithError "El modelo no pasó la prueba de tool calling."
 }
 
@@ -437,10 +433,11 @@ foreach ($line in $script:Summary) {
 }
 Write-Host ""
 Write-Host "Fercho AI quedo configurado en modo LOCAL (modelo '$FerchoModel' = $baseModel, num_ctx $NumCtx)."
+Write-Host "Modelo oficial de Fercho: Qwen2.5 7B Instruct (qwen2.5:7b-instruct) via Ollama."
 Write-Host ""
 Write-Host "Siguientes pasos:"
 Write-Host "  1. Levanta la aplicacion:  .\scripts\dev.ps1"
 Write-Host "  2. Registrate como cliente en http://localhost:3000 y habla con Fercho en /assistant"
-Write-Host "  3. (Opcional) Benchmark: scripts/fercho-bench.ps1 cuando este disponible"
+Write-Host "  3. (Opcional) Benchmark: scripts\fercho-bench.ps1"
 Write-Host ""
 Write-Host "Recuerda: OpenCode es solo una herramienta de desarrollo; nunca es parte del runtime de SuperFercho."
