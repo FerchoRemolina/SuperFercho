@@ -113,6 +113,7 @@ class FavoriteControllerTest {
                 .andExpect(jsonPath("$.items[0].product.categoryId").value(CATEGORY_ID.toString()))
                 .andExpect(jsonPath("$.items[0].product.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.items[0].product.available").value(true))
+                .andExpect(jsonPath("$.items[0].product.stock").value(25))
                 .andExpect(jsonPath("$.items[1].product").value(nullValue()));
 
         verify(listFavoritesUseCase).execute();
@@ -140,6 +141,7 @@ class FavoriteControllerTest {
                 "https://img.test/milk.png",
                 CATEGORY_ID,
                 "ACTIVE",
-                true);
+                true,
+                25);
     }
 }

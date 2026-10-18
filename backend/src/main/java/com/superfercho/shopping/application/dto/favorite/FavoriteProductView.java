@@ -11,4 +11,5 @@ public record FavoriteProductView(
         String imageUrl,
         UUID categoryId,
         String status,
-        boolean available) {}
+        boolean available,
+        int stock) {}

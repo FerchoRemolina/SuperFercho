@@ -12,4 +12,5 @@ public record ProductCardInfo(
         String imageUrl,
         UUID categoryId,
         ProductStatus status,
-        boolean sellable) {}
+        boolean sellable,
+        int stock) {}

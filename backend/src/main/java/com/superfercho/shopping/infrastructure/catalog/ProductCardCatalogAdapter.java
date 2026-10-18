@@ -30,7 +30,8 @@ public class ProductCardCatalogAdapter implements ProductCardCatalogPort {
                         info.imageUrl(),
                         info.categoryId(),
                         info.status().name(),
-                        info.sellable()))
+                        info.sellable(),
+                        info.stock()))
                 .toList();
     }
 }

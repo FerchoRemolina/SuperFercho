@@ -56,6 +56,7 @@ public final class FindProductCardsUseCase implements ProductCardQueryPort {
                 product.imageUrl(),
                 product.categoryId(),
                 product.status(),
-                sellable);
+                sellable,
+                product.stock());
     }
 }

@@ -12,7 +12,8 @@ public record FavoriteProductRestResponse(
         String imageUrl,
         UUID categoryId,
         String status,
-        boolean available) {
+        boolean available,
+        int stock) {
 
     public static FavoriteProductRestResponse from(FavoriteProductView product) {
         if (product == null) {
@@ -26,6 +27,7 @@ public record FavoriteProductRestResponse(
                 product.imageUrl(),
                 product.categoryId(),
                 product.status(),
-                product.available());
+                product.available(),
+                product.stock());
     }
 }

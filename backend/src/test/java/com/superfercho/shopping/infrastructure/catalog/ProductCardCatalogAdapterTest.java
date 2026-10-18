@@ -40,7 +40,8 @@ class ProductCardCatalogAdapterTest {
                         "https://img.test/milk.png",
                         CATEGORY_ID,
                         ProductStatus.INACTIVE,
-                        false)));
+                        false,
+                        0)));
         ProductCardCatalogAdapter adapter = new ProductCardCatalogAdapter(productCardQueryPort);
 
         List<FavoriteProductView> cards = adapter.findCardsByIds(List.of(PRODUCT_ID));
@@ -55,6 +56,7 @@ class ProductCardCatalogAdapterTest {
         assertEquals(CATEGORY_ID, card.categoryId());
         assertEquals("INACTIVE", card.status());
         assertFalse(card.available());
+        assertEquals(0, card.stock());
         verify(productCardQueryPort).findCardsByIds(List.of(PRODUCT_ID));
     }
 
@@ -62,12 +64,13 @@ class ProductCardCatalogAdapterTest {
     void shouldMapSellableActiveCard() {
         when(productCardQueryPort.findCardsByIds(List.of(PRODUCT_ID)))
                 .thenReturn(List.of(new ProductCardInfo(
-                        PRODUCT_ID, "Leche entera", "Alpina", PRICE, null, CATEGORY_ID, ProductStatus.ACTIVE, true)));
+                        PRODUCT_ID, "Leche entera", "Alpina", PRICE, null, CATEGORY_ID, ProductStatus.ACTIVE, true, 12)));
         ProductCardCatalogAdapter adapter = new ProductCardCatalogAdapter(productCardQueryPort);
 
         List<FavoriteProductView> cards = adapter.findCardsByIds(List.of(PRODUCT_ID));
 
         assertTrue(cards.get(0).available());
         assertEquals("ACTIVE", cards.get(0).status());
+        assertEquals(12, cards.get(0).stock());
     }
 }

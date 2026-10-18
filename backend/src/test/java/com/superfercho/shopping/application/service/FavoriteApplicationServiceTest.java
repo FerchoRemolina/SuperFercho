@@ -236,11 +236,11 @@ class FavoriteApplicationServiceTest {
 
     private static FavoriteProductView activeCard(UUID productId) {
         return new FavoriteProductView(
-                productId, "Leche entera", "Alpina", PRICE, "https://img.test/milk.png", CATEGORY_ID, "ACTIVE", true);
+                productId, "Leche entera", "Alpina", PRICE, "https://img.test/milk.png", CATEGORY_ID, "ACTIVE", true, 25);
     }
 
     private static FavoriteProductView inactiveCard(UUID productId) {
         return new FavoriteProductView(
-                productId, "Pan", "Bimbo", PRICE, null, CATEGORY_ID, "INACTIVE", false);
+                productId, "Pan", "Bimbo", PRICE, null, CATEGORY_ID, "INACTIVE", false, 0);
     }
 }
