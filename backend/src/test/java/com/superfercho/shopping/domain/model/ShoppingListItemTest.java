@@ -45,11 +45,19 @@ class ShoppingListItemTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {0, -1})
-    void shouldRejectItemWhenQuantityIsNotPositive(int quantity) {
+    @ValueSource(ints = {-1, -5})
+    void shouldRejectItemWhenQuantityIsNegative(int quantity) {
         assertThrows(
                 InvalidShoppingListItemException.class,
                 () -> ShoppingListItem.create(ID, PRODUCT_ID, quantity, CREATED_AT));
+    }
+
+    @Test
+    void shouldAllowZeroQuantity() {
+        // Cantidad 0: el producto permanece guardado sin comprarse.
+        ShoppingListItem item = ShoppingListItem.create(ID, PRODUCT_ID, 0, CREATED_AT);
+
+        assertEquals(0, item.quantity());
     }
 
     @Test

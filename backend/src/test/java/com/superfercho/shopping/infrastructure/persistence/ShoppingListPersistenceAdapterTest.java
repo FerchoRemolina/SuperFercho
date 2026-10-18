@@ -143,11 +143,26 @@ class ShoppingListPersistenceAdapterTest {
     }
 
     @Test
-    void shouldRejectInvalidQuantityAtDatabase() {
+    void shouldAcceptZeroQuantityAtDatabase() {
+        // Cantidad 0 es válida en listas: producto guardado sin comprarse.
         UUID listId = UUID.randomUUID();
         insertListHeader(listId, UUID.randomUUID());
 
-        assertThatThrownBy(() -> insertItemBypassingDomain(listId, 0))
+        insertItemBypassingDomain(listId, 0);
+
+        Integer stored = jdbcTemplate.queryForObject(
+                "select quantity from shopping.shopping_list_items where shopping_list_id = ?",
+                Integer.class,
+                listId);
+        assertThat(stored).isZero();
+    }
+
+    @Test
+    void shouldRejectNegativeQuantityAtDatabase() {
+        UUID listId = UUID.randomUUID();
+        insertListHeader(listId, UUID.randomUUID());
+
+        assertThatThrownBy(() -> insertItemBypassingDomain(listId, -1))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 

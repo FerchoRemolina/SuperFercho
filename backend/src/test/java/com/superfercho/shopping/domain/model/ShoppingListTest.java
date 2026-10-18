@@ -166,6 +166,17 @@ class ShoppingListTest {
     }
 
     @Test
+    void shouldChangeQuantityOfExistingProductToZero() {
+        // Cantidad 0: el producto permanece en la lista pero no se incluirá
+        // al comprar la lista.
+        ShoppingList list = validList().items(List.of(milk(2))).build().changeQuantity(MILK_ID, 0, LATER);
+
+        assertEquals(1, list.items().size());
+        assertEquals(0, list.items().get(0).quantity());
+        assertEquals(LATER, list.updatedAt());
+    }
+
+    @Test
     void shouldRejectChangeQuantityWhenProductIsMissing() {
         assertThrows(
                 InvalidShoppingListException.class, () -> validList().build().changeQuantity(MILK_ID, 1, LATER));

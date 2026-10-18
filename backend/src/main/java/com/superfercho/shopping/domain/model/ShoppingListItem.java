@@ -9,8 +9,8 @@ public record ShoppingListItem(UUID id, UUID productId, int quantity, Instant cr
     public ShoppingListItem {
         requireNonNull(id, "id");
         requireNonNull(productId, "productId");
-        if (quantity <= 0) {
-            throw new InvalidShoppingListItemException("quantity must be greater than 0");
+        if (quantity < 0) {
+            throw new InvalidShoppingListItemException("quantity must be greater than or equal to 0");
         }
         requireNonNull(createdAt, "createdAt");
     }
