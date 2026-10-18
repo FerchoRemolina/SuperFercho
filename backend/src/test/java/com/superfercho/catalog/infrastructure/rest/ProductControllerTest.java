@@ -36,6 +36,7 @@ import com.superfercho.catalog.application.usecase.ChangeProductPriceUseCase;
 import com.superfercho.catalog.application.usecase.CreateProductUseCase;
 import com.superfercho.catalog.application.usecase.DeactivateProductUseCase;
 import com.superfercho.catalog.application.usecase.GetProductUseCase;
+import com.superfercho.catalog.application.usecase.ListBestSellersUseCase;
 import com.superfercho.catalog.application.usecase.ListProductsUseCase;
 import com.superfercho.catalog.application.usecase.RestoreProductUseCase;
 import com.superfercho.catalog.application.usecase.SearchProductsUseCase;
@@ -83,6 +84,9 @@ class ProductControllerTest {
 
     @MockitoBean
     private ListProductsUseCase listProductsUseCase;
+
+    @MockitoBean
+    private ListBestSellersUseCase listBestSellersUseCase;
 
     @MockitoBean
     private SearchProductsUseCase searchProductsUseCase;
@@ -225,6 +229,37 @@ class ProductControllerTest {
         verify(listProductsUseCase)
                 .execute(new ListProductsCommand(CATEGORY_ID, ProductStatus.INACTIVE, CatalogView.ADMIN));
         verify(listProductsUseCase, never()).execute(new ListProductsCommand(null, null, CatalogView.PUBLIC));
+    }
+
+    @Test
+    void shouldExposeBestSellersForStorefrontWithoutAuthenticationFilters() throws Exception {
+        ProductResult bestSeller = new ProductResult(
+                PRODUCT_ID,
+                CATEGORY_ID,
+                TYPE_ID,
+                "Lácteos",
+                null,
+                "Entera",
+                UNIT,
+                "7701234567890",
+                "Leche entera",
+                "Alquería",
+                "Bolsa 1L",
+                PRICE,
+                20,
+                "https://img.test/leche.png",
+                ProductStatus.ACTIVE,
+                CREATED_AT,
+                UPDATED_AT);
+        when(listBestSellersUseCase.execute(null)).thenReturn(List.of(bestSeller));
+
+        mockMvc.perform(get("/api/v1/products/best-sellers"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(PRODUCT_ID.toString()))
+                .andExpect(jsonPath("$[0].name").value("Leche entera"))
+                .andExpect(jsonPath("$[0].productTypeName").value("Lácteos"));
+
+        verify(listBestSellersUseCase).execute(null);
     }
 
     @Test

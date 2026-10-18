@@ -19,6 +19,7 @@ import com.superfercho.catalog.application.usecase.ChangeProductPriceUseCase;
 import com.superfercho.catalog.application.usecase.CreateProductUseCase;
 import com.superfercho.catalog.application.usecase.DeactivateProductUseCase;
 import com.superfercho.catalog.application.usecase.GetProductUseCase;
+import com.superfercho.catalog.application.usecase.ListBestSellersUseCase;
 import com.superfercho.catalog.application.usecase.ListProductsUseCase;
 import com.superfercho.catalog.application.usecase.RestoreProductUseCase;
 import com.superfercho.catalog.application.usecase.SearchProductsUseCase;
@@ -52,6 +53,7 @@ public class ProductController {
     private final GetProductUseCase getProductUseCase;
     private final ListProductsUseCase listProductsUseCase;
     private final SearchProductsUseCase searchProductsUseCase;
+    private final ListBestSellersUseCase listBestSellersUseCase;
     private final UpdateProductUseCase updateProductUseCase;
     private final ActivateProductUseCase activateProductUseCase;
     private final DeactivateProductUseCase deactivateProductUseCase;
@@ -65,6 +67,7 @@ public class ProductController {
             GetProductUseCase getProductUseCase,
             ListProductsUseCase listProductsUseCase,
             SearchProductsUseCase searchProductsUseCase,
+            ListBestSellersUseCase listBestSellersUseCase,
             UpdateProductUseCase updateProductUseCase,
             ActivateProductUseCase activateProductUseCase,
             DeactivateProductUseCase deactivateProductUseCase,
@@ -76,6 +79,7 @@ public class ProductController {
         this.getProductUseCase = getProductUseCase;
         this.listProductsUseCase = listProductsUseCase;
         this.searchProductsUseCase = searchProductsUseCase;
+        this.listBestSellersUseCase = listBestSellersUseCase;
         this.updateProductUseCase = updateProductUseCase;
         this.activateProductUseCase = activateProductUseCase;
         this.deactivateProductUseCase = deactivateProductUseCase;
@@ -121,6 +125,18 @@ public class ProductController {
     public List<ProductRestResponse> search(
             @RequestParam(required = false) String text, @RequestParam(required = false) CatalogView view) {
         return searchProductsUseCase.execute(new SearchProductsCommand(text, catalogView(view))).stream()
+                .map(ProductRestResponse::from)
+                .toList();
+    }
+
+    /**
+     * Best sellers del storefront (Home Customer): unidades vendidas con
+     * ventana móvil (7 → 30 → 90 días → histórico), solo productos visibles y
+     * disponibles, diversidad sencilla por categoría. GET público.
+     */
+    @GetMapping("/best-sellers")
+    public List<ProductRestResponse> bestSellers(@RequestParam(required = false) Integer limit) {
+        return listBestSellersUseCase.execute(limit).stream()
                 .map(ProductRestResponse::from)
                 .toList();
     }

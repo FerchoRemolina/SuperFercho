@@ -6,6 +6,7 @@ import com.superfercho.catalog.application.port.ProductQueryPort;
 import com.superfercho.catalog.application.port.ProductRepository;
 import com.superfercho.catalog.application.port.ProductTypeRepository;
 import com.superfercho.catalog.application.port.ProductVariantRepository;
+import com.superfercho.catalog.application.port.SalesPort;
 import com.superfercho.catalog.application.usecase.ActivateCategoryUseCase;
 import com.superfercho.catalog.application.usecase.ActivateProductTypeUseCase;
 import com.superfercho.catalog.application.usecase.ActivateProductUseCase;
@@ -28,6 +29,7 @@ import com.superfercho.catalog.application.usecase.GetProductTypeUseCase;
 import com.superfercho.catalog.application.usecase.GetProductUseCase;
 import com.superfercho.catalog.application.usecase.GetProductVariantUseCase;
 import com.superfercho.catalog.application.usecase.ListCategoriesUseCase;
+import com.superfercho.catalog.application.usecase.ListBestSellersUseCase;
 import com.superfercho.catalog.application.usecase.ListProductTypesUseCase;
 import com.superfercho.catalog.application.usecase.ListProductVariantsUseCase;
 import com.superfercho.catalog.application.usecase.ListProductsUseCase;
@@ -203,6 +205,23 @@ public class CatalogUseCaseConfiguration {
             ProductVariantRepository productVariantRepository) {
         return new SearchProductsUseCase(
                 productRepository, categoryRepository, productTypeRepository, productVariantRepository);
+    }
+
+    @Bean
+    ListBestSellersUseCase listBestSellersUseCase(
+            SalesPort salesPort,
+            ProductRepository productRepository,
+            CategoryRepository categoryRepository,
+            ProductTypeRepository productTypeRepository,
+            ProductVariantRepository productVariantRepository,
+            Clock clock) {
+        return new ListBestSellersUseCase(
+                salesPort,
+                productRepository,
+                categoryRepository,
+                productTypeRepository,
+                productVariantRepository,
+                clock);
     }
 
     @Bean
