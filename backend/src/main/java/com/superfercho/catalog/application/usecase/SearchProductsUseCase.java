@@ -41,7 +41,8 @@ public final class SearchProductsUseCase {
         return ProductCatalogOrdering.sorted(
                         visible, lookup.productTypesById(), lookup.productVariantsById())
                 .stream()
-                .map(ProductResult::from)
+                .map(product -> ProductResult.from(
+                        product, lookup.productTypeNameOf(product), lookup.productVariantNameOf(product)))
                 .toList();
     }
 }

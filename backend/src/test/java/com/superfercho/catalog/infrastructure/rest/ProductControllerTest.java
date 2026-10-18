@@ -177,6 +177,39 @@ class ProductControllerTest {
     }
 
     @Test
+    void shouldExposeTaxonomyNamesAndPresentationForStorefront() throws Exception {
+        ProductResult enriched = new ProductResult(
+                PRODUCT_ID,
+                CATEGORY_ID,
+                TYPE_ID,
+                "Lácteos",
+                null,
+                "Entera",
+                UNIT,
+                "7701234567890",
+                "Leche entera",
+                "Alquería",
+                "Bolsa 1L",
+                PRICE,
+                20,
+                "https://img.test/leche.png",
+                ProductStatus.ACTIVE,
+                CREATED_AT,
+                UPDATED_AT);
+
+        when(listProductsUseCase.execute(new ListProductsCommand(null, null, CatalogView.PUBLIC)))
+                .thenReturn(List.of(enriched));
+
+        mockMvc.perform(get("/api/v1/products"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].productTypeId").value(TYPE_ID.toString()))
+                .andExpect(jsonPath("$[0].productTypeName").value("Lácteos"))
+                .andExpect(jsonPath("$[0].productVariantName").value("Entera"))
+                .andExpect(jsonPath("$[0].presentation.quantity").value(1))
+                .andExpect(jsonPath("$[0].presentation.unit").value("UNIT"));
+    }
+
+    @Test
     void shouldListProductsWithFiltersAndAdminView() throws Exception {
         when(listProductsUseCase.execute(
                         new ListProductsCommand(CATEGORY_ID, ProductStatus.INACTIVE, CatalogView.ADMIN)))

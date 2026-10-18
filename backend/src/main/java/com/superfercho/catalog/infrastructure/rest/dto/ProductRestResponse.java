@@ -7,11 +7,19 @@ import com.superfercho.platform.money.Money;
 import java.time.Instant;
 import java.util.UUID;
 
+/**
+ * Contrato público y administrativo de producto. productTypeName /
+ * productVariantName son aditivos y orientados a tienda: permiten al
+ * Customer conocer la taxonomía real (Categoría → Tipo → Variante →
+ * Presentación) sin resolver UUIDs en el frontend.
+ */
 public record ProductRestResponse(
         UUID id,
         UUID categoryId,
         UUID productTypeId,
+        String productTypeName,
         UUID productVariantId,
+        String productVariantName,
         Presentation presentation,
         String barcode,
         String name,
@@ -29,7 +37,9 @@ public record ProductRestResponse(
                 result.id(),
                 result.categoryId(),
                 result.productTypeId(),
+                result.productTypeName(),
                 result.productVariantId(),
+                result.productVariantName(),
                 result.presentation(),
                 result.barcode(),
                 result.name(),

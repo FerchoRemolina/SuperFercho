@@ -73,4 +73,20 @@ final class CatalogVisibilityLookup {
     Map<UUID, ProductVariant> productVariantsById() {
         return productVariantsById;
     }
+
+    /** Nombre comercial del tipo del producto, o null si no está resuelto. */
+    String productTypeNameOf(Product product) {
+        ProductType productType = productTypesById.get(product.productTypeId());
+        return productType == null ? null : productType.name();
+    }
+
+    /** Nombre comercial de la variante del producto, o null si no tiene o no está resuelta. */
+    String productVariantNameOf(Product product) {
+        UUID variantId = product.productVariantId();
+        if (variantId == null) {
+            return null;
+        }
+        ProductVariant productVariant = productVariantsById.get(variantId);
+        return productVariant == null ? null : productVariant.name();
+    }
 }
