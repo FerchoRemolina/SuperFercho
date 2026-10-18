@@ -4,6 +4,10 @@ spring:
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
   jpa:
     open-in-view: false
     hibernate:
@@ -54,3 +58,5 @@ superfercho:
     request-window: ${SUPERFERCHO_PASSWORD_RECOVERY_REQUEST_WINDOW:24h}
     ip-max-requests-per-window: ${SUPERFERCHO_PASSWORD_RECOVERY_IP_MAX_REQUESTS:20}
     ip-window: ${SUPERFERCHO_PASSWORD_RECOVERY_IP_WINDOW:1h}
+  media:
+    dir: ${SUPERFERCHO_MEDIA_DIR:./data/media}
