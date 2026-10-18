@@ -263,6 +263,57 @@ class CartApplicationServiceTest {
     }
 
     @Test
+    void shouldSkipZeroQuantityItemsWhenAddingShoppingListToCart() {
+        // Cantidad 0: permanece en la lista pero no se agrega al carrito.
+        ShoppingList list = ShoppingList.create(
+                LIST_ID,
+                CUSTOMER_ID,
+                "Mercado semanal",
+                List.of(
+                        ShoppingListItem.create(ITEM_ID, MILK_ID, 2, CREATED_AT),
+                        ShoppingListItem.create(
+                                UUID.fromString("99999999-9999-9999-9999-000000000002"), BREAD_ID, 0, CREATED_AT)),
+                CREATED_AT,
+                CREATED_AT);
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(list));
+        when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(emptyCart()));
+        when(clockPort.currentTime()).thenReturn(NOW);
+        when(productCatalogPort.getProduct(MILK_ID)).thenReturn(Optional.of(new ProductCatalogInfo(MILK_ID, MILK_PRICE)));
+        when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CartResponse response = cartService.execute(new AddShoppingListToCartCommand(LIST_ID));
+
+        assertEquals(1, response.items().size());
+        assertEquals(MILK_ID, response.items().get(0).productId());
+        assertEquals(2, response.items().get(0).quantity());
+        verify(productCatalogPort).getProduct(MILK_ID);
+        verify(productCatalogPort, never()).getProduct(BREAD_ID);
+        verify(cartRepository).save(any(Cart.class));
+    }
+
+    @Test
+    void shouldReturnCurrentCartWhenShoppingListOnlyHasZeroQuantityItems() {
+        ShoppingList list = ShoppingList.create(
+                LIST_ID,
+                CUSTOMER_ID,
+                "Mercado semanal",
+                List.of(ShoppingListItem.create(ITEM_ID, MILK_ID, 0, CREATED_AT)),
+                CREATED_AT,
+                CREATED_AT);
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(list));
+        when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cartWithMilk()));
+
+        CartResponse response = cartService.execute(new AddShoppingListToCartCommand(LIST_ID));
+
+        assertEquals(CART_ID, response.id());
+        assertEquals(1, response.items().size());
+        verify(productCatalogPort, never()).getProduct(any());
+        verify(cartRepository, never()).save(any());
+    }
+
+    @Test
     void shouldMergeShoppingListQuantitiesIntoExistingCartAndKeepOriginalPrice() {
         when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(listWithMilkAndBread()));

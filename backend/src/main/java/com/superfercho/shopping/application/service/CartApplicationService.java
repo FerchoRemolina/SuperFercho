@@ -78,13 +78,17 @@ public final class CartApplicationService
     public CartResponse execute(AddShoppingListToCartCommand command) {
         UUID currentUserId = currentUserProvider.getCurrentUserId();
         ShoppingList shoppingList = requireList(currentUserId, command.shoppingListId());
-        if (shoppingList.items().isEmpty()) {
-            return CartResponse.from(getOrCreateCart(currentUserId));
-        }
         List<ProductAddition> additions = new ArrayList<>();
         for (ShoppingListItem item : shoppingList.items()) {
+            // Cantidad 0: permanece guardado en la lista pero no se compra.
+            if (item.quantity() <= 0) {
+                continue;
+            }
             Money price = requireProduct(item.productId()).currentPrice();
             additions.add(new ProductAddition(item.productId(), item.quantity(), price));
+        }
+        if (additions.isEmpty()) {
+            return CartResponse.from(getOrCreateCart(currentUserId));
         }
         return addProducts(currentUserId, clockPort.currentTime(), additions);
     }
