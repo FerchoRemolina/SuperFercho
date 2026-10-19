@@ -115,6 +115,18 @@ public class IdentitySecurityConfiguration {
                         .hasRole("ADMIN")
                         .requestMatchers("/api/v1/admin/customers", "/api/v1/admin/customers/**")
                         .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/admin/media/images")
+                        .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/media/images/**")
+                        .permitAll()
+                        .requestMatchers(
+                                HttpMethod.PUT,
+                                "/api/v1/admin/storefront-content/hero")
+                        .hasRole("ADMIN")
+                        .requestMatchers("/api/v1/admin/storefront-content/**")
+                        .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/storefront-content/**")
+                        .permitAll()
                         .requestMatchers("/api/v1/admin/storefront-preview", "/api/v1/admin/storefront-preview/**")
                         .hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/payments/{paymentId}")

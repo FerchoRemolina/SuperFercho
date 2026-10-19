@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -72,6 +73,8 @@ import com.superfercho.orders.infrastructure.configuration.TransactionalCancelOr
 import com.superfercho.orders.infrastructure.configuration.TransactionalCheckoutUseCase;
 import com.superfercho.orders.infrastructure.rest.AdminOrderController;
 import com.superfercho.orders.infrastructure.rest.OrderController;
+import com.superfercho.storefront.infrastructure.rest.AdminStorefrontContentController;
+import com.superfercho.storefront.infrastructure.rest.StorefrontContentController;
 import com.superfercho.platform.money.Money;
 import com.superfercho.platform.time.ClockConfiguration;
 import java.math.BigDecimal;
@@ -99,7 +102,9 @@ import org.springframework.test.web.servlet.ResultMatcher;
             CategoryController.class,
             OrderController.class,
             AdminOrderController.class,
-            AdminCustomerController.class
+            AdminCustomerController.class,
+            StorefrontContentController.class,
+            AdminStorefrontContentController.class
         })
 @Import({IdentitySecurityConfiguration.class, ClockConfiguration.class})
 @TestPropertySource(
@@ -237,6 +242,58 @@ class HttpAuthorizationSecurityTest {
 
     @MockitoBean
     private GetAdminTopCustomersUseCase getAdminTopCustomersUseCase;
+
+    @MockitoBean
+    private com.superfercho.storefront.application.usecase.GetStorefrontHeroUseCase
+    getStorefrontHeroUseCase;
+
+    @MockitoBean
+    private com.superfercho.storefront.application.usecase.UpdateStorefrontHeroUseCase
+    updateStorefrontHeroUseCase;
+
+    @MockitoBean
+    private com.superfercho.storefront.application.usecase.ListActiveStorefrontFaqsUseCase
+    listActiveStorefrontFaqsUseCase;
+
+    @MockitoBean
+    private com.superfercho.storefront.application.usecase.ListStorefrontFaqsUseCase
+    listStorefrontFaqsUseCase;
+
+    @MockitoBean
+    private com.superfercho.storefront.application.usecase.CreateStorefrontFaqUseCase
+    createStorefrontFaqUseCase;
+
+    @MockitoBean
+    private com.superfercho.storefront.application.usecase.UpdateStorefrontFaqUseCase
+    updateStorefrontFaqUseCase;
+
+    @MockitoBean
+    private com.superfercho.storefront.application.usecase.ReorderStorefrontFaqsUseCase
+    reorderStorefrontFaqsUseCase;
+
+    @MockitoBean
+    private com.superfercho.storefront.application.usecase.DeleteStorefrontFaqUseCase
+    deleteStorefrontFaqUseCase;
+
+    @MockitoBean
+    private com.superfercho.storefront.application.usecase.GetStorefrontFooterSettingsUseCase
+    getStorefrontFooterSettingsUseCase;
+
+    @MockitoBean
+    private com.superfercho.storefront.application.usecase.UpdateStorefrontFooterSettingsUseCase
+    updateStorefrontFooterSettingsUseCase;
+
+    @MockitoBean
+    private com.superfercho.storefront.application.usecase.UpdateStorefrontQrImageUseCase
+    updateStorefrontQrImageUseCase;
+
+    @MockitoBean
+    private com.superfercho.media.infrastructure.web.ImageSniffer
+    imageSniffer;
+
+@MockitoBean
+private com.superfercho.storefront.application.port.AdminPrincipalProvider
+        adminPrincipalProvider;
 
     @BeforeEach
     void stubUseCases() {
@@ -445,6 +502,204 @@ class HttpAuthorizationSecurityTest {
                 .andExpect(notBlockedBySecurity());
     }
 
+@Test
+void shouldAllowPublicStorefrontHeroWithoutJwt() throws Exception {
+    mockMvc.perform(get("/api/v1/storefront-content/hero"))
+            .andExpect(notBlockedBySecurity());
+}
+
+@Test
+void shouldAllowPublicStorefrontHeroWithCustomerJwt() throws Exception {
+    mockMvc.perform(get("/api/v1/storefront-content/hero")
+                    .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+            .andExpect(notBlockedBySecurity());
+}
+
+@Test
+void shouldAllowPublicStorefrontHeroWithAdminJwt() throws Exception {
+    mockMvc.perform(get("/api/v1/storefront-content/hero")
+                    .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+            .andExpect(notBlockedBySecurity());
+}
+
+@Test
+void shouldRejectAdminStorefrontHeroUpdateWithoutJwt() throws Exception {
+    mockMvc.perform(put("/api/v1/admin/storefront-content/hero")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                            {
+                              "title": "Nuevo t├¡tulo",
+                              "description": "Nueva descripci├│n",
+                              "ctaLabel": "Nueva CTA",
+                              "imageUrl": null,
+                              "mode": "STANDARD"
+                            }
+                            """))
+            .andExpect(unauthenticated());
+}
+
+@Test
+void shouldRejectAdminStorefrontHeroUpdateWithCustomerJwt() throws Exception {
+    mockMvc.perform(put("/api/v1/admin/storefront-content/hero")
+                    .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                            {
+                              "title": "Nuevo t├¡tulo",
+                              "description": "Nueva descripci├│n",
+                              "ctaLabel": "Nueva CTA",
+                              "imageUrl": null,
+                              "mode": "STANDARD"
+                            }
+                            """))
+            .andExpect(accessDenied());
+}
+
+@Test
+void shouldAllowAdminStorefrontHeroUpdateWithAdminJwt() throws Exception {
+    mockMvc.perform(put("/api/v1/admin/storefront-content/hero")
+                    .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                            {
+                              "title": "Nuevo t├¡tulo",
+                              "description": "Nueva descripci├│n",
+                              "ctaLabel": "Nueva CTA",
+                              "imageUrl": null,
+                              "mode": "STANDARD"
+                            }
+                            """))
+            .andExpect(notBlockedBySecurity());
+}
+
+    @Test
+    void shouldAllowPublicStorefrontFaqsAndFooterWithoutJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/storefront-content/faqs")).andExpect(notBlockedBySecurity());
+        mockMvc.perform(get("/api/v1/storefront-content/footer-settings"))
+                .andExpect(notBlockedBySecurity());
+    }
+
+    @Test
+    void shouldAllowPublicMediaImageWithoutJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/media/images/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.png"))
+                .andExpect(notBlockedBySecurity());
+    }
+
+    @Test
+    void shouldRejectAdminStorefrontFaqAndFooterMutationsWithoutJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/storefront-content/faqs")).andExpect(unauthenticated());
+        mockMvc.perform(post("/api/v1/admin/storefront-content/faqs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"question":"┬┐P?","answer":"R.","displayOrder":10,"active":true}
+                                """))
+                .andExpect(unauthenticated());
+        mockMvc.perform(put("/api/v1/admin/storefront-content/footer-settings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "supportEmail":"a@b.com",
+                                  "linkedinUrl":"https://www.linkedin.com/in/x/",
+                                  "githubUrl":"https://github.com/x/"
+                                }
+                                """))
+                .andExpect(unauthenticated());
+        mockMvc.perform(multipart("/api/v1/admin/storefront-content/footer-settings/qr-image")
+                        .file(new org.springframework.mock.web.MockMultipartFile(
+                                "file", "qr.png", "image/png", new byte[] {1, 2, 3})))
+                .andExpect(unauthenticated());
+        mockMvc.perform(delete("/api/v1/admin/storefront-content/footer-settings/qr-image"))
+                .andExpect(unauthenticated());
+        mockMvc.perform(post("/api/v1/admin/media/images")
+                        .contentType(MediaType.MULTIPART_FORM_DATA))
+                .andExpect(unauthenticated());
+    }
+
+    @Test
+    void shouldRejectAdminStorefrontFaqAndFooterMutationsWithCustomerJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/storefront-content/faqs")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(accessDenied());
+        mockMvc.perform(put("/api/v1/admin/storefront-content/footer-settings")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "supportEmail":"a@b.com",
+                                  "linkedinUrl":"https://www.linkedin.com/in/x/",
+                                  "githubUrl":"https://github.com/x/"
+                                }
+                                """))
+                .andExpect(accessDenied());
+        mockMvc.perform(multipart("/api/v1/admin/storefront-content/footer-settings/qr-image")
+                        .file(new org.springframework.mock.web.MockMultipartFile(
+                                "file", "qr.png", "image/png", new byte[] {1, 2, 3}))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(accessDenied());
+        mockMvc.perform(delete("/api/v1/admin/storefront-content/footer-settings/qr-image")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(accessDenied());
+        mockMvc.perform(post("/api/v1/admin/media/images")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER))
+                        .contentType(MediaType.MULTIPART_FORM_DATA))
+                .andExpect(accessDenied());
+    }
+
+    @Test
+    void shouldAllowAdminStorefrontFaqFooterAndMediaMutationsWithAdminJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/storefront-content/faqs")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(notBlockedBySecurity());
+        mockMvc.perform(post("/api/v1/admin/storefront-content/faqs")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"question":"┬┐P?","answer":"R.","displayOrder":10,"active":true}
+                                """))
+                .andExpect(notBlockedBySecurity());
+        mockMvc.perform(put("/api/v1/admin/storefront-content/faqs/{faqId}",
+                        UUID.fromString("00000000-0000-0000-0000-00000000fa01"))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"question":"┬┐P?","answer":"R.","displayOrder":10,"active":false}
+                                """))
+                .andExpect(notBlockedBySecurity());
+        mockMvc.perform(put("/api/v1/admin/storefront-content/faqs/order")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"orderedIds":["00000000-0000-0000-0000-00000000fa01"]}
+                                """))
+                .andExpect(notBlockedBySecurity());
+        mockMvc.perform(delete("/api/v1/admin/storefront-content/faqs/{faqId}",
+                        UUID.fromString("00000000-0000-0000-0000-00000000fa01"))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(notBlockedBySecurity());
+        mockMvc.perform(put("/api/v1/admin/storefront-content/footer-settings")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "supportEmail":"a@b.com",
+                                  "linkedinUrl":"https://www.linkedin.com/in/x/",
+                                  "githubUrl":"https://github.com/x/"
+                                }
+                                """))
+                .andExpect(notBlockedBySecurity());
+        mockMvc.perform(multipart("/api/v1/admin/storefront-content/footer-settings/qr-image")
+                        .file(new org.springframework.mock.web.MockMultipartFile(
+                                "file", "qr.png", "image/png", new byte[] {1, 2, 3}))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(notBlockedBySecurity());
+        mockMvc.perform(delete("/api/v1/admin/storefront-content/footer-settings/qr-image")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(notBlockedBySecurity());
+        mockMvc.perform(post("/api/v1/admin/media/images")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN))
+                        .contentType(MediaType.MULTIPART_FORM_DATA))
+                .andExpect(notBlockedBySecurity());
+    }
 
     @Test
     void shouldRejectCustomerOrdersWithoutJwt() throws Exception {
