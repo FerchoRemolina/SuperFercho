@@ -213,6 +213,22 @@ class ShoppingListControllerTest {
     }
 
     @Test
+    void shouldAllowZeroQuantityWhenChangingShoppingListItemQuantity() throws Exception {
+        when(changeShoppingListItemQuantityUseCase.execute(any())).thenReturn(listWithItem(0));
+
+        mockMvc.perform(patch("/api/v1/shopping-lists/{shoppingListId}/items/{productId}", LIST_ID, PRODUCT_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"quantity":0}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].quantity").value(0));
+
+        verify(changeShoppingListItemQuantityUseCase)
+                .execute(new ChangeShoppingListItemQuantityCommand(LIST_ID, PRODUCT_ID, 0));
+    }
+
+    @Test
     void shouldAddShoppingListToCart() throws Exception {
         when(addShoppingListToCartUseCase.execute(any())).thenReturn(cartWithItem(2));
 

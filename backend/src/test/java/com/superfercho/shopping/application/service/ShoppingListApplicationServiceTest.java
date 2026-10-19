@@ -198,6 +198,22 @@ class ShoppingListApplicationServiceTest {
     }
 
     @Test
+    void shouldChangeShoppingListItemQuantityToZero() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(listWithMilk()));
+        when(clockPort.currentTime()).thenReturn(NOW);
+        when(shoppingListRepository.save(any(ShoppingList.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShoppingListResponse response =
+                shoppingListService.execute(new ChangeShoppingListItemQuantityCommand(LIST_ID, MILK_ID, 0));
+
+        assertEquals(1, response.items().size());
+        assertEquals(0, response.items().get(0).quantity());
+        verify(shoppingListRepository).save(any(ShoppingList.class));
+    }
+
+    @Test
     void shouldRemoveProductFromShoppingList() {
         ShoppingList list = emptyList()
                 .addProduct(ITEM_ID, MILK_ID, 1, CREATED_AT)
@@ -313,14 +329,15 @@ class ShoppingListApplicationServiceTest {
     }
 
     @Test
-    void shouldPropagateDomainExceptionWhenQuantityIsInvalid() {
+    void shouldPropagateDomainExceptionWhenQuantityIsNegative() {
+        // 0 es válido (producto guardado sin comprarse); los negativos no.
         when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(listWithMilk()));
         when(clockPort.currentTime()).thenReturn(NOW);
 
         assertThrows(
                 InvalidShoppingListItemException.class,
-                () -> shoppingListService.execute(new ChangeShoppingListItemQuantityCommand(LIST_ID, MILK_ID, 0)));
+                () -> shoppingListService.execute(new ChangeShoppingListItemQuantityCommand(LIST_ID, MILK_ID, -1)));
         verify(shoppingListRepository, never()).save(any());
     }
 
