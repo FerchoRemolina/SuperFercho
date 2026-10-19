@@ -1,6 +1,7 @@
 package com.superfercho.shopping.infrastructure.rest;
 
 import com.superfercho.shopping.application.dto.shoppinglist.AddProductToShoppingListCommand;
+import com.superfercho.shopping.application.dto.shoppinglist.AddShoppingListToCartCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.ChangeShoppingListItemQuantityCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.ClearShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.CreateShoppingListCommand;
@@ -9,6 +10,7 @@ import com.superfercho.shopping.application.dto.shoppinglist.GetShoppingListQuer
 import com.superfercho.shopping.application.dto.shoppinglist.RemoveProductFromShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.RenameShoppingListCommand;
 import com.superfercho.shopping.application.port.in.AddProductToShoppingListUseCase;
+import com.superfercho.shopping.application.port.in.AddShoppingListToCartUseCase;
 import com.superfercho.shopping.application.port.in.ChangeShoppingListItemQuantityUseCase;
 import com.superfercho.shopping.application.port.in.ClearShoppingListUseCase;
 import com.superfercho.shopping.application.port.in.CreateShoppingListUseCase;
@@ -19,6 +21,7 @@ import com.superfercho.shopping.application.port.in.RemoveProductFromShoppingLis
 import com.superfercho.shopping.application.port.in.RenameShoppingListUseCase;
 import com.superfercho.shopping.infrastructure.rest.dto.AddItemRequest;
 import com.superfercho.shopping.infrastructure.rest.dto.AddShoppingListItemRestResponse;
+import com.superfercho.shopping.infrastructure.rest.dto.CartRestResponse;
 import com.superfercho.shopping.infrastructure.rest.dto.ChangeShoppingListItemQuantityRequest;
 import com.superfercho.shopping.infrastructure.rest.dto.CreateShoppingListRequest;
 import com.superfercho.shopping.infrastructure.rest.dto.RenameShoppingListRequest;
@@ -53,6 +56,7 @@ public class ShoppingListController {
     private final RemoveProductFromShoppingListUseCase removeProductFromShoppingListUseCase;
     private final ClearShoppingListUseCase clearShoppingListUseCase;
     private final DeleteShoppingListUseCase deleteShoppingListUseCase;
+    private final AddShoppingListToCartUseCase addShoppingListToCartUseCase;
 
     public ShoppingListController(
             CreateShoppingListUseCase createShoppingListUseCase,
@@ -63,7 +67,8 @@ public class ShoppingListController {
             ChangeShoppingListItemQuantityUseCase changeShoppingListItemQuantityUseCase,
             RemoveProductFromShoppingListUseCase removeProductFromShoppingListUseCase,
             ClearShoppingListUseCase clearShoppingListUseCase,
-            DeleteShoppingListUseCase deleteShoppingListUseCase) {
+            DeleteShoppingListUseCase deleteShoppingListUseCase,
+            AddShoppingListToCartUseCase addShoppingListToCartUseCase) {
         this.createShoppingListUseCase = createShoppingListUseCase;
         this.listShoppingListsUseCase = listShoppingListsUseCase;
         this.getShoppingListUseCase = getShoppingListUseCase;
@@ -73,6 +78,7 @@ public class ShoppingListController {
         this.removeProductFromShoppingListUseCase = removeProductFromShoppingListUseCase;
         this.clearShoppingListUseCase = clearShoppingListUseCase;
         this.deleteShoppingListUseCase = deleteShoppingListUseCase;
+        this.addShoppingListToCartUseCase = addShoppingListToCartUseCase;
     }
 
     @PostMapping
@@ -123,6 +129,11 @@ public class ShoppingListController {
             @RequestBody ChangeShoppingListItemQuantityRequest request) {
         return ShoppingListRestResponse.from(changeShoppingListItemQuantityUseCase.execute(
                 new ChangeShoppingListItemQuantityCommand(shoppingListId, productId, request.quantity())));
+    }
+
+    @PostMapping("/{shoppingListId}/add-to-cart")
+    public CartRestResponse addToCart(@PathVariable UUID shoppingListId) {
+        return CartRestResponse.from(addShoppingListToCartUseCase.execute(new AddShoppingListToCartCommand(shoppingListId)));
     }
 
     @DeleteMapping("/{shoppingListId}/items/{productId}")

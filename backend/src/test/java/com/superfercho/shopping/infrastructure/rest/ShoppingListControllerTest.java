@@ -12,8 +12,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.superfercho.platform.error.ApiExceptionHandler;
+import com.superfercho.platform.money.Money;
+import com.superfercho.shopping.application.dto.cart.CartItemResponse;
+import com.superfercho.shopping.application.dto.cart.CartResponse;
 import com.superfercho.shopping.application.dto.shoppinglist.AddProductToShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.AddProductToShoppingListResult;
+import com.superfercho.shopping.application.dto.shoppinglist.AddShoppingListToCartCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.ChangeShoppingListItemQuantityCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.ClearShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.CreateShoppingListCommand;
@@ -26,6 +30,7 @@ import com.superfercho.shopping.application.dto.shoppinglist.ShoppingListRespons
 import com.superfercho.shopping.application.exception.ProductNotFoundException;
 import com.superfercho.shopping.application.exception.ShoppingListNotFoundException;
 import com.superfercho.shopping.application.port.in.AddProductToShoppingListUseCase;
+import com.superfercho.shopping.application.port.in.AddShoppingListToCartUseCase;
 import com.superfercho.shopping.application.port.in.ChangeShoppingListItemQuantityUseCase;
 import com.superfercho.shopping.application.port.in.ClearShoppingListUseCase;
 import com.superfercho.shopping.application.port.in.CreateShoppingListUseCase;
@@ -34,6 +39,7 @@ import com.superfercho.shopping.application.port.in.GetShoppingListUseCase;
 import com.superfercho.shopping.application.port.in.ListShoppingListsUseCase;
 import com.superfercho.shopping.application.port.in.RemoveProductFromShoppingListUseCase;
 import com.superfercho.shopping.application.port.in.RenameShoppingListUseCase;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -56,8 +62,10 @@ class ShoppingListControllerTest {
     private static final Instant UPDATED_AT = Instant.parse("2026-04-01T10:05:00Z");
     private static final UUID CUSTOMER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID LIST_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+    private static final UUID CART_ID = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
     private static final UUID PRODUCT_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
     private static final UUID ITEM_ID = UUID.fromString("99999999-9999-9999-9999-000000000001");
+    private static final Money PRICE = Money.cop(new BigDecimal("10.50"));
 
     @Autowired
     private MockMvc mockMvc;
@@ -88,6 +96,9 @@ class ShoppingListControllerTest {
 
     @MockitoBean
     private DeleteShoppingListUseCase deleteShoppingListUseCase;
+
+    @MockitoBean
+    private AddShoppingListToCartUseCase addShoppingListToCartUseCase;
 
     @Test
     void shouldCreateShoppingList() throws Exception {
@@ -202,6 +213,28 @@ class ShoppingListControllerTest {
     }
 
     @Test
+    void shouldAddShoppingListToCart() throws Exception {
+        when(addShoppingListToCartUseCase.execute(any())).thenReturn(cartWithItem(2));
+
+        mockMvc.perform(post("/api/v1/shopping-lists/{shoppingListId}/add-to-cart", LIST_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(CART_ID.toString()))
+                .andExpect(jsonPath("$.items[0].productId").value(PRODUCT_ID.toString()))
+                .andExpect(jsonPath("$.items[0].quantity").value(2));
+
+        verify(addShoppingListToCartUseCase).execute(new AddShoppingListToCartCommand(LIST_ID));
+    }
+
+    @Test
+    void shouldMapShoppingListNotFoundOnAddToCartTo404() throws Exception {
+        when(addShoppingListToCartUseCase.execute(any())).thenThrow(new ShoppingListNotFoundException(LIST_ID));
+
+        mockMvc.perform(post("/api/v1/shopping-lists/{shoppingListId}/add-to-cart", LIST_ID))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SHOPPING_LIST_NOT_FOUND"));
+    }
+
+    @Test
     void shouldRemoveProductFromShoppingList() throws Exception {
         when(removeProductFromShoppingListUseCase.execute(any())).thenReturn(emptyList("Weekly groceries"));
 
@@ -283,6 +316,16 @@ class ShoppingListControllerTest {
                 CUSTOMER_ID,
                 "Weekly groceries",
                 List.of(new ShoppingListItemResponse(ITEM_ID, PRODUCT_ID, quantity, CREATED_AT)),
+                CREATED_AT,
+                UPDATED_AT);
+    }
+
+    private static CartResponse cartWithItem(int quantity) {
+        return new CartResponse(
+                CART_ID,
+                CUSTOMER_ID,
+                com.superfercho.shopping.domain.model.CartStatus.ACTIVE,
+                List.of(new CartItemResponse(ITEM_ID, PRODUCT_ID, quantity, PRICE, CREATED_AT, UPDATED_AT)),
                 CREATED_AT,
                 UPDATED_AT);
     }
