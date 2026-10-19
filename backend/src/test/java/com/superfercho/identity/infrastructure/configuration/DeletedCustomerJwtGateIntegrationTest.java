@@ -40,7 +40,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
-@SpringBootTest
+@SpringBootTest(properties = "superfercho.scheduling.enabled=false")
 @AutoConfigureMockMvc
 @Testcontainers(disabledWithoutDocker = true)
 class DeletedCustomerJwtGateIntegrationTest {

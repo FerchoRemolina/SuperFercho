@@ -1,6 +1,7 @@
 package com.superfercho.identity.infrastructure.configuration;
 
 import com.superfercho.identity.application.usecase.ExpireStorefrontPreviewsUseCase;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -10,6 +11,10 @@ import org.springframework.scheduling.annotation.Scheduled;
 @Configuration
 @EnableScheduling
 @Profile("!test")
+@ConditionalOnProperty(
+        value = "superfercho.scheduling.enabled",
+        havingValue = "true",
+        matchIfMissing = true)
 public class IdentitySchedulingConfiguration {
 
     @Bean

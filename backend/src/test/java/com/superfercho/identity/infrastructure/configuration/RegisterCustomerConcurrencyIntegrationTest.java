@@ -30,7 +30,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
-@SpringBootTest
+@SpringBootTest(properties = "superfercho.scheduling.enabled=false")
 @Testcontainers(disabledWithoutDocker = true)
 class RegisterCustomerConcurrencyIntegrationTest {
 
