@@ -1,6 +1,7 @@
 package com.superfercho.shopping.domain.model;
 
 import com.superfercho.shopping.domain.exception.InvalidShoppingListException;
+import com.superfercho.shopping.domain.exception.InvalidShoppingListItemException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -57,16 +58,23 @@ public final class ShoppingList {
         return of(id, customerId, name, items, createdAt, at);
     }
 
+    /**
+     * Añadir un producto es idempotente respecto a lista + producto: si el
+     * producto ya pertenece a la lista, la lista permanece sin cambios; si no,
+     * se incorpora con la cantidad recibida. La cantidad se ajusta después con
+     * changeQuantity, nunca volviendo a añadir. El alta exige cantidad
+     * positiva; la cantidad 0 solo se alcanza mediante changeQuantity.
+     */
     public ShoppingList addProduct(UUID itemId, UUID productId, int quantity, Instant currentTime) {
         Instant at = requireCurrentTime(currentTime);
-        int existingIndex = indexOfProduct(productId);
-        List<ShoppingListItem> next = new ArrayList<>(items);
-        if (existingIndex < 0) {
-            next.add(ShoppingListItem.create(itemId, productId, quantity, at));
-        } else {
-            ShoppingListItem existing = next.get(existingIndex);
-            next.set(existingIndex, existing.changeQuantity(existing.quantity() + quantity));
+        if (indexOfProduct(productId) >= 0) {
+            return this;
         }
+        if (quantity <= 0) {
+            throw new InvalidShoppingListItemException("quantity must be greater than 0 when adding a product");
+        }
+        List<ShoppingListItem> next = new ArrayList<>(items);
+        next.add(ShoppingListItem.create(itemId, productId, quantity, at));
         return of(id, customerId, name, next, createdAt, at);
     }
 

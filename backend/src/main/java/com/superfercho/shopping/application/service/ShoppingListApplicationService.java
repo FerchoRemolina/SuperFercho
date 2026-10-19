@@ -1,6 +1,7 @@
 package com.superfercho.shopping.application.service;
 
 import com.superfercho.shopping.application.dto.shoppinglist.AddProductToShoppingListCommand;
+import com.superfercho.shopping.application.dto.shoppinglist.AddProductToShoppingListResult;
 import com.superfercho.shopping.application.dto.shoppinglist.ChangeShoppingListItemQuantityCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.ClearShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.CreateShoppingListCommand;
@@ -9,6 +10,7 @@ import com.superfercho.shopping.application.dto.shoppinglist.GetShoppingListQuer
 import com.superfercho.shopping.application.dto.shoppinglist.RemoveProductFromShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.RenameShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.ShoppingListResponse;
+import com.superfercho.shopping.application.exception.DuplicateShoppingListItemException;
 import com.superfercho.shopping.application.exception.ProductNotFoundException;
 import com.superfercho.shopping.application.exception.ShoppingListNotFoundException;
 import com.superfercho.shopping.application.port.CurrentUserProvider;
@@ -89,13 +91,28 @@ public final class ShoppingListApplicationService
     }
 
     @Override
-    public ShoppingListResponse execute(AddProductToShoppingListCommand command) {
+    public AddProductToShoppingListResult execute(AddProductToShoppingListCommand command) {
         UUID currentUserId = currentUserProvider.getCurrentUserId();
         requireProduct(command.productId());
         Instant now = clockPort.currentTime();
-        ShoppingList updated = requireList(currentUserId, command.shoppingListId())
-                .addProduct(UUID.randomUUID(), command.productId(), command.quantity(), now);
-        return ShoppingListResponse.from(shoppingListRepository.save(updated));
+        ShoppingList current = requireList(currentUserId, command.shoppingListId());
+        if (containsProduct(current, command.productId())) {
+            // Idempotente: el producto ya pertenece a la lista; nada cambia.
+            return AddProductToShoppingListResult.alreadyPresent(current);
+        }
+        ShoppingList updated =
+                current.addProduct(UUID.randomUUID(), command.productId(), command.quantity(), now);
+        try {
+            return AddProductToShoppingListResult.added(shoppingListRepository.save(updated));
+        } catch (DuplicateShoppingListItemException exception) {
+            // Carrera concurrente: otro request agregó el mismo producto primero.
+            ShoppingList winner = requireList(currentUserId, command.shoppingListId());
+            return AddProductToShoppingListResult.alreadyPresent(winner);
+        }
+    }
+
+    private static boolean containsProduct(ShoppingList shoppingList, UUID productId) {
+        return shoppingList.items().stream().anyMatch(item -> item.productId().equals(productId));
     }
 
     @Override

@@ -167,6 +167,27 @@ class ShoppingListPersistenceAdapterTest {
     }
 
     @Test
+    void shouldRejectDuplicateProductInSameListAtDatabase() {
+        UUID listId = UUID.randomUUID();
+        insertListHeader(listId, UUID.randomUUID());
+        insertItemBypassingDomain(listId, 1);
+
+        assertThatThrownBy(() -> insertItemBypassingDomain(listId, 2))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void shouldAllowSameProductInDifferentListsAtDatabase() {
+        UUID firstListId = UUID.randomUUID();
+        UUID secondListId = UUID.randomUUID();
+        insertListHeader(firstListId, UUID.randomUUID());
+        insertListHeader(secondListId, UUID.randomUUID());
+
+        insertItemBypassingDomain(firstListId, 1);
+        insertItemBypassingDomain(secondListId, 1);
+    }
+
+    @Test
     void shouldRejectItemWhenShoppingListDoesNotExist() {
         assertThatThrownBy(() -> insertItemBypassingDomain(UUID.randomUUID(), 1))
                 .isInstanceOf(DataIntegrityViolationException.class);

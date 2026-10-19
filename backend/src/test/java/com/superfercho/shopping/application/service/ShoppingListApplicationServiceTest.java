@@ -12,6 +12,7 @@ import com.superfercho.identity.application.exception.UnauthenticatedUserExcepti
 import com.superfercho.platform.money.Money;
 import com.superfercho.shopping.application.dto.ProductCatalogInfo;
 import com.superfercho.shopping.application.dto.shoppinglist.AddProductToShoppingListCommand;
+import com.superfercho.shopping.application.dto.shoppinglist.AddProductToShoppingListResult;
 import com.superfercho.shopping.application.dto.shoppinglist.ChangeShoppingListItemQuantityCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.ClearShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.CreateShoppingListCommand;
@@ -148,34 +149,35 @@ class ShoppingListApplicationServiceTest {
         when(shoppingListRepository.save(any(ShoppingList.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        ShoppingListResponse response =
+        AddProductToShoppingListResult result =
                 shoppingListService.execute(new AddProductToShoppingListCommand(LIST_ID, MILK_ID, 2));
 
-        assertEquals(1, response.items().size());
-        assertEquals(MILK_ID, response.items().get(0).productId());
-        assertEquals(2, response.items().get(0).quantity());
-        assertEquals(NOW, response.updatedAt());
+        assertEquals(false, result.alreadyPresent());
+        assertEquals(1, result.shoppingList().items().size());
+        assertEquals(MILK_ID, result.shoppingList().items().get(0).productId());
+        assertEquals(2, result.shoppingList().items().get(0).quantity());
+        assertEquals(NOW, result.shoppingList().updatedAt());
         verify(productCatalogPort).getProduct(MILK_ID);
         verify(shoppingListRepository).save(any(ShoppingList.class));
     }
 
     @Test
-    void shouldIncrementQuantityWhenProductAlreadyInShoppingList() {
+    void shouldReportAlreadyPresentAndNotChangeListWhenProductIsAlreadyInShoppingList() {
         when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(listWithMilk()));
         when(clockPort.currentTime()).thenReturn(NOW);
         when(productCatalogPort.getProduct(MILK_ID)).thenReturn(Optional.of(new ProductCatalogInfo(MILK_ID, MILK_PRICE)));
-        when(shoppingListRepository.save(any(ShoppingList.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
 
-        ShoppingListResponse response =
+        // Idempotente: el producto ya está en la lista; no se persiste nada.
+        AddProductToShoppingListResult result =
                 shoppingListService.execute(new AddProductToShoppingListCommand(LIST_ID, MILK_ID, 3));
 
-        assertEquals(1, response.items().size());
-        assertEquals(ITEM_ID, response.items().get(0).id());
-        assertEquals(5, response.items().get(0).quantity());
+        assertTrue(result.alreadyPresent());
+        assertEquals(1, result.shoppingList().items().size());
+        assertEquals(ITEM_ID, result.shoppingList().items().get(0).id());
+        assertEquals(2, result.shoppingList().items().get(0).quantity());
         verify(productCatalogPort).getProduct(MILK_ID);
-        verify(shoppingListRepository).save(any(ShoppingList.class));
+        verify(shoppingListRepository, never()).save(any());
     }
 
     @Test

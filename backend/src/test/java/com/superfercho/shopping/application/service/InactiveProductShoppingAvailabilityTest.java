@@ -25,6 +25,7 @@ import com.superfercho.platform.money.Money;
 import com.superfercho.shopping.application.dto.cart.AddProductToCartCommand;
 import com.superfercho.shopping.application.dto.cart.CartResponse;
 import com.superfercho.shopping.application.dto.shoppinglist.AddProductToShoppingListCommand;
+import com.superfercho.shopping.application.dto.shoppinglist.AddProductToShoppingListResult;
 import com.superfercho.shopping.application.dto.shoppinglist.AddShoppingListToCartCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.ShoppingListResponse;
 import com.superfercho.shopping.application.exception.ProductNotFoundException;
@@ -155,11 +156,11 @@ class InactiveProductShoppingAvailabilityTest {
         when(shoppingListRepository.save(any(ShoppingList.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        ShoppingListResponse response =
+        AddProductToShoppingListResult result =
                 shoppingListService.execute(new AddProductToShoppingListCommand(LIST_ID, PRODUCT_ID, 2));
 
-        assertEquals(1, response.items().size());
-        assertEquals(PRODUCT_ID, response.items().get(0).productId());
+        assertEquals(1, result.shoppingList().items().size());
+        assertEquals(PRODUCT_ID, result.shoppingList().items().get(0).productId());
         verify(shoppingListRepository).save(any(ShoppingList.class));
     }
 

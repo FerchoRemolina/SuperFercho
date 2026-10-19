@@ -1,6 +1,7 @@
 package com.superfercho.shopping.domain.model;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -145,15 +146,19 @@ class ShoppingListTest {
     }
 
     @Test
-    void shouldIncrementQuantityWhenProductAlreadyExists() {
+    void shouldKeepListUnchangedWhenAddingProductAlreadyPresent() {
         ShoppingListItem existing = milk(2);
-        ShoppingList list = validList().items(List.of(existing)).build().addProduct(itemId(99), MILK_ID, 3, LATER);
+        ShoppingList before = validList().items(List.of(existing)).build();
+        ShoppingList after = before.addProduct(itemId(99), MILK_ID, 3, LATER);
 
-        assertEquals(1, list.items().size());
-        assertEquals(existing.id(), list.items().get(0).id());
-        assertEquals(5, list.items().get(0).quantity());
-        assertEquals(existing.createdAt(), list.items().get(0).createdAt());
-        assertEquals(LATER, list.updatedAt());
+        // Semántica idempotente: añadir un producto que ya pertenece a la
+        // lista no incrementa cantidades, no crea registros y no cambia la
+        // lista. La cantidad se ajusta con changeQuantity.
+        assertSame(before, after);
+        assertEquals(1, after.items().size());
+        assertEquals(existing.id(), after.items().get(0).id());
+        assertEquals(2, after.items().get(0).quantity());
+        assertEquals(CREATED_AT, after.updatedAt());
     }
 
     @Test

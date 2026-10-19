@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -26,8 +27,12 @@ public class ShoppingListPersistenceAdapter implements ShoppingListRepositoryPor
 
     @Override
     public ShoppingList save(ShoppingList shoppingList) {
-        return shoppingListPersistenceMapper.toDomain(
-                shoppingListJpaRepository.saveAndFlush(shoppingListPersistenceMapper.toEntity(shoppingList)));
+        try {
+            return shoppingListPersistenceMapper.toDomain(
+                    shoppingListJpaRepository.saveAndFlush(shoppingListPersistenceMapper.toEntity(shoppingList)));
+        } catch (DataIntegrityViolationException exception) {
+            throw ShoppingConstraintViolationTranslator.translate(exception);
+        }
     }
 
     @Override

@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.superfercho.platform.error.ApiExceptionHandler;
 import com.superfercho.shopping.application.dto.shoppinglist.AddProductToShoppingListCommand;
+import com.superfercho.shopping.application.dto.shoppinglist.AddProductToShoppingListResult;
 import com.superfercho.shopping.application.dto.shoppinglist.ChangeShoppingListItemQuantityCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.ClearShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.CreateShoppingListCommand;
@@ -150,7 +151,8 @@ class ShoppingListControllerTest {
 
     @Test
     void shouldAddProductToShoppingList() throws Exception {
-        when(addProductToShoppingListUseCase.execute(any())).thenReturn(listWithItem(2));
+        when(addProductToShoppingListUseCase.execute(any()))
+                .thenReturn(new AddProductToShoppingListResult(listWithItem(2), false));
 
         mockMvc.perform(post("/api/v1/shopping-lists/{shoppingListId}/items", LIST_ID)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -158,7 +160,26 @@ class ShoppingListControllerTest {
                                 {"productId":"%s","quantity":2}
                                 """.formatted(PRODUCT_ID)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[0].quantity").value(2));
+                .andExpect(jsonPath("$.alreadyPresent").value(false))
+                .andExpect(jsonPath("$.shoppingList.items[0].quantity").value(2));
+
+        verify(addProductToShoppingListUseCase)
+                .execute(new AddProductToShoppingListCommand(LIST_ID, PRODUCT_ID, 2));
+    }
+
+    @Test
+    void shouldReportAlreadyPresentWhenProductIsAlreadyInShoppingList() throws Exception {
+        when(addProductToShoppingListUseCase.execute(any()))
+                .thenReturn(new AddProductToShoppingListResult(listWithItem(2), true));
+
+        mockMvc.perform(post("/api/v1/shopping-lists/{shoppingListId}/items", LIST_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"productId":"%s","quantity":2}
+                                """.formatted(PRODUCT_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alreadyPresent").value(true))
+                .andExpect(jsonPath("$.shoppingList.items[0].quantity").value(2));
 
         verify(addProductToShoppingListUseCase)
                 .execute(new AddProductToShoppingListCommand(LIST_ID, PRODUCT_ID, 2));

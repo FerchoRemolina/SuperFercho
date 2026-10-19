@@ -18,6 +18,7 @@ import com.superfercho.shopping.application.port.in.ListShoppingListsUseCase;
 import com.superfercho.shopping.application.port.in.RemoveProductFromShoppingListUseCase;
 import com.superfercho.shopping.application.port.in.RenameShoppingListUseCase;
 import com.superfercho.shopping.infrastructure.rest.dto.AddItemRequest;
+import com.superfercho.shopping.infrastructure.rest.dto.AddShoppingListItemRestResponse;
 import com.superfercho.shopping.infrastructure.rest.dto.ChangeShoppingListItemQuantityRequest;
 import com.superfercho.shopping.infrastructure.rest.dto.CreateShoppingListRequest;
 import com.superfercho.shopping.infrastructure.rest.dto.RenameShoppingListRequest;
@@ -109,9 +110,9 @@ public class ShoppingListController {
     }
 
     @PostMapping("/{shoppingListId}/items")
-    public ShoppingListRestResponse addItem(
+    public AddShoppingListItemRestResponse addItem(
             @PathVariable UUID shoppingListId, @RequestBody AddItemRequest request) {
-        return ShoppingListRestResponse.from(addProductToShoppingListUseCase.execute(
+        return AddShoppingListItemRestResponse.from(addProductToShoppingListUseCase.execute(
                 new AddProductToShoppingListCommand(shoppingListId, request.productId(), request.quantity())));
     }
 

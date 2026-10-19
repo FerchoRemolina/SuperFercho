@@ -2,12 +2,15 @@ package com.superfercho.shopping.infrastructure.persistence;
 
 import com.superfercho.shopping.application.exception.DuplicateCustomerCartException;
 import com.superfercho.shopping.application.exception.DuplicateFavoriteException;
+import com.superfercho.shopping.application.exception.DuplicateShoppingListItemException;
 import org.springframework.dao.DataIntegrityViolationException;
 
 final class ShoppingConstraintViolationTranslator {
 
     private static final String CUSTOMER_CART_CONSTRAINT = "uk_shopping_carts_customer_id";
     private static final String CUSTOMER_PRODUCT_FAVORITE_CONSTRAINT = "uk_shopping_favorites_customer_product";
+    private static final String LIST_PRODUCT_SHOPPING_LIST_ITEM_CONSTRAINT =
+            "uk_shopping_shopping_list_items_list_product";
 
     private ShoppingConstraintViolationTranslator() {
     }
@@ -19,6 +22,9 @@ final class ShoppingConstraintViolationTranslator {
         }
         if (detail.contains(CUSTOMER_PRODUCT_FAVORITE_CONSTRAINT)) {
             return withCause(new DuplicateFavoriteException(), exception);
+        }
+        if (detail.contains(LIST_PRODUCT_SHOPPING_LIST_ITEM_CONSTRAINT)) {
+            return withCause(new DuplicateShoppingListItemException(), exception);
         }
         return exception;
     }
