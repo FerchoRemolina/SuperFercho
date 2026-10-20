@@ -315,3 +315,35 @@ export function DeviceIcon(props: IconProps) {
     </Icon>
   );
 }
+export function LinkedInIcon(props: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      width="1.25em"
+      height="1.25em"
+      {...props}
+    >
+      <path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45z" />
+    </svg>
+  );
+}
+export function DocumentIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M7 3.75h7.5L19 8.25v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.75a1 1 0 0 1 1-1z" />
+      <path d="M14.5 3.75V8.5H19" />
+      <path d="M9 12.5h6M9 16h6" />
+    </Icon>
+  );
+}
+export function QuestionCircleIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="8.25" />
+      <path d="M9.75 9.5a2.25 2.25 0 1 1 3.4 1.93c-.7.42-1.15.95-1.15 1.82V14" />
+      <path d="M12 17h.01" />
+    </Icon>
+  );
+}
