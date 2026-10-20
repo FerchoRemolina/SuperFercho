@@ -1,7 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { Suspense, type ReactNode, useMemo, useState } from "react";
 import { AdminHeader } from "@/features/admin/components/admin-header";
 import { AdminSidebar } from "@/features/admin/components/admin-sidebar";
 import { useAdminProductsQuery } from "@/features/admin/hooks";
@@ -24,11 +23,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="sf-admin min-h-screen bg-sf-bg">
-      <AdminSidebar
-        inventoryAttentionCount={inventoryAttentionCount}
-        mobileOpen={mobileOpen}
-        onCloseMobile={() => setMobileOpen(false)}
-      />
+      <Suspense fallback={null}>
+        <AdminSidebar
+          inventoryAttentionCount={inventoryAttentionCount}
+          mobileOpen={mobileOpen}
+          onCloseMobile={() => setMobileOpen(false)}
+        />
+      </Suspense>
       <div className="lg:pl-[16rem]">
         <AdminHeader onOpenMobileNav={() => setMobileOpen(true)} />
         <div className="min-h-[calc(100vh-3.5rem)]">{children}</div>

@@ -32,7 +32,7 @@ export async function request<T>(
   const headers = new Headers(options.headers);
   headers.set("Accept", "application/json, application/problem+json");
 
-  if (options.body !== undefined) {
+  if (options.body !== undefined && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
   if (token && !options.anonymous && !headers.has("Authorization")) {
@@ -45,7 +45,12 @@ export async function request<T>(
   const response = await fetch(resolveUrl(path), {
     method: options.method ?? "GET",
     headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body:
+      options.body === undefined
+        ? undefined
+        : options.body instanceof FormData
+          ? options.body
+          : JSON.stringify(options.body),
   });
 
   if (response.ok) {

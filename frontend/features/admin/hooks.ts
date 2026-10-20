@@ -35,7 +35,18 @@ import {
   getAdminProduct,
   getAdminProductType,
   getAdminProductVariant,
+  getAdminStorefrontHero,
+  getAdminStorefrontFooterSettings,
   getAdminBusinessSummary,
+  listAdminStorefrontFaqs,
+  createAdminStorefrontFaq,
+  updateAdminStorefrontFaq,
+  reorderAdminStorefrontFaqs,
+  deleteAdminStorefrontFaq,
+  updateAdminStorefrontFooterSettings,
+  uploadAdminStorefrontQrImage,
+  deleteAdminStorefrontQrImage,
+  uploadAdminMediaImage,
  getAdminSalesPeriodSummary,
   getAdminSalesAnalytics,
   getAdminNewCustomers,
@@ -62,6 +73,7 @@ import {
   updateAdminProduct,
   updateAdminProductType,
   updateAdminProductVariant,
+  updateAdminStorefrontHero,
    type AdjustAdminProductStockRequest,
    type AnalyticsGranularity,
    type AdminCustomerAccountStatusFilter,
@@ -81,6 +93,11 @@ import {
   type UpdateAdminProductRequest,
   type UpdateAdminProductTypeRequest,
   type UpdateAdminProductVariantRequest,
+  type AdminStorefrontFooterSettings,
+  type UpdateAdminStorefrontHeroRequest,
+  type UpdateAdminStorefrontFooterSettingsRequest,
+  type UpsertAdminStorefrontFaqRequest,
+  type UploadedMediaImage,
  } from "@/features/admin/api";
 import {
   isAdminRole,
@@ -848,5 +865,175 @@ export function useDeactivateAdminCustomerAccountMutation() {
       userId: string;
     }) => deactivateAdminCustomerAccount(customerRecordId, userId),
     onSuccess: () => invalidateAdminCustomerRecords(queryClient),
+  });
+}
+
+export function useAdminStorefrontHeroQuery() {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.storefrontHero(),
+    queryFn: getAdminStorefrontHero,
+    enabled: isAdminRole(session?.role),
+  });
+}
+
+export function useUpdateAdminStorefrontHeroMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: UpdateAdminStorefrontHeroRequest) =>
+      updateAdminStorefrontHero(body),
+    onSuccess: (hero) => {
+      queryClient.setQueryData(keys.storefrontHero(), hero);
+      void queryClient.invalidateQueries({ queryKey: keys.storefrontContentRoot() });
+    },
+  });
+}
+
+/** Independiente del Hero: la URL devuelta aún no está persistida; solo pasa
+ *  al formulario y se persiste cuando el usuario guarda el Hero. */
+export function useUploadAdminMediaImageMutation() {
+  return useMutation({
+    mutationFn: (file: File): Promise<UploadedMediaImage> =>
+      uploadAdminMediaImage(file),
+  });
+}
+
+export function useAdminStorefrontFaqsQuery() {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.storefrontFaqs(),
+    queryFn: listAdminStorefrontFaqs,
+    enabled: isAdminRole(session?.role),
+  });
+}
+
+export function useCreateAdminStorefrontFaqMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: UpsertAdminStorefrontFaqRequest) =>
+      createAdminStorefrontFaq(body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: keys.storefrontFaqs() });
+      void queryClient.invalidateQueries({
+        queryKey: keys.storefrontContentRoot(),
+      });
+    },
+  });
+}
+
+export function useUpdateAdminStorefrontFaqMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      faqId,
+      body,
+    }: {
+      faqId: string;
+      body: UpsertAdminStorefrontFaqRequest;
+    }) => updateAdminStorefrontFaq(faqId, body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: keys.storefrontFaqs() });
+      void queryClient.invalidateQueries({
+        queryKey: keys.storefrontContentRoot(),
+      });
+    },
+  });
+}
+
+export function useReorderAdminStorefrontFaqsMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (orderedIds: string[]) => reorderAdminStorefrontFaqs(orderedIds),
+    onSuccess: (faqs) => {
+      queryClient.setQueryData(keys.storefrontFaqs(), faqs);
+      void queryClient.invalidateQueries({
+        queryKey: keys.storefrontContentRoot(),
+      });
+    },
+  });
+}
+
+export function useDeleteAdminStorefrontFaqMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (faqId: string) => deleteAdminStorefrontFaq(faqId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: keys.storefrontFaqs() });
+      void queryClient.invalidateQueries({
+        queryKey: keys.storefrontContentRoot(),
+      });
+    },
+  });
+}
+
+export function useAdminStorefrontFooterSettingsQuery() {
+  const { session } = useSession();
+
+  return useQuery({
+    queryKey: keys.storefrontFooterSettings(),
+    queryFn: getAdminStorefrontFooterSettings,
+    enabled: isAdminRole(session?.role),
+  });
+}
+
+export function useUpdateAdminStorefrontFooterSettingsMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: UpdateAdminStorefrontFooterSettingsRequest) =>
+      updateAdminStorefrontFooterSettings(body),
+    onSuccess: (settings) => {
+      queryClient.setQueryData(keys.storefrontFooterSettings(), settings);
+      void queryClient.invalidateQueries({
+        queryKey: keys.storefrontContentRoot(),
+      });
+    },
+  });
+}
+
+export function useUploadAdminStorefrontQrImageMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (file: File) => uploadAdminStorefrontQrImage(file),
+    onSuccess: (result) => {
+      queryClient.setQueryData(
+        keys.storefrontFooterSettings(),
+        (current: AdminStorefrontFooterSettings | undefined) =>
+          current
+            ? { ...current, qrImageUrl: result.qrImageUrl }
+            : current,
+      );
+      void queryClient.invalidateQueries({
+        queryKey: keys.storefrontFooterSettings(),
+      });
+    },
+  });
+}
+
+export function useDeleteAdminStorefrontQrImageMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => deleteAdminStorefrontQrImage(),
+    onSuccess: (result) => {
+      queryClient.setQueryData(
+        keys.storefrontFooterSettings(),
+        (current: AdminStorefrontFooterSettings | undefined) =>
+          current
+            ? { ...current, qrImageUrl: result.qrImageUrl }
+            : current,
+      );
+      void queryClient.invalidateQueries({
+        queryKey: keys.storefrontFooterSettings(),
+      });
+    },
   });
 }

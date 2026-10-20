@@ -367,6 +367,11 @@ export function adminKeys() {
       ["admin", "knowledge", "search", query, limit] as const,
     paymentsRoot: () => ["admin", "payments"] as const,
     payment: (paymentId: string) => ["admin", "payment", paymentId] as const,
+    storefrontContentRoot: () => ["admin", "storefront-content"] as const,
+    storefrontHero: () => ["admin", "storefront-content", "hero"] as const,
+    storefrontFaqs: () => ["admin", "storefront-content", "faqs"] as const,
+    storefrontFooterSettings: () =>
+      ["admin", "storefront-content", "footer-settings"] as const,
   };
 }
 
@@ -1304,5 +1309,190 @@ export async function deactivateAdminCustomerAccount(
   return request<AdminCustomerAccount>(
     `/admin/customers/${encodeURIComponent(customerRecordId)}/accounts/${encodeURIComponent(userId)}/deactivate`,
     { method: "POST" },
+  );
+}
+
+/** Mirrors HeroContentRestResponse (Storefront REST). imageUrl es null cuando
+ *  aplica la ilustración de branding por defecto. */
+export type AdminStorefrontHero = {
+  title: string;
+  description: string;
+  ctaLabel: string;
+  imageUrl: string | null;
+  mode: "STANDARD" | "IMMERSIVE";
+  updatedAt: string;
+};
+
+export type UpdateAdminStorefrontHeroRequest = {
+  title: string;
+  description: string;
+  ctaLabel: string;
+  imageUrl: string | null;
+  mode: "STANDARD" | "IMMERSIVE";
+};
+
+export async function getAdminStorefrontHero(): Promise<AdminStorefrontHero> {
+  return request<AdminStorefrontHero>("/storefront-content/hero");
+}
+
+export async function updateAdminStorefrontHero(
+  body: UpdateAdminStorefrontHeroRequest,
+): Promise<AdminStorefrontHero> {
+  return request<AdminStorefrontHero>("/admin/storefront-content/hero", {
+    method: "PUT",
+    body,
+  });
+}
+
+export const MEDIA_IMAGE_ALLOWED_TYPES: readonly string[] = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+];
+export const MEDIA_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+
+export type MediaImageValidationCode =
+  | "MEDIA_MISSING"
+  | "MEDIA_TYPE_NOT_SUPPORTED"
+  | "MEDIA_TOO_LARGE";
+
+/** Validación cliente (solo UX anticipada; el backend revalida por contenido). */
+export function validateMediaImage(file: File): MediaImageValidationCode | null {
+  if (file.size === 0) {
+    return "MEDIA_MISSING";
+  }
+  if (!MEDIA_IMAGE_ALLOWED_TYPES.includes(file.type)) {
+    return "MEDIA_TYPE_NOT_SUPPORTED";
+  }
+  if (file.size > MEDIA_IMAGE_MAX_BYTES) {
+    return "MEDIA_TOO_LARGE";
+  }
+  return null;
+}
+
+export type UploadedMediaImage = { url: string };
+
+export async function uploadAdminMediaImage(
+  file: File,
+): Promise<UploadedMediaImage> {
+  const body = new FormData();
+  body.append("file", file);
+  return request<UploadedMediaImage>("/admin/media/images", {
+    method: "POST",
+    body,
+  });
+}
+
+/** Mirrors FaqAdminRestResponse. */
+export type AdminStorefrontFaq = {
+  id: string;
+  question: string;
+  answer: string;
+  displayOrder: number;
+  active: boolean;
+};
+
+/** Mirrors UpsertStorefrontFaqRequest. */
+export type UpsertAdminStorefrontFaqRequest = {
+  question: string;
+  answer: string;
+  displayOrder: number;
+  active: boolean;
+};
+
+/** Mirrors FooterSettingsRestResponse. */
+export type AdminStorefrontFooterSettings = {
+  supportEmail: string;
+  linkedinUrl: string;
+  githubUrl: string;
+  qrImageUrl: string | null;
+};
+
+/** Mirrors UpdateFooterSettingsRequest. */
+export type UpdateAdminStorefrontFooterSettingsRequest = {
+  supportEmail: string;
+  linkedinUrl: string;
+  githubUrl: string;
+};
+
+/** Mirrors QrImageRestResponse. */
+export type AdminStorefrontQrImage = {
+  qrImageUrl: string | null;
+};
+
+export async function listAdminStorefrontFaqs(): Promise<AdminStorefrontFaq[]> {
+  return request<AdminStorefrontFaq[]>("/admin/storefront-content/faqs");
+}
+
+export async function createAdminStorefrontFaq(
+  body: UpsertAdminStorefrontFaqRequest,
+): Promise<AdminStorefrontFaq> {
+  return request<AdminStorefrontFaq>("/admin/storefront-content/faqs", {
+    method: "POST",
+    body,
+  });
+}
+
+export async function updateAdminStorefrontFaq(
+  faqId: string,
+  body: UpsertAdminStorefrontFaqRequest,
+): Promise<AdminStorefrontFaq> {
+  return request<AdminStorefrontFaq>(
+    `/admin/storefront-content/faqs/${encodeURIComponent(faqId)}`,
+    { method: "PUT", body },
+  );
+}
+
+export async function reorderAdminStorefrontFaqs(
+  orderedIds: string[],
+): Promise<AdminStorefrontFaq[]> {
+  return request<AdminStorefrontFaq[]>("/admin/storefront-content/faqs/order", {
+    method: "PUT",
+    body: { orderedIds },
+  });
+}
+
+export async function deleteAdminStorefrontFaq(faqId: string): Promise<void> {
+  await request<void>(
+    `/admin/storefront-content/faqs/${encodeURIComponent(faqId)}`,
+    { method: "DELETE" },
+  );
+}
+
+/** Lectura pública del singleton (mismo patrón que el Hero). */
+export async function getAdminStorefrontFooterSettings(): Promise<AdminStorefrontFooterSettings> {
+  const settings = await request<AdminStorefrontFooterSettings>(
+    "/storefront-content/footer-settings",
+  );
+  return {
+    ...settings,
+    qrImageUrl: settings.qrImageUrl ?? null,
+  };
+}
+
+export async function updateAdminStorefrontFooterSettings(
+  body: UpdateAdminStorefrontFooterSettingsRequest,
+): Promise<AdminStorefrontFooterSettings> {
+  return request<AdminStorefrontFooterSettings>(
+    "/admin/storefront-content/footer-settings",
+    { method: "PUT", body },
+  );
+}
+
+export async function uploadAdminStorefrontQrImage(
+  file: File,
+): Promise<AdminStorefrontQrImage> {
+  const body = new FormData();
+  body.append("file", file);
+  return request<AdminStorefrontQrImage>(
+    "/admin/storefront-content/footer-settings/qr-image",
+    { method: "POST", body },
+  );
+}
+
+export async function deleteAdminStorefrontQrImage(): Promise<AdminStorefrontQrImage> {
+  return request<AdminStorefrontQrImage>(
+    "/admin/storefront-content/footer-settings/qr-image",
+    { method: "DELETE" },
   );
 }

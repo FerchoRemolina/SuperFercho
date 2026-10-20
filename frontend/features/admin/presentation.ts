@@ -789,6 +789,37 @@ export const ADMIN_NAV_TREE: AdminNavNode[] = [
   },
   {
     kind: "group",
+    id: "storefront",
+    label: "Contenido tienda",
+    children: [
+      {
+        kind: "leaf",
+        href: "/admin/storefront-content?section=hero",
+        label: "Hero",
+        match: "exact",
+      },
+      {
+        kind: "leaf",
+        href: "/admin/storefront-content?section=faqs",
+        label: "Preguntas frecuentes",
+        match: "exact",
+      },
+      {
+        kind: "leaf",
+        href: "/admin/storefront-content?section=footer",
+        label: "Footer",
+        match: "exact",
+      },
+      {
+        kind: "leaf",
+        href: "/admin/storefront-content?section=qr",
+        label: "QR de LinkedIn",
+        match: "exact",
+      },
+    ],
+  },
+  {
+    kind: "group",
     id: "fercho",
     label: "Fercho",
     children: [
@@ -946,23 +977,70 @@ export function salesPeriodGranularityLabel(
   }
 }
 
+function splitAdminNavHref(href: string): { path: string; search: string } {
+  const queryIndex = href.indexOf("?");
+  if (queryIndex < 0) {
+    return { path: href, search: "" };
+  }
+  return {
+    path: href.slice(0, queryIndex),
+    search: href.slice(queryIndex + 1),
+  };
+}
+
+/**
+ * @param currentSearch - query string actual (con o sin `?`), p. ej. de `useSearchParams`.
+ */
 export function isAdminNavActive(
   href: string,
   pathname: string,
   match: "exact" | "prefix",
+  currentSearch = "",
 ): boolean {
-  if (match === "exact") {
-    return pathname === href;
+  const { path, search: hrefSearch } = splitAdminNavHref(href);
+  const pathActive =
+    match === "exact"
+      ? pathname === path
+      : pathname === path || pathname.startsWith(`${path}/`);
+  if (!pathActive) {
+    return false;
   }
-  return pathname === href || pathname.startsWith(`${href}/`);
+  if (!hrefSearch) {
+    return true;
+  }
+
+  const wanted = new URLSearchParams(hrefSearch);
+  const raw = currentSearch.startsWith("?")
+    ? currentSearch.slice(1)
+    : currentSearch;
+  const current = new URLSearchParams(raw);
+
+  for (const [key, value] of wanted.entries()) {
+    const actual = current.get(key);
+    if (actual === value) {
+      continue;
+    }
+    // `/admin/storefront-content` sin query = sección Hero por defecto.
+    if (
+      key === "section" &&
+      value === "hero" &&
+      actual == null &&
+      pathname === "/admin/storefront-content"
+    ) {
+      continue;
+    }
+    return false;
+  }
+  return true;
 }
 
 export function isAdminNavNodeActive(
   node: AdminNavNode,
   pathname: string,
+  currentSearch = "",
 ): boolean {
   if (node.kind === "leaf") {
-    return isAdminNavActive(node.href, pathname, node.match);
+    return isAdminNavActive(node.href, pathname, node.match, currentSearch);
   }
   if (node.id === "inventory-control") {
     return pathname.startsWith("/admin/inventory");
@@ -974,7 +1052,12 @@ export function isAdminNavNodeActive(
       pathname.startsWith("/admin/inventory")
     );
   }
-  return node.children.some((child) => isAdminNavNodeActive(child, pathname));
+  if (node.id === "storefront") {
+    return pathname.startsWith("/admin/storefront-content");
+  }
+  return node.children.some((child) =>
+    isAdminNavNodeActive(child, pathname, currentSearch),
+  );
 }
 
 export type AdminBreadcrumbItem = {
@@ -1063,6 +1146,9 @@ export function adminBreadcrumbsForPath(pathname: string): AdminBreadcrumbItem[]
       { label: "Fercho", href: "/admin/knowledge" },
       { label: "Gestión del conocimiento" },
     ];
+  }
+  if (pathname.startsWith("/admin/storefront-content")) {
+    return [{ label: "Contenido tienda" }];
   }
   if (/^\/admin\/payments\/[^/]+$/.test(pathname)) {
     return [{ label: "Pagos" }, { label: "Detalle" }];

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo, useState, type ComponentType, type SVGProps } from "react";
 import {
   ADMIN_NAV_TREE,
@@ -15,7 +15,11 @@ import {
   BookIcon,
   ChevronIcon,
   ClipboardListIcon,
+  DocumentIcon,
+  LinkedInIcon,
   PackageIcon,
+  QuestionCircleIcon,
+  SparklesIcon,
   UserIcon,
 } from "@/shared/ui/icons";
 import { cx } from "@/shared/utils/cx";
@@ -46,16 +50,27 @@ const ROOT_ICONS: Record<string, IconComponent> = {
   inventory: PackageIcon,
   sales: ClipboardListIcon,
   customers: UserIcon,
+  storefront: SparklesIcon,
   fercho: BookIcon,
 };
 
-function collectRouteExpanded(pathname: string): Record<string, boolean> {
+const LEAF_ICONS: Record<string, IconComponent> = {
+  "/admin/storefront-content?section=hero": SparklesIcon,
+  "/admin/storefront-content?section=faqs": QuestionCircleIcon,
+  "/admin/storefront-content?section=footer": DocumentIcon,
+  "/admin/storefront-content?section=qr": LinkedInIcon,
+};
+
+function collectRouteExpanded(
+  pathname: string,
+  search: string,
+): Record<string, boolean> {
   const open: Record<string, boolean> = {};
   function walk(node: AdminNavNode) {
     if (node.kind !== "group") {
       return;
     }
-    if (isAdminNavNodeActive(node, pathname)) {
+    if (isAdminNavNodeActive(node, pathname, search)) {
       open[node.id] = true;
     }
     for (const child of node.children) {
@@ -78,9 +93,11 @@ export function AdminSidebar({
   onCloseMobile?: () => void;
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const search = searchParams.toString();
   const routeExpanded = useMemo(
-    () => collectRouteExpanded(pathname),
-    [pathname],
+    () => collectRouteExpanded(pathname, search),
+    [pathname, search],
   );
   const [manualExpanded, setManualExpanded] = useState<
     Record<string, boolean | undefined>
@@ -130,6 +147,7 @@ export function AdminSidebar({
                 <AdminNavItem
                   node={node}
                   pathname={pathname}
+                  search={search}
                   depth={0}
                   inventoryAttentionCount={inventoryAttentionCount}
                   isExpanded={isExpanded}
@@ -148,6 +166,7 @@ export function AdminSidebar({
 function AdminNavItem({
   node,
   pathname,
+  search,
   depth,
   inventoryAttentionCount,
   isExpanded,
@@ -156,6 +175,7 @@ function AdminNavItem({
 }: {
   node: AdminNavNode;
   pathname: string;
+  search: string;
   depth: number;
   inventoryAttentionCount: number;
   isExpanded: (id: string) => boolean;
@@ -163,8 +183,9 @@ function AdminNavItem({
   onNavigate?: () => void;
 }) {
   if (node.kind === "leaf") {
-    const active = isAdminNavActive(node.href, pathname, node.match);
-    const Icon = depth === 0 ? ROOT_ICONS[node.href] : undefined;
+    const active = isAdminNavActive(node.href, pathname, node.match, search);
+    const Icon =
+      depth === 0 ? ROOT_ICONS[node.href] : LEAF_ICONS[node.href];
     return (
       <Link
         href={node.href}
@@ -178,7 +199,9 @@ function AdminNavItem({
         )}
         aria-current={active ? "page" : undefined}
       >
-        {Icon ? <Icon className="h-[18px] w-[18px] shrink-0" /> : null}
+        {Icon ? (
+          <Icon className="h-[18px] w-[18px] shrink-0 opacity-90" />
+        ) : null}
         <span className="truncate">{node.label}</span>
       </Link>
     );
@@ -188,6 +211,7 @@ function AdminNavItem({
     <AdminNavGroupItem
       node={node}
       pathname={pathname}
+      search={search}
       depth={depth}
       inventoryAttentionCount={inventoryAttentionCount}
       isExpanded={isExpanded}
@@ -200,6 +224,7 @@ function AdminNavItem({
 function AdminNavGroupItem({
   node,
   pathname,
+  search,
   depth,
   inventoryAttentionCount,
   isExpanded,
@@ -208,6 +233,7 @@ function AdminNavGroupItem({
 }: {
   node: AdminNavGroup;
   pathname: string;
+  search: string;
   depth: number;
   inventoryAttentionCount: number;
   isExpanded: (id: string) => boolean;
@@ -215,7 +241,7 @@ function AdminNavGroupItem({
   onNavigate?: () => void;
 }) {
   const open = isExpanded(node.id);
-  const groupActive = isAdminNavNodeActive(node, pathname);
+  const groupActive = isAdminNavNodeActive(node, pathname, search);
   const badge =
     node.badgeKey === "inventoryAttention" && inventoryAttentionCount > 0
       ? inventoryAttentionCount
@@ -267,6 +293,7 @@ function AdminNavGroupItem({
                 <AdminNavItem
                   node={child}
                   pathname={pathname}
+                  search={search}
                   depth={depth + 1}
                   inventoryAttentionCount={inventoryAttentionCount}
                   isExpanded={isExpanded}
