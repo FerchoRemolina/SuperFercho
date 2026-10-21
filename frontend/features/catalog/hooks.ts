@@ -5,6 +5,7 @@ import {
   catalogKeys,
   getCategory,
   getProduct,
+  listBestSellers,
   listCategories,
   listProducts,
   searchProducts,
@@ -48,5 +49,12 @@ export function useSearchProductsQuery(text: string) {
     queryKey: keys.search(trimmed),
     queryFn: () => searchProducts({ text: trimmed }),
     enabled: trimmed.length > 0,
+  });
+}
+
+export function useBestSellersQuery() {
+  return useQuery({
+    queryKey: keys.bestSellers(),
+    queryFn: listBestSellers,
   });
 }

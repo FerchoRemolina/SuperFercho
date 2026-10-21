@@ -82,6 +82,7 @@ export function catalogKeys() {
       ["catalog", "products", categoryId ?? "all"] as const,
     product: (productId: string) => ["catalog", "product", productId] as const,
     search: (text: string) => ["catalog", "search", text] as const,
+    bestSellers: () => ["catalog", "best-sellers"] as const,
   };
 }
 
@@ -119,6 +120,14 @@ export async function listProducts(query: ListProductsQuery = {}): Promise<Produ
 
 export async function searchProducts(query: SearchProductsQuery): Promise<Product[]> {
   return request<Product[]>(`/products/search${toQuery({ text: query.text })}`, anonymousGet);
+}
+
+/**
+ * "Los mÃ¡s vendidos" del Home: el backend resuelve ventana mÃ³vil con
+ * fallback, disponibilidad/visibilidad, diversidad por categorÃ­a y lÃ­mite.
+ */
+export async function listBestSellers(): Promise<Product[]> {
+  return request<Product[]>("/products/best-sellers", anonymousGet);
 }
 
 export async function getProduct(productId: string): Promise<Product> {
