@@ -15,6 +15,7 @@ import { messageForApiProblem } from "@/shared/errors/messages";
 import { useSession } from "@/shared/session/session-provider";
 import { Alert } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
+import { CartIcon, CheckCircleIcon } from "@/shared/ui/icons";
 import { cx } from "@/shared/utils/cx";
 
 export function AddToCartButton({
@@ -22,11 +23,18 @@ export function AddToCartButton({
   available,
   stock,
   className,
+  quantitySelector = true,
 }: {
   productId: string;
   available: boolean;
   stock?: number;
   className?: string;
+  /**
+   * Muestra el selector - 1 + y envía la cantidad elegida. En superficies de
+   * compra rápida (Favoritos) se desactiva: el botón añade siempre 1 unidad y
+   * la cantidad se ajusta en el carrito.
+   */
+  quantitySelector?: boolean;
 }) {
   const { session } = useSession();
   const router = useRouter();
@@ -35,9 +43,12 @@ export function AddToCartButton({
   const [quantity, setQuantity] = useState(() =>
     stock === undefined ? 1 : initialSelectedQuantity(stock),
   );
-  const showSelector = stock !== undefined && stock > 0;
-  const selectedQuantity =
-    stock === undefined ? quantity : clampSelectedQuantity(quantity, stock);
+  const showSelector = quantitySelector && stock !== undefined && stock > 0;
+  const selectedQuantity = quantitySelector
+    ? stock === undefined
+      ? quantity
+      : clampSelectedQuantity(quantity, stock)
+    : 1;
 
   if (showSelector && selectedQuantity !== quantity) {
     setQuantity(selectedQuantity);
@@ -48,7 +59,11 @@ export function AddToCartButton({
   }
 
   async function onAdd() {
-    const nextQuantity = quantityToAddToCart(selectedQuantity, stock);
+    const nextQuantity = quantitySelector
+      ? quantityToAddToCart(selectedQuantity, stock)
+      : stock === undefined || stock > 0
+        ? 1
+        : null;
     if (nextQuantity === null) {
       return;
     }
@@ -93,13 +108,22 @@ export function AddToCartButton({
         type="button"
         onClick={onAdd}
         disabled={addMutation.isPending}
-        className="w-full"
+        aria-label="Añadir al carrito"
+        className="w-full gap-2"
       >
-        {addMutation.isPending
-          ? "Añadiendo…"
-          : added
-            ? "Añadido"
-            : "Añadir al carrito"}
+        {addMutation.isPending ? (
+          "Añadiendo…"
+        ) : added ? (
+          <>
+            <CheckCircleIcon className="size-4" aria-hidden="true" />
+            Añadido
+          </>
+        ) : (
+          <>
+            <CartIcon className="size-4" aria-hidden="true" />
+            Añadir
+          </>
+        )}
       </Button>
       <p className="sr-only" aria-live="polite">
         {added ? "Producto añadido al carrito." : ""}

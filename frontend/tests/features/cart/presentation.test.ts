@@ -30,7 +30,12 @@ describe("cart presentation", () => {
     expect(summary).toContain("Seguir comprando");
     expect(summary).toContain('href="/catalog"');
     expect(summary).toContain("Vaciar carrito");
-    expect(page).toContain("order-1 md:order-2");
+    // Móvil: productos primero, resumen después (mismo DOM, sin duplicar).
+    const listIndex = page.indexOf("<ul");
+    const asideIndex = page.indexOf("<aside");
+    expect(listIndex).toBeGreaterThan(-1);
+    expect(asideIndex).toBeGreaterThan(listIndex);
+    expect(page).not.toContain("order-1");
     expect(page).toContain("md:sticky");
   });
 });

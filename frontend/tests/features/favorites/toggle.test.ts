@@ -70,7 +70,7 @@ describe("favorite toggle composition", () => {
     expect(toggle).toContain("aria-label={label}");
   });
 
-  it("places the heart over the product image on catalog and detail only", () => {
+  it("places the heart over the product image on catalog, detail and favorites grid", () => {
     const productCard = source("features/catalog/components/product-card.tsx");
     const productDetail = source(
       "features/catalog/components/product-detail-content.tsx",
@@ -85,9 +85,11 @@ describe("favorite toggle composition", () => {
     expect(productCard).not.toContain('variant="action"');
     expect(productDetail).toContain('className="absolute right-2 top-2 z-10"');
     expect(productDetail).not.toContain('variant="action"');
-    expect(favoriteItem).toContain('variant="action"');
-    expect(favoriteItem).not.toContain('className="absolute right-2 top-2 z-10"');
-    expect(favoriteItem).not.toContain("HeartIcon");
+    // La cuadrícula de Favoritos usa el mismo corazón en la cabecera compacta.
+    expect(favoriteItem).toContain("<FavoriteToggle");
+    expect(favoriteItem).toContain("items-center justify-between");
+    expect(favoriteItem).not.toContain('variant="action"');
+    expect(favoriteItem).not.toContain("Quitar de favoritos");
     expect(productCard).not.toContain("useFavoritesQuery");
     expect(image).toContain("relative aspect-square");
     expect(image).toContain("{children}");
@@ -97,16 +99,20 @@ describe("favorite toggle composition", () => {
     expect(favoritesKeys().root()).toEqual(["favorites"]);
   });
 
-  it("hides the cart CTA when catalog stock is 0 without conflating available", () => {
+  it("hides the cart CTA when stock is 0 using stock from the favorites endpoint", () => {
     const favoriteItem = source(
       "features/favorites/components/favorite-item-card.tsx",
     );
     const page = source(
       "features/favorites/components/favorites-page-content.tsx",
     );
+    const api = source("features/favorites/api.ts");
 
-    expect(page).toContain("useProductsQuery");
-    expect(page).toContain("catalogProduct={productsById.get(item.productId)}");
+    // Favoritos ya no descarga el catálogo completo: el stock llega en /favorites.
+    expect(api).toContain("stock: number");
+    expect(page).not.toContain("useProductsQuery");
+    expect(page).not.toContain("catalogProduct");
+    expect(favoriteItem).not.toContain("catalogProduct");
     expect(favoriteItem).toContain("canOfferAddToCart");
     expect(favoriteItem).toContain("isFavoriteProductPurchasable");
     expect(favoriteItem).toContain("productStockLabel");
@@ -116,5 +122,8 @@ describe("favorite toggle composition", () => {
     expect(favoriteItem).toContain("No disponible");
     expect(favoriteItem).not.toContain("available={stock");
     expect(favoriteItem).not.toContain("available={!outOfStock");
+    // Compra rápida: sin stepper; Añadir agrega siempre 1 unidad.
+    expect(favoriteItem).toContain("quantitySelector={false}");
+    expect(favoriteItem).not.toContain("ProductQuantitySelector");
   });
 });

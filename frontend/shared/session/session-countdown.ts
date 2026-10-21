@@ -22,3 +22,22 @@ export function formatSessionRemaining(remainingMs: number): string {
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
+
+export type SessionCountdownTone = "green" | "yellow" | "red";
+
+/**
+ * Color del temporizador según el tiempo REAL restante de la sesión,
+ * evaluado sobre los segundos mostrados: verde > 5:00 · amarillo 2:00–5:00
+ * (incluidos) · rojo < 2:00. Ejemplos: 05:01 verde · 05:00 amarillo ·
+ * 02:00 amarillo · 01:59 rojo.
+ */
+export function sessionCountdownTone(remainingMs: number): SessionCountdownTone {
+  const totalSeconds = Math.floor(remainingMs / 1000);
+  if (totalSeconds > 300) {
+    return "green";
+  }
+  if (totalSeconds >= 120) {
+    return "yellow";
+  }
+  return "red";
+}

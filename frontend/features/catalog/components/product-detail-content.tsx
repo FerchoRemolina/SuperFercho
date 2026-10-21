@@ -30,15 +30,16 @@ export function ProductDetailContent({ productId }: { productId: string }) {
 
   if (productQuery.isPending) {
     return (
-      <Container as="main" className="py-8 md:py-16">
-        <Skeleton className="mb-4 h-5 w-28" />
-        <div className="grid gap-6 md:grid-cols-2 md:gap-8">
-          <Skeleton className="aspect-square w-full" />
+      <Container as="main" width="wide" className="py-8 md:py-12">
+        <Skeleton className="mb-4 h-9 w-32 rounded-full" />
+        <div className="grid gap-6 md:grid-cols-2 md:gap-10">
+          <Skeleton className="aspect-square w-full rounded-2xl" />
           <div>
-            <Skeleton className="h-8 w-2/3" />
-            <Skeleton className="mt-4 h-5 w-1/3" />
-            <Skeleton className="mt-6 h-8 w-40" />
-            <Skeleton className="mt-6 h-24 w-full" />
+            <Skeleton className="h-5 w-24 rounded-full" />
+            <Skeleton className="mt-4 h-9 w-2/3" />
+            <Skeleton className="mt-5 h-9 w-40" />
+            <Skeleton className="mt-6 h-11 w-full max-w-xs" />
+            <Skeleton className="mt-4 h-24 w-full" />
           </div>
         </div>
       </Container>
@@ -50,13 +51,15 @@ export function ProductDetailContent({ productId }: { productId: string }) {
       isApiError(productQuery.error) &&
       productQuery.error.problem.code === "PRODUCT_NOT_FOUND";
     return (
-      <Container as="main" className="py-8 md:py-16">
+      <Container as="main" width="wide" className="py-8 md:py-12">
         {notFound ? (
           <EmptyState
             title="No encontramos este producto."
             description="Puede que ya no esté disponible. Vuelve al catálogo para ver otras opciones."
+            align="center"
+            className="py-14"
             action={
-              <Link href="/catalog" className={buttonClassName("secondary")}>
+              <Link href="/catalog" className={buttonClassName("primary")}>
                 Ir al catálogo
               </Link>
             }
@@ -85,58 +88,69 @@ export function ProductDetailContent({ productId }: { productId: string }) {
     !brandsMatchName(product.brand ?? "", product.name);
 
   return (
-    <Container as="main" className="py-8 md:py-16">
+    <Container as="main" width="wide" className="py-8 md:py-12">
       <Link
         href="/catalog"
-        className="mb-4 inline-flex min-h-11 items-center text-sm font-semibold text-sf-muted hover:text-sf-primary md:mb-6"
+        className={cx(
+          "mb-4 inline-flex min-h-9 items-center gap-1.5 rounded-full border border-sf-border bg-sf-surface px-3.5",
+          "text-sm font-semibold text-sf-muted transition-colors duration-150",
+          "hover:border-sf-primary/40 hover:text-sf-primary md:mb-6",
+        )}
       >
         ← Catálogo
       </Link>
 
-      <div className="grid gap-6 md:grid-cols-2 md:items-start md:gap-8">
-        <ProductImage src={product.imageUrl} alt={product.name}>
-          {showFavorite ? (
-            <FavoriteToggle
-              productId={product.id}
-              className="absolute right-2 top-2 z-10"
-            />
-          ) : null}
-        </ProductImage>
+      <div className="grid gap-6 md:grid-cols-2 md:items-start md:gap-10">
+        <div className="overflow-hidden rounded-2xl border border-sf-border bg-sf-surface shadow-[0_1px_2px_rgba(23,33,27,0.06)]">
+          <ProductImage src={product.imageUrl} alt={product.name}>
+            {showFavorite ? (
+              <FavoriteToggle
+                productId={product.id}
+                className="absolute right-2 top-2 z-10"
+              />
+            ) : null}
+          </ProductImage>
+        </div>
 
         <div className="min-w-0">
           {category ? (
             <Link
               href={`/categories/${category.id}`}
-              className="text-sm font-semibold text-sf-primary"
+              className="inline-flex min-h-8 items-center rounded-full bg-sf-primary-soft px-3 text-xs font-semibold text-sf-primary transition-colors hover:bg-sf-primary/20"
             >
               {category.name}
             </Link>
           ) : null}
           {showBrand ? (
-            <p className="mt-1.5 text-sm text-sf-muted">{product.brand}</p>
+            <p className="mt-2.5 text-xs font-medium uppercase tracking-[0.06em] text-sf-muted">
+              {product.brand}
+            </p>
           ) : null}
-          <h1 className="mt-2 break-words text-[1.75rem] font-bold leading-tight tracking-tight text-sf-ink md:text-[2.75rem]">
+          <h1 className="mt-2 break-words text-[1.5rem] font-bold leading-tight tracking-tight text-sf-ink md:text-[2rem]">
             {product.name}
           </h1>
-          <p className="mt-3 text-xl font-bold text-sf-ink md:mt-4 md:text-2xl">
-            {formatMoney(product.price)}
-          </p>
-          <Badge
-            tone={availability === "Disponible" ? "primary" : "danger"}
-            className="mt-3 w-fit md:mt-4"
-          >
-            {availability}
-          </Badge>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <p className="text-2xl font-bold tabular-nums text-sf-ink md:text-3xl">
+              {formatMoney(product.price)}
+            </p>
+            <Badge
+              tone={availability === "Disponible" ? "primary" : "danger"}
+              className="rounded-md px-2 py-0.5 text-xs"
+            >
+              {availability}
+            </Badge>
+          </div>
 
-          <div className="mt-5 grid gap-2 md:mt-6 md:gap-2.5">
+          <div className="mt-6 grid gap-2.5 border-t border-sf-border pt-6 md:gap-3">
             <AddToCartButton
               productId={product.id}
               available={available}
               stock={product.stock}
               className={cx(
-                "!gap-2",
-                "[&_.flex]:w-full [&_.flex]:max-w-none [&_.flex]:justify-between",
-                "md:[&_.flex]:w-auto md:[&_.flex]:justify-start md:[&_.flex]:gap-1.5",
+                "!gap-2.5",
+                "[&>button]:min-h-12 md:[&>button]:min-h-11 md:[&>button]:w-auto md:[&>button]:self-start md:[&>button]:px-8",
+                "[&>div.flex]:w-full [&>div.flex]:max-w-none",
+                "md:[&>div.flex]:w-auto",
               )}
             />
             <AddToListControl
@@ -148,16 +162,19 @@ export function ProductDetailContent({ productId }: { productId: string }) {
             />
             <Link
               href="/catalog"
-              className="inline-flex min-h-11 items-center text-sm font-semibold text-sf-muted hover:text-sf-primary hover:underline"
+              className="inline-flex min-h-11 items-center text-sm font-semibold text-sf-muted transition-colors hover:text-sf-primary hover:underline"
             >
               Seguir viendo productos
             </Link>
           </div>
 
           {product.description ? (
-            <p className="mt-5 text-base leading-relaxed text-sf-muted md:mt-6">
-              {product.description}
-            </p>
+            <div className="mt-6 rounded-2xl bg-sf-bg p-4 md:p-5">
+              <h2 className="text-sm font-semibold text-sf-ink">Descripción</h2>
+              <p className="mt-1.5 text-sm leading-relaxed text-sf-muted md:text-base">
+                {product.description}
+              </p>
+            </div>
           ) : null}
         </div>
       </div>

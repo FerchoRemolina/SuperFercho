@@ -45,7 +45,7 @@ export function ProductImage({
           <img
             src={src ?? ""}
             alt={alt}
-            className={compact ? "h-full w-full object-contain p-1" : "h-full w-full object-contain p-3"}
+            className={compact ? "h-full w-full object-contain p-1" : "h-full w-full object-contain p-2"}
             onError={() => setFailed(true)}
           />
         ) : compact ? (
@@ -58,16 +58,20 @@ export function ProductImage({
             className="size-6 opacity-90"
           />
         ) : (
-          <div className="flex flex-col items-center gap-2 px-4 text-center">
-            {/* eslint-disable-next-line @next/next/no-img-element -- static branding SVG from /public */}
-            <img
-              src={brandingAssets.mark}
-              alt=""
-              width={48}
-              height={48}
-              className="size-12 opacity-90"
-            />
-            <span className="text-xs font-medium text-sf-muted">Sin imagen</span>
+          <div className="flex flex-col items-center gap-2.5 px-4 text-center">
+            <span className="flex size-12 items-center justify-center rounded-full bg-sf-surface shadow-[0_1px_2px_rgba(23,33,27,0.08)] ring-1 ring-sf-border/70">
+              {/* eslint-disable-next-line @next/next/no-img-element -- static branding SVG from /public */}
+              <img
+                src={brandingAssets.mark}
+                alt=""
+                width={28}
+                height={28}
+                className="size-7 opacity-80"
+              />
+            </span>
+            <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-sf-muted">
+              Sin imagen
+            </span>
           </div>
         )}
       </div>

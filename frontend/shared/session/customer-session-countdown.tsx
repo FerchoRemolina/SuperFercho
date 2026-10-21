@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import {
   formatSessionRemaining,
   remainingMsUntil,
+  sessionCountdownTone,
 } from "@/shared/session/session-countdown";
 import { clearSession } from "@/shared/session/session";
 import { useSession } from "@/shared/session/session-provider";
+import { cx } from "@/shared/utils/cx";
 
 /**
  * Compact JWT remaining time for normal CUSTOMER sessions only.
@@ -42,9 +44,22 @@ export function CustomerSessionCountdown() {
     return null;
   }
 
+  // Verde > 5 min · amarillo 2:00–5:00 · rojo < 2:00 (tiempo real restante).
+  const tone = sessionCountdownTone(remainingMs);
+  const toneClasses =
+    tone === "green"
+      ? "border-sf-primary/25 bg-sf-primary-soft text-sf-primary"
+      : tone === "yellow"
+        ? "border-sf-warning/30 bg-sf-yellow-soft text-sf-warning"
+        : "border-sf-error/30 bg-red-50 text-sf-error";
+
   return (
     <p
-      className="hidden items-center text-xs font-medium tabular-nums text-sf-muted md:flex"
+      className={cx(
+        "hidden min-w-[104px] items-center justify-center whitespace-nowrap rounded-full border px-3 py-1",
+        "text-xs font-medium tabular-nums md:flex",
+        toneClasses,
+      )}
       title="Tiempo restante de sesión"
       aria-live="polite"
     >

@@ -111,7 +111,7 @@ export function FavoriteToggle({
         aria-pressed={favorited}
         aria-label={label}
         className={cx(
-          "group relative inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full",
+          "group/favorite relative inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full",
           "border bg-sf-surface/90 shadow-[0_1px_2px_rgba(23,33,27,0.08)] backdrop-blur-sm",
           "transition-[background-color,border-color,box-shadow,transform] duration-200 ease-out",
           "hover:bg-sf-surface hover:shadow-[0_2px_8px_rgba(23,33,27,0.1)]",
@@ -126,7 +126,7 @@ export function FavoriteToggle({
         <HeartIcon
           className={cx(
             "transition-[transform,fill,opacity] duration-200 ease-out",
-            "md:group-hover:scale-[1.09]",
+            "md:group-hover/favorite:scale-[1.09]",
             pulse && "scale-[1.12]",
             favorited ? "opacity-100" : "opacity-90",
           )}
@@ -136,7 +136,7 @@ export function FavoriteToggle({
           className={cx(
             "pointer-events-none absolute right-0 top-[calc(100%+0.25rem)] z-30",
             "hidden whitespace-nowrap rounded-lg bg-sf-ink px-2 py-1 text-xs font-semibold text-white",
-            "md:group-hover:block md:group-focus-visible:block",
+            "md:group-hover/favorite:block md:group-focus-visible/favorite:block",
           )}
         >
           {label}

@@ -55,7 +55,7 @@ export function CancelOrderPanel({ order }: { order: Order }) {
   const critical = isCancellationCountdownCritical(remainingMs);
 
   return (
-    <Card className="grid gap-2.5 !p-4 md:!p-4">
+    <Card className="grid gap-2.5 !p-4 md:gap-3 md:!p-5">
       {error ? (
         <Alert tone="error" title={error.title}>
           {error.message}
@@ -71,7 +71,7 @@ export function CancelOrderPanel({ order }: { order: Order }) {
             <p
               aria-live="polite"
               className={cx(
-                "text-sm font-semibold tabular-nums",
+                "rounded-lg bg-sf-bg px-3 py-2 text-sm font-semibold tabular-nums",
                 critical ? "text-sf-error" : "text-sf-ink",
               )}
             >
@@ -105,7 +105,7 @@ export function CancelOrderPanel({ order }: { order: Order }) {
             <p
               aria-live="polite"
               className={cx(
-                "text-sm font-semibold tabular-nums",
+                "rounded-lg bg-sf-bg px-3 py-2 text-sm font-semibold tabular-nums",
                 critical ? "text-sf-error" : "text-sf-ink",
               )}
             >

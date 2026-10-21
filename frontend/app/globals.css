@@ -8,6 +8,7 @@
   --color-sf-muted: #667085;
   --color-sf-primary: #087443;
   --color-sf-primary-hover: #075c37;
+  --color-sf-primary-soft: #e9f5ef;
   --color-sf-accent: #087443;
   --color-sf-accent-hover: #075c37;
   --color-sf-yellow: #ffd429;
@@ -47,9 +48,13 @@ body {
   line-height: 1.5;
 }
 
-:focus-visible {
-  outline: 2px solid var(--color-sf-primary);
-  outline-offset: 2px;
+/* En @layer base para que las utilities de Tailwind (p. ej. outline-none del
+ * buscador) puedan sobreescribirlo: el CSS sin capa vence a cualquier capa. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-sf-primary);
+    outline-offset: 2px;
+  }
 }
 
 .sr-only {
@@ -62,4 +67,27 @@ body {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/*
+ * Storefront (customer): microinteracción estándar de elevación para cards
+ * interactivas. Sutil y funcional; se desactiva con prefers-reduced-motion.
+ */
+@utility sf-lift {
+  transition-property: transform, box-shadow, border-color;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 28px rgba(23, 33, 27, 0.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-lift {
+    transition: none;
+  }
+  .sf-lift:hover {
+    transform: none;
+  }
 }

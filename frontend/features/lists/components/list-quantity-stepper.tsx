@@ -30,7 +30,7 @@ export function ListQuantityStepper({
   }
 
   async function commit(next: number) {
-    if (busy || next < 1 || next === quantity) {
+    if (busy || next < 0 || next === quantity) {
       setDraft(String(quantity));
       return;
     }
@@ -48,7 +48,7 @@ export function ListQuantityStepper({
         variant="secondary"
         className="min-h-11 w-10 px-0 text-base"
         aria-label="Disminuir cantidad"
-        disabled={busy || quantity <= 1}
+        disabled={busy || quantity <= 0}
         onClick={() => void commit(quantity - 1)}
       >
         −

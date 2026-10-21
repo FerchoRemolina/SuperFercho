@@ -10,13 +10,15 @@ export function Container({
   children: ReactNode;
   className?: string;
   as?: "div" | "main" | "section" | "header" | "nav";
-  width?: "default" | "narrow";
+  width?: "default" | "narrow" | "wide";
 }) {
   return (
     <Tag
       className={cx(
         "mx-auto w-full px-4 md:px-8",
-        width === "narrow" ? "max-w-md" : "max-w-6xl",
+        width === "narrow" && "max-w-md",
+        width === "wide" && "max-w-[1440px]",
+        width === "default" && "max-w-6xl",
         className,
       )}
     >

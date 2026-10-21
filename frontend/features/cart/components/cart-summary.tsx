@@ -26,21 +26,23 @@ export function CartSummary({ cart }: { cart: Cart }) {
         : null;
 
   return (
-    <Card className="grid gap-3 md:gap-4">
-      <h2 className="text-lg font-semibold text-sf-ink md:text-xl">Resumen</h2>
-      <dl className="grid gap-2 text-sm">
+    <Card className="grid gap-2.5 !p-4 md:gap-3 md:!p-5">
+      <h2 className="text-base font-semibold text-sf-ink md:text-lg">Resumen</h2>
+      <dl className="grid gap-1.5 text-sm">
         <div className="flex justify-between gap-4">
           <dt className="text-sf-muted">Productos</dt>
-          <dd className="font-semibold text-sf-ink">{cart.items.length}</dd>
+          <dd className="font-semibold tabular-nums text-sf-ink">
+            {cart.items.length}
+          </dd>
         </div>
         <div className="flex justify-between gap-4">
           <dt className="text-sf-muted">Unidades</dt>
-          <dd className="font-semibold text-sf-ink">{unitCount}</dd>
+          <dd className="font-semibold tabular-nums text-sf-ink">{unitCount}</dd>
         </div>
         {linesTotal ? (
-          <div className="flex justify-between gap-4 border-t border-sf-border pt-3">
+          <div className="mt-1 flex items-baseline justify-between gap-4 border-t border-sf-border pt-2.5">
             <dt className="text-base font-semibold text-sf-ink">Subtotal</dt>
-            <dd className="text-lg font-bold text-sf-ink">
+            <dd className="text-xl font-bold tabular-nums text-sf-ink">
               {formatMoney(linesTotal)}
             </dd>
           </div>
@@ -54,17 +56,17 @@ export function CartSummary({ cart }: { cart: Cart }) {
           {errorMessage}
         </Alert>
       ) : null}
-      <Link href="/checkout" className={buttonClassName("primary")}>
+      <Link href="/checkout" className={buttonClassName("primary", "w-full")}>
         Ir a pagar
       </Link>
       <Link
         href="/catalog"
-        className="inline-flex min-h-11 items-center justify-center text-sm font-semibold text-sf-muted hover:text-sf-primary hover:underline"
+        className="inline-flex min-h-10 items-center justify-center text-sm font-semibold text-sf-muted transition-colors hover:text-sf-primary hover:underline"
       >
         Seguir comprando
       </Link>
       {confirming ? (
-        <div className="grid gap-2 border-t border-sf-border pt-3">
+        <div className="grid gap-2 rounded-xl bg-sf-bg p-3">
           <p className="text-sm font-semibold text-sf-ink">
             ¿Vaciar el carrito?
           </p>

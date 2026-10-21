@@ -39,10 +39,21 @@ describe("shopping lists composition", () => {
     expect(addControl).not.toContain("Gestionar listas");
     expect(addControl).not.toContain("Crear lista y agregar");
     expect(addControl).toContain("lists.length === 0");
-    expect(listItem).toContain("useAddCartItemMutation");
-    expect(listItem).toContain("quantity: item.quantity");
-    expect(api).not.toContain("from-list");
-    expect(api).not.toContain("/cart");
+    // Pertenencia idempotente: marca listas que ya contienen el producto y
+    // consume alreadyPresent del backend sin tratarlo como error.
+    expect(addControl).toContain("shoppingListContainsProduct");
+    expect(addControl).toContain("alreadyPresent");
+    expect(addControl).toContain("Ya está en esta lista");
+    expect(addControl).toContain("El producto ya está en esta lista.");
+    // La lista no es un carrito: el ítem no agrega al carrito por su cuenta.
+    expect(listItem).not.toContain("useAddCartItemMutation");
+    expect(listItem).not.toContain("Agregar al carrito");
+    expect(listItem).toContain("ListQuantityStepper");
+    expect(listItem).toContain("Eliminar");
+    // Compra de la lista: un único endpoint oficial, sin loop por producto.
+    expect(api).toContain("/add-to-cart");
+    expect(api).not.toContain("/cart/items");
+    expect(api).toContain("shoppingListPurchaseSummary");
   });
 
   it("gates lists intro and empty-state copy for zero lists", () => {
@@ -94,14 +105,39 @@ describe("shopping lists composition", () => {
     expect(api).not.toMatch(/body:.*customerId/);
   });
 
+  it("buys the list with one global action against the official endpoint", () => {
+    const detail = source(
+      "features/lists/components/list-detail-page-content.tsx",
+    );
+    const hooks = source("features/lists/hooks.ts");
+
+    expect(detail).toContain("useAddShoppingListToCartMutation");
+    expect(detail).not.toContain("useAddCartItemMutation");
+    expect(detail).toContain("Comprar esta lista");
+    expect(detail).toContain('router.push("/cart")');
+    expect(detail).toContain("shoppingListPurchaseSummary");
+    expect(detail).toContain("buyMutation.isPending");
+    expect(hooks).toContain("useAddShoppingListToCartMutation");
+    expect(hooks).toContain("cartKeys");
+  });
+
+  it("keeps quantity management and explicit removal separate from buying", () => {
+    const stepper = source("features/lists/components/list-quantity-stepper.tsx");
+    const listItem = source("features/lists/components/list-item-card.tsx");
+
+    // Mínimo 0: el producto permanece en la lista sin eliminarse.
+    expect(stepper).toContain("next < 0");
+    expect(stepper).toContain("quantity <= 0");
+    expect(listItem).toContain("item.quantity === 0");
+    expect(listItem).toContain("Guardado · no se compra ahora");
+    expect(listItem).toContain("useRemoveShoppingListItemMutation");
+  });
+
   it("hides Agregar al carrito when stock is 0 while keeping sellability separate", () => {
     const listItem = source("features/lists/components/list-item-card.tsx");
-    expect(listItem).toContain("canOfferAddToCart");
-    expect(listItem).toContain("product.status === \"ACTIVE\"");
+    expect(listItem).not.toContain("Agregar al carrito");
     expect(listItem).toContain("productAvailabilityLabel");
     expect(listItem).toContain("productStockLabel");
-    expect(listItem).toContain("offerAddToCart");
-    expect(listItem).toContain("Agregar al carrito");
     expect(listItem).toContain("agotado");
     expect(listItem).toContain("No disponible");
   });

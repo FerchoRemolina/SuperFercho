@@ -20,16 +20,24 @@ export function HomeProductCard({ product }: { product: Product }) {
   return (
     <article
       className={cx(
-        "flex h-full flex-col rounded-2xl border border-sf-border bg-sf-surface p-3 shadow-[0_1px_2px_rgba(23,33,27,0.06)]",
-        "transition-colors hover:border-sf-primary/30 md:p-4",
+        "group sf-lift relative flex h-full flex-col rounded-2xl border border-sf-border bg-sf-surface p-2.5",
+        "shadow-[0_1px_2px_rgba(23,33,27,0.06)] hover:border-sf-primary/35 hover:shadow-[0_10px_28px_rgba(23,33,27,0.10)]",
+        "[&_img]:transition-transform [&_img]:duration-300 group-hover:[&_img]:scale-[1.04]",
+        "motion-reduce:[&_img]:transition-none motion-reduce:hover:shadow-[0_1px_2px_rgba(23,33,27,0.06)]",
       )}
     >
-      <ProductImage src={product.imageUrl} alt="">
+      <ProductImage src={product.imageUrl} alt="" className="rounded-xl">
         <Link
           href={`/products/${product.id}`}
           className="absolute inset-0 z-0 rounded-xl"
           aria-label={product.name}
         />
+        <Badge
+          tone={availability === "Disponible" ? "primary" : "danger"}
+          className="absolute left-2 top-2 z-10 rounded-full px-2 py-0.5 text-[11px] shadow-sm"
+        >
+          {availability}
+        </Badge>
         {showFavorite ? (
           <FavoriteToggle
             productId={product.id}
@@ -38,32 +46,36 @@ export function HomeProductCard({ product }: { product: Product }) {
         ) : null}
       </ProductImage>
 
-      <div className="mt-3 flex min-w-0 flex-1 flex-col gap-1">
+      <div className="flex min-w-0 flex-1 flex-col px-1.5 pt-3">
         {product.brand ? (
-          <p className="truncate text-sm text-sf-muted">{product.brand}</p>
+          <p className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-sf-muted">
+            {product.brand}
+          </p>
         ) : null}
-        <Link href={`/products/${product.id}`} className="group min-w-0">
-          <h3 className="line-clamp-2 text-base font-semibold text-sf-ink group-hover:text-sf-primary">
+        <Link href={`/products/${product.id}`} className="group/name mt-0.5 min-w-0">
+          <h3 className="line-clamp-2 min-h-[2.5rem] text-[15px] font-semibold leading-snug text-sf-ink transition-colors group-hover/name:text-sf-primary">
             {product.name}
           </h3>
         </Link>
-        <p className="mt-auto pt-2 text-base font-bold text-sf-ink">
+        <p className="mt-auto pt-2.5 text-lg font-bold leading-none tabular-nums text-sf-ink">
           {formatMoney(product.price)}
         </p>
-        <Badge
-          tone={availability === "Disponible" ? "primary" : "danger"}
-          className="mt-2 w-fit"
-        >
-          {availability}
-        </Badge>
       </div>
 
-      <Link
-        href={`/products/${product.id}`}
-        className={cx(buttonClassName("secondary"), "mt-3 w-full")}
-      >
-        Ver producto
-      </Link>
+      <div className="mt-3 px-1.5 pb-1">
+        <Link
+          href={`/products/${product.id}`}
+          className={cx(buttonClassName("primary"), "w-full gap-2")}
+        >
+          Ver producto
+          <span
+            aria-hidden="true"
+            className="transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none"
+          >
+            →
+          </span>
+        </Link>
+      </div>
     </article>
   );
 }
