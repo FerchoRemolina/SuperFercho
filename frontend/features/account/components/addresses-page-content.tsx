@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import type { Address } from "@/features/account/api";
 import { AddressForm } from "@/features/account/components/address-form";
 import {
@@ -19,6 +18,8 @@ import { Button, buttonClassName } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { Container } from "@/shared/ui/container";
 import { EmptyState } from "@/shared/ui/empty-state";
+import { MapPinIcon } from "@/shared/ui/icons";
+import { PageHeader } from "@/shared/ui/page-header";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { cx } from "@/shared/utils/cx";
 
@@ -40,7 +41,7 @@ export function AddressesPageContent() {
 
   if (addressesQuery.isPending) {
     return (
-      <Container as="main" className="py-8 md:py-16">
+      <Container as="main" width="wide" className="py-8 md:py-12">
         <Header />
         <AddressesSkeleton />
       </Container>
@@ -52,7 +53,7 @@ export function AddressesPageContent() {
       ? messageForApiProblem(addressesQuery.error.problem)
       : "No se pudieron cargar las direcciones.";
     return (
-      <Container as="main" className="py-8 md:py-16">
+      <Container as="main" width="wide" className="py-8 md:py-12">
         <Header />
         <div className="mt-6 grid gap-4 md:mt-8">
           <Alert tone="error" title="No se pudieron cargar las direcciones">
@@ -84,7 +85,7 @@ export function AddressesPageContent() {
     defaultMutation.isPending;
 
   return (
-    <Container as="main" className="py-8 md:py-16">
+    <Container as="main" width="wide" className="py-8 md:py-12">
       <Header />
       {mutationError && editor === null ? (
         <div className="mt-4 md:mt-5">
@@ -96,7 +97,7 @@ export function AddressesPageContent() {
 
       {editor ? (
         <Card className="mt-6 grid gap-3 !p-4 md:mt-8 md:!p-5">
-          <h2 className="text-lg font-semibold text-sf-ink md:text-xl">
+          <h2 className="text-base font-semibold text-sf-ink md:text-lg">
             {editor.mode === "create" ? "Nueva dirección" : "Editar dirección"}
           </h2>
           <AddressForm
@@ -130,6 +131,9 @@ export function AddressesPageContent() {
           <EmptyState
             title="No tienes direcciones"
             description="Agrega tu primera dirección de entrega para pedir a domicilio."
+            align="center"
+            className="py-14"
+            icon={<MapPinIcon className="size-6" />}
             action={
               <button
                 type="button"
@@ -142,7 +146,7 @@ export function AddressesPageContent() {
           />
         </div>
       ) : hasAddresses ? (
-        <ul className="mt-5 grid gap-3 md:mt-6 md:gap-4">
+        <ul className="mt-5 grid gap-3 md:mt-6 md:grid-cols-2 md:gap-4">
           {addresses.map((address) => (
             <li key={address.id}>
               <AddressCard
@@ -169,20 +173,11 @@ export function AddressesPageContent() {
 
 function Header() {
   return (
-    <div>
-      <Link
-        href="/catalog"
-        className="mb-3 inline-flex min-h-11 items-center text-sm font-semibold text-sf-muted hover:text-sf-primary md:mb-4"
-      >
-        ← Catálogo
-      </Link>
-      <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
-        Direcciones de entrega
-      </h1>
-      <p className="mt-2 max-w-2xl text-sm text-sf-muted md:text-base">
-        Guarda dónde quieres recibir tus pedidos.
-      </p>
-    </div>
+    <PageHeader
+      title="Direcciones de entrega"
+      description="Guarda dónde quieres recibir tus pedidos."
+      back={{ href: "/catalog", label: "← Catálogo" }}
+    />
   );
 }
 
@@ -216,32 +211,47 @@ function AddressCard({
   return (
     <Card
       className={cx(
-        "grid gap-3 !p-4 md:!p-4",
-        !active && "bg-sf-bg/60 shadow-none",
+        "grid gap-3 !p-4 md:gap-3 md:!p-5",
+        active
+          ? address.isDefault && "border-sf-primary/40"
+          : "bg-sf-bg/60 shadow-none",
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-base font-semibold tracking-tight text-sf-ink md:text-lg">
-            {address.label}
-          </p>
-          <p className="mt-0.5 text-sm text-sf-muted">{address.recipientName}</p>
+        <div className="flex min-w-0 items-start gap-3">
+          <span
+            aria-hidden="true"
+            className={cx(
+              "flex size-10 shrink-0 items-center justify-center rounded-xl",
+              active
+                ? "bg-sf-primary-soft text-sf-primary"
+                : "bg-sf-bg text-sf-muted",
+            )}
+          >
+            <MapPinIcon className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-base font-semibold tracking-tight text-sf-ink md:text-lg">
+              {address.label}
+            </p>
+            <p className="mt-0.5 text-sm text-sf-muted">{address.recipientName}</p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           {address.isDefault ? (
-            <Badge tone="accent" className="w-fit">
+            <Badge tone="accent" className="w-fit rounded-full px-2.5 py-0.5 text-xs">
               Predeterminada
             </Badge>
           ) : null}
           {!active ? (
-            <Badge tone="neutral" className="w-fit">
+            <Badge tone="neutral" className="w-fit rounded-full px-2.5 py-0.5 text-xs">
               Inactiva
             </Badge>
           ) : null}
         </div>
       </div>
 
-      <div className="grid gap-0.5 text-sm">
+      <div className="grid gap-0.5 text-sm md:pl-[3.25rem]">
         <p className="font-medium text-sf-ink">{address.addressLine}</p>
         {address.additionalInfo ? (
           <p className="text-sf-muted">{address.additionalInfo}</p>
@@ -326,20 +336,28 @@ function AddressCard({
 
 function AddressesSkeleton() {
   return (
-    <ul className="mt-6 grid gap-3 md:mt-8 md:gap-4" aria-hidden="true">
+    <ul
+      className="mt-6 grid gap-3 md:mt-8 md:grid-cols-2 md:gap-4"
+      aria-hidden="true"
+    >
       {Array.from({ length: 2 }, (_, index) => (
         <li key={index}>
-          <Card className="grid gap-3 !p-4">
+          <Card className="grid gap-3 !p-4 md:!p-5">
             <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <Skeleton className="h-5 w-1/3" />
-                <Skeleton className="mt-2 h-4 w-1/4" />
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <Skeleton className="size-10 rounded-xl" />
+                <div className="min-w-0 flex-1">
+                  <Skeleton className="h-5 w-1/3" />
+                  <Skeleton className="mt-2 h-4 w-1/4" />
+                </div>
               </div>
-              <Skeleton className="h-7 w-28 rounded-lg" />
+              <Skeleton className="h-6 w-24 rounded-full" />
             </div>
-            <Skeleton className="h-4 w-2/3" />
-            <Skeleton className="h-4 w-1/2" />
-            <Skeleton className="mt-1 h-11 w-24" />
+            <div className="md:pl-[3.25rem]">
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="mt-2 h-4 w-1/2" />
+            </div>
+            <Skeleton className="h-11 w-24" />
           </Card>
         </li>
       ))}
