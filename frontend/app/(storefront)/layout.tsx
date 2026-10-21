@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { FerchoFab } from "@/features/assistant/components/fercho-fab";
+import { SiteFooter } from "@/shared/ui/site-footer";
 import { SiteHeader } from "@/shared/ui/site-header";
 
 export default function StorefrontLayout({
@@ -11,6 +12,7 @@ export default function StorefrontLayout({
     <>
       <SiteHeader />
       {children}
+      <SiteFooter />
       <FerchoFab />
     </>
   );
