@@ -47,6 +47,7 @@ const availableProduct: FavoriteProduct = {
   categoryId: "dddddddd-dddd-dddd-dddd-dddddddddddd",
   status: "ACTIVE",
   available: true,
+  stock: 25,
 };
 
 const favoriteList: FavoriteList = {
@@ -99,7 +100,7 @@ describe("favorites api", () => {
     expect(new Headers(init.headers).get("Content-Type")).toBeNull();
   });
 
-  it("maps product composition including status and available", async () => {
+  it("maps product composition including status, available and stock", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(favoriteList));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -109,6 +110,7 @@ describe("favorites api", () => {
     expect(product).toEqual(availableProduct);
     expect(product?.status).toBe("ACTIVE");
     expect(product?.available).toBe(true);
+    expect(product?.stock).toBe(25);
   });
 
   it("keeps product null without refetching the catalog", async () => {

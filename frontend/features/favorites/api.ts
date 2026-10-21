@@ -20,6 +20,7 @@ export type FavoriteProduct = {
   categoryId: string;
   status: FavoriteProductStatus;
   available: boolean;
+  stock: number;
 };
 
 /** Mirrors FavoriteItemRestResponse. `product` is null when Catalog no longer has the id. */
