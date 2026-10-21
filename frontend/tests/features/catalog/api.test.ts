@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getCategory,
   getProduct,
+  listBestSellers,
   listCategories,
   listProducts,
   searchProducts,
@@ -108,6 +109,23 @@ describe("catalog api", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
       "http://localhost:8080/api/v1/products/search?text=leche",
     );
+  });
+
+  it("lists best sellers anonymously without parameters", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify([product]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await listBestSellers();
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "http://localhost:8080/api/v1/products/best-sellers",
+    );
+    expect(result).toEqual([product]);
   });
 
   it("gets a product and a category by id", async () => {
