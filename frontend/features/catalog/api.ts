@@ -46,6 +46,11 @@ export type Category = {
 export type Product = {
   id: string;
   categoryId: string;
+  productTypeId?: string | null;
+  productTypeName?: string | null;
+  productVariantId?: string | null;
+  productVariantName?: string | null;
+  presentation?: Presentation | null;
   barcode: string | null;
   name: string;
   brand: string | null;
@@ -79,6 +84,26 @@ export function catalogKeys() {
     search: (text: string) => ["catalog", "search", text] as const,
   };
 }
+
+/** Unidades de presentaciÃ³n comercial (mirrors PresentationUnit del backend). */
+export const PRESENTATION_UNITS = [
+  "G",
+  "KG",
+  "ML",
+  "L",
+  "UNIT",
+  "PACK",
+  "BOX",
+  "ROLL",
+] as const;
+
+export type PresentationUnit = (typeof PRESENTATION_UNITS)[number];
+
+/** Mirrors Presentation del backend (cantidad + unidad, independiente del stock). */
+export type Presentation = {
+  quantity: number;
+  unit: PresentationUnit;
+};
 
 export async function listCategories(): Promise<Category[]> {
   return request<Category[]>("/categories", anonymousGet);
