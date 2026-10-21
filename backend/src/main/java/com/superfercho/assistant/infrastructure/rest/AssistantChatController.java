@@ -28,6 +28,6 @@ public class AssistantChatController {
                 ? null
                 : new ExplicitConfirmation(request.confirmation().token());
         return ChatRestResponse.from(chatUseCase.execute(new ChatCommand(
-                request.conversationId(), request.message(), confirmation, request.visitorToken())));
+                request.conversationId(), request.message(), confirmation)));
     }
 }

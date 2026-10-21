@@ -10,8 +10,7 @@ public record ChatRestResponse(
         boolean awaitingConfirmation,
         String confirmationToken,
         SensitiveActionType confirmationType,
-        boolean authenticationRequired,
-        String visitorToken) {
+        boolean authenticationRequired) {
 
     public static ChatRestResponse from(ChatResponse response) {
         return new ChatRestResponse(
@@ -20,7 +19,6 @@ public record ChatRestResponse(
                 response.awaitingConfirmation(),
                 response.confirmationToken(),
                 response.confirmationType(),
-                response.authenticationRequired(),
-                response.visitorToken());
+                response.authenticationRequired());
     }
 }

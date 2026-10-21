@@ -48,7 +48,7 @@ class AssistantChatControllerTest {
     @Test
     void shouldChatWithoutConversationId() throws Exception {
         when(chatUseCase.execute(any()))
-                .thenReturn(new ChatResponse(CONVERSATION_ID, "Hay leche disponible.", false, null, null, false, null));
+                .thenReturn(new ChatResponse(CONVERSATION_ID, "Hay leche disponible.", false, null, null, false));
 
         mockMvc.perform(post("/api/v1/assistant/chat")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -71,29 +71,9 @@ class AssistantChatControllerTest {
     }
 
     @Test
-    void shouldForwardVisitorToken() throws Exception {
-        when(chatUseCase.execute(any()))
-                .thenReturn(new ChatResponse(CONVERSATION_ID, "Continuamos.", false, null, null, false, null));
-
-        mockMvc.perform(post("/api/v1/assistant/chat")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "conversationId": "%s",
-                                  "message": "seguimos",
-                                  "visitorToken": "visitor-token-123"
-                                }
-                                """.formatted(CONVERSATION_ID)))
-                .andExpect(status().isOk());
-
-        verify(chatUseCase).execute(new ChatCommand(
-                CONVERSATION_ID, "seguimos", null, "visitor-token-123"));
-    }
-
-    @Test
     void shouldMapAuthenticationRequiredFlag() throws Exception {
         when(chatUseCase.execute(any()))
-                .thenReturn(new ChatResponse(CONVERSATION_ID, "Inicia sesion para usar tu carrito.", false, null, null, true, null));
+                .thenReturn(new ChatResponse(CONVERSATION_ID, "Inicia sesion para usar tu carrito.", false, null, null, true));
 
         mockMvc.perform(post("/api/v1/assistant/chat")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -110,7 +90,7 @@ class AssistantChatControllerTest {
     @Test
     void shouldForwardExistingConversationId() throws Exception {
         when(chatUseCase.execute(any()))
-                .thenReturn(new ChatResponse(CONVERSATION_ID, "Continuemos.", false, null, null, false, null));
+                .thenReturn(new ChatResponse(CONVERSATION_ID, "Continuemos.", false, null, null, false));
 
         mockMvc.perform(post("/api/v1/assistant/chat")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -130,7 +110,7 @@ class AssistantChatControllerTest {
     @Test
     void shouldForwardConfirmationToken() throws Exception {
         when(chatUseCase.execute(any()))
-                .thenReturn(new ChatResponse(CONVERSATION_ID, "Checkout confirmed.", false, null, null, false, null));
+                .thenReturn(new ChatResponse(CONVERSATION_ID, "Checkout confirmed.", false, null, null, false));
 
         mockMvc.perform(post("/api/v1/assistant/chat")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -155,7 +135,7 @@ class AssistantChatControllerTest {
     void shouldForwardConfirmationAndMessageWithoutChoosingPriority() throws Exception {
         when(chatUseCase.execute(any()))
                 .thenReturn(new ChatResponse(
-                        CONVERSATION_ID, "¿Confirmas la compra?", true, CONFIRMATION_TOKEN, SensitiveActionType.CHECKOUT, false, null));
+                        CONVERSATION_ID, "¿Confirmas la compra?", true, CONFIRMATION_TOKEN, SensitiveActionType.CHECKOUT, false));
 
         mockMvc.perform(post("/api/v1/assistant/chat")
                         .contentType(MediaType.APPLICATION_JSON)

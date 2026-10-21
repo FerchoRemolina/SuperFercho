@@ -9,5 +9,4 @@ public record ChatResponse(
         boolean awaitingConfirmation,
         String confirmationToken,
         SensitiveActionType confirmationType,
-        boolean authenticationRequired,
-        String visitorToken) {}
+        boolean authenticationRequired) {}

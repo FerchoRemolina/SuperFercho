@@ -1,6 +1,5 @@
 package com.superfercho.assistant.infrastructure.rest;
 
-import com.superfercho.assistant.application.exception.ConversationClaimException;
 import com.superfercho.assistant.application.exception.ConversationNotFoundException;
 import com.superfercho.assistant.application.exception.InvalidChatRequestException;
 import com.superfercho.assistant.application.exception.InvalidConfirmationException;
@@ -33,11 +32,6 @@ public class AssistantExceptionHandler {
     @ExceptionHandler(ConversationNotFoundException.class)
     ProblemDetail handleConversationNotFound(ConversationNotFoundException ignored) {
         return problem(HttpStatus.NOT_FOUND, "CONVERSATION_NOT_FOUND", "Conversation not found");
-    }
-
-    @ExceptionHandler(ConversationClaimException.class)
-    ProblemDetail handleConversationClaim(ConversationClaimException ignored) {
-        return problem(HttpStatus.CONFLICT, "CONVERSATION_CLAIM_FAILED", "Conversation cannot be claimed");
     }
 
     @ExceptionHandler(LlmProviderException.class)

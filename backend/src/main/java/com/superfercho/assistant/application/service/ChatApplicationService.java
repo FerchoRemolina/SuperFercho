@@ -121,7 +121,7 @@ public final class ChatApplicationService implements ChatUseCase {
         pendingSensitiveActionStore.delete(pending.token());
         Conversation updated = conversationStore.save(
                 conversation.append(Message.assistant(UUID.randomUUID(), resultText, now), now));
-        return new ChatResponse(updated.id(), resultText, false, null, null, false, null);
+        return new ChatResponse(updated.id(), resultText, false, null, null, false);
     }
 
     private ChatResponse completeWithTools(Conversation conversation, UUID userId, Instant now) {
@@ -142,7 +142,7 @@ public final class ChatApplicationService implements ChatUseCase {
                 roundsUsed = round + 1;
                 log.info("FERCHO_TRACE rounds={} tools={}", roundsUsed, String.join(",", executedTools));
                 return new ChatResponse(
-                        current.id(), text, confirmationToken != null, confirmationToken, confirmationType, authenticationRequired, null);
+                        current.id(), text, confirmationToken != null, confirmationToken, confirmationType, authenticationRequired);
             }
             List<MessageToolCall> domainCalls = new ArrayList<>();
             List<Message> toolMessages = new ArrayList<>();
@@ -184,7 +184,7 @@ public final class ChatApplicationService implements ChatUseCase {
         String fallback = "Too many tool calls were requested in this turn.";
         current = conversationStore.save(current.append(Message.assistant(UUID.randomUUID(), fallback, now), now));
         log.info("FERCHO_TRACE rounds={} tools={}", MAX_TOOL_ROUNDS, String.join(",", executedTools));
-        return new ChatResponse(current.id(), fallback, confirmationToken != null, confirmationToken, confirmationType, authenticationRequired, null);
+        return new ChatResponse(current.id(), fallback, confirmationToken != null, confirmationToken, confirmationType, authenticationRequired);
     }
 
     private static String statusOf(ToolResult result) {

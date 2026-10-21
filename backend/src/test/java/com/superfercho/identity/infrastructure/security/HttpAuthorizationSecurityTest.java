@@ -528,8 +528,8 @@ void shouldRejectAdminStorefrontHeroUpdateWithoutJwt() throws Exception {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                             {
-                              "title": "Nuevo t├¡tulo",
-                              "description": "Nueva descripci├│n",
+                              "title": "Nuevo título",
+                              "description": "Nueva descripción",
                               "ctaLabel": "Nueva CTA",
                               "imageUrl": null,
                               "mode": "STANDARD"
@@ -545,8 +545,8 @@ void shouldRejectAdminStorefrontHeroUpdateWithCustomerJwt() throws Exception {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                             {
-                              "title": "Nuevo t├¡tulo",
-                              "description": "Nueva descripci├│n",
+                              "title": "Nuevo título",
+                              "description": "Nueva descripción",
                               "ctaLabel": "Nueva CTA",
                               "imageUrl": null,
                               "mode": "STANDARD"
@@ -562,8 +562,8 @@ void shouldAllowAdminStorefrontHeroUpdateWithAdminJwt() throws Exception {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                             {
-                              "title": "Nuevo t├¡tulo",
-                              "description": "Nueva descripci├│n",
+                              "title": "Nuevo título",
+                              "description": "Nueva descripción",
                               "ctaLabel": "Nueva CTA",
                               "imageUrl": null,
                               "mode": "STANDARD"
@@ -591,7 +591,7 @@ void shouldAllowAdminStorefrontHeroUpdateWithAdminJwt() throws Exception {
         mockMvc.perform(post("/api/v1/admin/storefront-content/faqs")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"question":"┬┐P?","answer":"R.","displayOrder":10,"active":true}
+                                {"question":"¿P?","answer":"R.","displayOrder":10,"active":true}
                                 """))
                 .andExpect(unauthenticated());
         mockMvc.perform(put("/api/v1/admin/storefront-content/footer-settings")
@@ -654,7 +654,7 @@ void shouldAllowAdminStorefrontHeroUpdateWithAdminJwt() throws Exception {
                         .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"question":"┬┐P?","answer":"R.","displayOrder":10,"active":true}
+                                {"question":"¿P?","answer":"R.","displayOrder":10,"active":true}
                                 """))
                 .andExpect(notBlockedBySecurity());
         mockMvc.perform(put("/api/v1/admin/storefront-content/faqs/{faqId}",
@@ -662,7 +662,7 @@ void shouldAllowAdminStorefrontHeroUpdateWithAdminJwt() throws Exception {
                         .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"question":"┬┐P?","answer":"R.","displayOrder":10,"active":false}
+                                {"question":"¿P?","answer":"R.","displayOrder":10,"active":false}
                                 """))
                 .andExpect(notBlockedBySecurity());
         mockMvc.perform(put("/api/v1/admin/storefront-content/faqs/order")
@@ -1052,13 +1052,13 @@ void shouldAllowAdminStorefrontHeroUpdateWithAdminJwt() throws Exception {
     }
 
     @Test
-    void shouldAllowVisitorAssistantChat() throws Exception {
+    void shouldRejectAnonymousAssistantChat() throws Exception {
         mockMvc.perform(post("/api/v1/assistant/chat")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"message": "hola"}
                                 """))
-                .andExpect(notBlockedBySecurity());
+                .andExpect(unauthenticated());
     }
 
     @Test
@@ -1092,38 +1092,6 @@ void shouldAllowAdminStorefrontHeroUpdateWithAdminJwt() throws Exception {
                                 {"message": "hola"}
                                 """))
                 .andExpect(unauthenticated());
-    }
-
-    @Test
-    void shouldRejectVisitorClaimConversation() throws Exception {
-        mockMvc.perform(post("/api/v1/assistant/conversations/{conversationId}/claim", DOCUMENT_ID)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"visitorToken": "cualquier-token"}
-                                """))
-                .andExpect(unauthenticated());
-    }
-
-    @Test
-    void shouldRejectAdminClaimConversation() throws Exception {
-        mockMvc.perform(post("/api/v1/assistant/conversations/{conversationId}/claim", DOCUMENT_ID)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"visitorToken": "cualquier-token"}
-                                """))
-                .andExpect(accessDenied());
-    }
-
-    @Test
-    void shouldAllowCustomerClaimConversationPastSecurity() throws Exception {
-        mockMvc.perform(post("/api/v1/assistant/conversations/{conversationId}/claim", DOCUMENT_ID)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"visitorToken": "cualquier-token"}
-                                """))
-                .andExpect(notBlockedBySecurity());
     }
 
     private String bearer(Role role) {
