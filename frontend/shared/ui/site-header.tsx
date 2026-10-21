@@ -7,6 +7,7 @@ import { useSession } from "@/shared/session/session-provider";
 import { CustomerSessionCountdown } from "@/shared/session/customer-session-countdown";
 import { StorefrontPreviewBanner } from "@/shared/session/storefront-preview-banner";
 import { CartHeaderLink } from "@/features/cart/components/cart-header-link";
+import { FavoritesHeaderLink } from "@/features/favorites/components/favorites-header-link";
 import { SearchBar } from "@/features/catalog/components/search-bar";
 import { BrandLogo } from "@/shared/ui/brand-logo";
 import { Button, buttonClassName } from "@/shared/ui/button";
@@ -14,14 +15,15 @@ import { Container } from "@/shared/ui/container";
 import {
   ClipboardListIcon,
   CloseIcon,
+  GridIcon,
   HeartIcon,
   LogOutIcon,
   MapPinIcon,
   MenuIcon,
   PackageIcon,
-  SearchIcon,
   UserIcon,
 } from "@/shared/ui/icons";
+import { HeaderIconAction } from "@/shared/ui/header-icon-action";
 import {
   accountAvatarInitial,
   accountMenuDisplayName,
@@ -29,9 +31,7 @@ import {
 import { cx } from "@/shared/utils/cx";
 
 const publicLinks = [
-  { href: "/", label: "Inicio" },
   { href: "/catalog", label: "Catálogo" },
-  { href: "/search", label: "Buscar" },
 ] as const;
 
 function isActivePath(pathname: string, href: string): boolean {
@@ -60,7 +60,6 @@ export function SiteHeader() {
   const menuId = useId();
   const isCustomer = session?.role === "CUSTOMER";
   const isAdmin = session?.role === "ADMIN";
-  const showHeaderSearch = pathname !== "/search";
   const accountName = accountMenuDisplayName({
     firstName: session?.firstName,
     isPreview,
@@ -118,7 +117,7 @@ export function SiteHeader() {
   }, [accountOpen]);
 
   return (
-    <header className="sticky top-0 z-40 bg-sf-surface">
+    <header className="sticky top-0 z-40 bg-sf-surface/95 backdrop-blur-sm">
       {isPreview && previewMeta ? (
         <StorefrontPreviewBanner
           previewExpiresAt={previewMeta.previewExpiresAt}
@@ -128,82 +127,70 @@ export function SiteHeader() {
           }}
         />
       ) : null}
-      <div className="border-b border-sf-border">
-      <Container className="flex h-16 items-center justify-between gap-3 md:gap-4">
-        <BrandLogo />
+      <div className="border-b border-sf-border shadow-[0_1px_2px_rgba(23,33,27,0.04)]">
+      <Container width="wide" className="flex h-16 items-center justify-between gap-3 md:gap-4">
+        <div className="shrink-0">
+          <BrandLogo />
+        </div>
 
-        <nav
-          aria-label="Principal"
-          className="hidden items-center gap-1 md:flex"
-        >
-          {publicLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={cx(
-                "inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold",
-                isActivePath(pathname, link.href)
-                  ? "bg-sf-bg text-sf-primary"
-                  : "text-sf-ink hover:bg-sf-bg hover:text-sf-primary",
-              )}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
+        {/* Búsqueda global: zona flexible prioritaria del encabezado. */}
+        <div className="hidden min-w-0 flex-1 justify-center lg:flex">
+          <SearchBar compact />
+        </div>
 
-        {showHeaderSearch ? (
-          <div className="hidden flex-1 justify-center px-4 md:flex">
-            <SearchBar compact />
-          </div>
-        ) : (
-          <div className="hidden flex-1 md:block" aria-hidden="true" />
-        )}
-
-        <div className="hidden items-center gap-2 md:flex">
-          <CustomerSessionCountdown />
+        {/* Zona derecha: sesión, Catálogo y acciones por icono con etiqueta.
+            Sin separadores verticales: la jerarquía se resuelve con espaciado. */}
+        <div className="hidden items-center gap-2 whitespace-nowrap md:flex md:shrink-0">
+          {session ? (
+            <>
+              <div className="hidden lg:block">
+                <CustomerSessionCountdown />
+              </div>
+              <Link
+                href="/catalog"
+                aria-current={isActivePath(pathname, "/catalog") ? "page" : undefined}
+                className={cx(
+                  "inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-[15px] font-semibold leading-tight transition-colors",
+                  isActivePath(pathname, "/catalog")
+                    ? "bg-sf-primary/10 text-sf-primary"
+                    : "text-sf-ink hover:bg-sf-bg hover:text-sf-primary",
+                )}
+              >
+                <GridIcon className="h-[18px] w-[18px]" strokeWidth={2} />
+                Catálogo
+              </Link>
+            </>
+          ) : null}
           {session ? (
             <>
               {isCustomer ? (
                 <>
-                  <Link
-                    href="/assistant"
-                    className={buttonClassName("ghost")}
-                    aria-current={
-                      isActivePath(pathname, "/assistant") ? "page" : undefined
-                    }
-                  >
-                    Fercho
-                  </Link>
-                  <Link
+                  <HeaderIconAction
+                    label="Mis listas"
                     href="/lists"
-                    className={buttonClassName("ghost")}
-                    aria-current={isActivePath(pathname, "/lists") ? "page" : undefined}
-                  >
-                    Mis listas
-                  </Link>
-                  <Link
-                    href="/favorites"
-                    className={buttonClassName("ghost", "gap-2")}
-                    aria-current={isActivePath(pathname, "/favorites") ? "page" : undefined}
-                  >
-                    <HeartIcon />
-                    Favoritos
-                  </Link>
-                  <CartHeaderLink />
+                    icon={                    <ClipboardListIcon
+                      width={26}
+                      height={26}
+                      strokeWidth={2}
+                      className="shrink-0"
+                    />}
+                  />
+                  <FavoritesHeaderLink variant="header" />
+                  <CartHeaderLink variant="header" />
                 </>
               ) : null}
               <div className="relative" ref={accountRef}>
-                <Button
-                  variant="secondary"
+                <HeaderIconAction
+                  label="Cuenta"
                   aria-expanded={accountOpen}
-                  aria-haspopup="menu"
+                  icon={                  <UserIcon
+                    width={26}
+                    height={26}
+                    strokeWidth={2}
+                    className="shrink-0"
+                  />}
                   onClick={() => setAccountOpen((open) => !open)}
-                  className="gap-2"
-                >
-                  <UserIcon />
-                  Cuenta
-                </Button>
+                />
                 {accountMenuMounted ? (
                   <div
                     role="menu"
@@ -349,10 +336,16 @@ export function SiteHeader() {
             </>
           ) : (
             <>
-              <Link href="/login" className={buttonClassName("ghost")}>
+              <Link
+                href="/login"
+                className={buttonClassName("secondary", "min-h-10 px-5")}
+              >
                 Entrar
               </Link>
-              <Link href="/register" className={buttonClassName("primary")}>
+              <Link
+                href="/register"
+                className={buttonClassName("primary", "min-h-10 px-5")}
+              >
                 Crear cuenta
               </Link>
             </>
@@ -360,13 +353,6 @@ export function SiteHeader() {
         </div>
 
         <div className="flex items-center gap-1 md:hidden">
-          <Link
-            href="/search"
-            aria-label="Buscar"
-            className={buttonClassName("ghost", "px-3")}
-          >
-            <SearchIcon />
-          </Link>
           {isCustomer ? (
             <Link
               href="/favorites"
@@ -377,25 +363,31 @@ export function SiteHeader() {
             </Link>
           ) : null}
           {isCustomer || !session ? <CartHeaderLink compact /> : null}
-          <Button
-            variant="ghost"
-            className="px-3"
-            aria-expanded={menuOpen}
-            aria-controls={menuId}
-            aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            {menuOpen ? <CloseIcon /> : <MenuIcon />}
-          </Button>
         </div>
+        <Button
+          variant="ghost"
+          className="px-3 md:hidden"
+          aria-expanded={menuOpen}
+          aria-controls={menuId}
+          aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          {menuOpen ? <CloseIcon /> : <MenuIcon />}
+        </Button>
       </Container>
+
+      {/* Tablet (md–lg): la búsqueda ocupa una fila propia a ancho completo
+          para que el placeholder nunca se comprima. */}
+      <div className="flex justify-center border-b border-sf-border px-4 pb-3 md:flex lg:hidden">
+        <SearchBar compact id="header-search-tablet" />
+      </div>
 
       {menuOpen ? (
         <div
           id={menuId}
-          className="border-t border-sf-border bg-sf-surface md:hidden"
+          className="border-t border-sf-border bg-sf-surface xl:hidden"
         >
-          <Container className="flex flex-col gap-1 py-4">
+          <Container width="wide" className="flex flex-col gap-1 py-4">
             <nav aria-label="Móvil" className="flex flex-col gap-1">
               {publicLinks.map((link) => (
                 <Link
@@ -404,7 +396,7 @@ export function SiteHeader() {
                   className={cx(
                     "flex min-h-12 items-center rounded-lg px-3 text-base font-semibold",
                     isActivePath(pathname, link.href)
-                      ? "bg-sf-bg text-sf-primary"
+                      ? "bg-sf-primary/10 text-sf-primary"
                       : "text-sf-ink hover:bg-sf-bg",
                   )}
                 >
@@ -414,22 +406,11 @@ export function SiteHeader() {
               {isCustomer ? (
                 <>
                   <Link
-                    href="/assistant"
-                    className={cx(
-                      "flex min-h-12 items-center rounded-lg px-3 text-base font-semibold",
-                      isActivePath(pathname, "/assistant")
-                        ? "bg-sf-bg text-sf-primary"
-                        : "text-sf-ink hover:bg-sf-bg",
-                    )}
-                  >
-                    Fercho
-                  </Link>
-                  <Link
                     href="/lists"
                     className={cx(
                       "flex min-h-12 items-center rounded-lg px-3 text-base font-semibold",
                       isActivePath(pathname, "/lists")
-                        ? "bg-sf-bg text-sf-primary"
+                        ? "bg-sf-primary/10 text-sf-primary"
                         : "text-sf-ink hover:bg-sf-bg",
                     )}
                   >
@@ -440,7 +421,7 @@ export function SiteHeader() {
                     className={cx(
                       "flex min-h-12 items-center rounded-lg px-3 text-base font-semibold",
                       isActivePath(pathname, "/favorites")
-                        ? "bg-sf-bg text-sf-primary"
+                        ? "bg-sf-primary/10 text-sf-primary"
                         : "text-sf-ink hover:bg-sf-bg",
                     )}
                   >
@@ -507,16 +488,22 @@ export function SiteHeader() {
                 <Button variant="secondary" onClick={logout}>
                   Cerrar sesión
                 </Button>
-              ) : (
-                <>
-                  <Link href="/login" className={buttonClassName("secondary")}>
-                    Entrar
-                  </Link>
-                  <Link href="/register" className={buttonClassName("primary")}>
-                    Crear cuenta
-                  </Link>
-                </>
-              )}
+          ) : (
+            <div className="flex items-center gap-3">
+              <Link
+                href="/login"
+                className={buttonClassName("secondary", "min-h-10 px-5")}
+              >
+                Entrar
+              </Link>
+              <Link
+                href="/register"
+                className={buttonClassName("primary", "min-h-10 px-5")}
+              >
+                Crear cuenta
+              </Link>
+            </div>
+          )}
             </div>
           </Container>
         </div>

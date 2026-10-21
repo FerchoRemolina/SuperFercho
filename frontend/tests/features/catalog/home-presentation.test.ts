@@ -30,11 +30,57 @@ describe("home customer presentation", () => {
 
     expect(page).toContain("Ver productos");
     expect(page).toContain('href="/catalog"');
-    expect(page).toContain("Ver catálogo →");
+    expect(page).toContain("Ver catálogo completo");
+    expect(page).toContain("Los más vendidos");
+    expect(page).toContain("Lo que más están llevando nuestros clientes.");
     expect(page).not.toContain("quickAccess");
     expect(page).not.toContain("Explora los productos del súper");
     expect(page).toContain("brandingAssets.mark");
-    expect(page).toContain("Hablar con Fercho");
+    // Fercho ya no vive en la Home: su representación es el asistente flotante.
+    expect(page).not.toContain("Hablar con Fercho");
+    expect(page).not.toContain("Tu asistente en el súper");
+    expect(page).toContain("HomeValueProps");
+  });
+
+  it("feeds the Home preview from the best-sellers endpoint without client-side slicing", () => {
+    const preview = source(
+      "features/catalog/components/home-product-preview.tsx",
+    );
+    expect(preview).toContain("useBestSellersQuery");
+    expect(preview).toContain("HomeProductCard");
+    expect(preview).not.toContain("HOME_PRODUCT_LIMIT");
+    expect(preview).not.toContain(".slice(");
+    expect(preview).not.toContain("useProductsQuery");
+  });
+
+  it("navigates product cards to the real detail route /products/[productId]", () => {
+    const card = source("features/catalog/components/home-product-card.tsx");
+    const catalogCard = source("features/catalog/components/product-card.tsx");
+    const detailPage = source(
+      "app/(storefront)/products/[productId]/page.tsx",
+    );
+
+    // La ruta real soportada por el detalle es /products/[productId].
+    expect(detailPage).toContain("ProductDetailContent");
+    expect(detailPage).toContain("productId");
+    // Tarjetas de Home y catálogo construyen la URL con el id real del producto.
+    expect(card).toContain("`/products/${product.id}`");
+    expect(catalogCard).toContain("`/products/${product.id}`");
+    expect(card).toContain("Ver producto");
+  });
+
+  it("styles the catalog CTA and card action with brand green", () => {
+    const page = source("app/(storefront)/page.tsx");
+    const card = source("features/catalog/components/home-product-card.tsx");
+
+    // CTA de sección: verde sólido de marca, destacado como CTA principal.
+    expect(page).toContain('buttonClassName("primary")');
+    expect(page).toContain("group/cta");
+    expect(page).toContain("href=\"/catalog\"");
+    expect(page).toContain("Ver catálogo completo");
+    // CTA de tarjeta: verde sólido con flecha, navegación al detalle.
+    expect(card).toContain('buttonClassName("primary")');
+    expect(card).toContain("Ver producto");
   });
 
   it("keeps catalog ProductCard actions while using compact presentation", () => {

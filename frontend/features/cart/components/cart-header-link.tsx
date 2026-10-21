@@ -4,33 +4,46 @@ import Link from "next/link";
 import { cartUnitCount } from "@/features/cart/api";
 import { useCartQuery } from "@/features/cart/hooks";
 import { useSession } from "@/shared/session/session-provider";
+import { HeaderIconAction } from "@/shared/ui/header-icon-action";
 import { buttonClassName } from "@/shared/ui/button";
 import { CartIcon } from "@/shared/ui/icons";
-import { cx } from "@/shared/utils/cx";
 
-export function CartHeaderLink({ compact = false }: { compact?: boolean }) {
+/**
+ * Acceso al Carrito en el encabezado: conserva el contador numérico actual.
+ * Variante "header": círculo con etiqueta según la referencia aprobada.
+ */
+export function CartHeaderLink({
+  compact = false,
+  variant = "compact",
+}: {
+  compact?: boolean;
+  variant?: "compact" | "header";
+}) {
   const { session } = useSession();
   const cartQuery = useCartQuery();
   const isCustomer = session?.role === "CUSTOMER";
   const count = isCustomer ? cartUnitCount(cartQuery.data) : 0;
 
+  if (variant === "header") {
+    return (
+      <HeaderIconAction
+        label="Carrito"
+        badge={count}
+        icon={<CartIcon width={26} height={26} strokeWidth={2} />}
+        href="/cart"
+      />
+    );
+  }
+
   return (
     <Link
       href="/cart"
-      aria-label={
-        count > 0 ? `Carrito, ${count} unidades` : "Carrito"
-      }
+      aria-label={count > 0 ? `Carrito, ${count} unidades` : "Carrito"}
       className={buttonClassName("ghost", compact ? "relative px-3" : "relative gap-2")}
     >
       <CartIcon />
-      {compact ? null : "Carrito"}
       {count > 0 ? (
-        <span
-          className={cx(
-            "inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-sf-yellow px-1.5 text-xs font-bold text-sf-ink",
-            compact ? "absolute -right-0.5 -top-0.5" : "",
-          )}
-        >
+        <span className="absolute -right-0.5 -top-0.5 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-sf-yellow px-1.5 text-xs font-bold text-sf-ink">
           {count}
         </span>
       ) : null}

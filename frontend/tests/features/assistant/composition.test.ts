@@ -60,13 +60,16 @@ describe("assistant composition", () => {
     expect(invalidate).not.toContain('["assistant"');
   });
 
-  it("exposes Fercho in customer navigation and home without unavailable copy", () => {
+  it("exposes Fercho as floating assistant, not as header or home navigation", () => {
     const header = source("shared/ui/site-header.tsx");
     const home = source("app/(storefront)/page.tsx");
-    expect(header).toContain('href="/assistant"');
-    expect(header).toContain("Fercho");
-    expect(home).toContain('href="/assistant"');
-    expect(home).toContain("Hablar con Fercho");
+    const fab = source("features/assistant/components/fercho-fab.tsx");
+    // Fercho ya no es una opción más del menú ni un bloque al final de la Home.
+    expect(header).not.toContain('href="/assistant"');
+    expect(home).not.toContain('href="/assistant"');
+    // Su representación permanente es el asistente flotante.
+    expect(fab).toContain('href="/assistant"');
+    expect(fab).toContain("brandingAssets.ferchoIcon");
     expect(home).not.toContain("aún no");
     expect(home).not.toContain("no está disponible");
   });
