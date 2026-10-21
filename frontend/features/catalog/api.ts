@@ -86,7 +86,7 @@ export function catalogKeys() {
   };
 }
 
-/** Unidades de presentaciÃ³n comercial (mirrors PresentationUnit del backend). */
+/** Unidades de presentación comercial (mirrors PresentationUnit del backend). */
 export const PRESENTATION_UNITS = [
   "G",
   "KG",
@@ -123,8 +123,8 @@ export async function searchProducts(query: SearchProductsQuery): Promise<Produc
 }
 
 /**
- * "Los mÃ¡s vendidos" del Home: el backend resuelve ventana mÃ³vil con
- * fallback, disponibilidad/visibilidad, diversidad por categorÃ­a y lÃ­mite.
+ * "Los más vendidos" del Home: el backend resuelve ventana móvil con
+ * fallback, disponibilidad/visibilidad, diversidad por categoría y límite.
  */
 export async function listBestSellers(): Promise<Product[]> {
   return request<Product[]>("/products/best-sellers", anonymousGet);
