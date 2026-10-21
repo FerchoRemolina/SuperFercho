@@ -44,7 +44,7 @@ function buildNavGroups(): FooterNavGroup[] {
       Icon: GridIcon,
       links: [
         { href: "/", label: "Inicio" },
-        { href: "/catalog", label: "CatÃ¡logo" },
+        { href: "/catalog", label: "Catálogo" },
         { href: "/search", label: "Buscar" },
       ],
     },
@@ -61,16 +61,16 @@ function buildNavGroups(): FooterNavGroup[] {
     },
     {
       id: "legal",
-      title: "InformaciÃ³n legal",
+      title: "Información legal",
       Icon: DocumentIcon,
       links: [
-        { href: "/legal/privacy", label: "PolÃ­tica de privacidad" },
-        { href: "/legal/terms", label: "TÃ©rminos y condiciones" },
+        { href: "/legal/privacy", label: "Política de privacidad" },
+        { href: "/legal/terms", label: "Términos y condiciones" },
       ],
     },
     {
       id: "atencion",
-      title: "AtenciÃ³n al cliente",
+      title: "Atención al cliente",
       Icon: QuestionCircleIcon,
       links: [
         { href: "/#preguntas-frecuentes", label: "Preguntas frecuentes" },
@@ -128,7 +128,7 @@ function FooterNavGroupColumn({
       aria-label={group.title}
       className={cx(
         "border-b border-white/10 last:border-b-0 md:border-b-0 md:border-l md:border-white/12 md:pl-5 md:first:border-l-0 md:first:pl-0 lg:pl-6 lg:first:pl-0",
-        // Ãšltima columna (AtenciÃ³n): un poco mÃ¡s de aire a la derecha para correo + copiar.
+        // Última columna (Atención): un poco más de aire a la derecha para correo + copiar.
         group.id === "atencion" && "lg:pr-3 xl:pr-4",
       )}
     >
@@ -203,7 +203,7 @@ export function SiteFooter() {
       </div>
 
       <div className="relative overflow-hidden bg-gradient-to-b from-[#06402b] via-[#0a4a32] to-[#053526] text-white">
-        {/* Decoraciones de esquina detrÃ¡s del contenido (PNG con alfa real). */}
+        {/* Decoraciones de esquina detrás del contenido (PNG con alfa real). */}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 z-0 select-none"
@@ -235,10 +235,10 @@ export function SiteFooter() {
               <BrandLogo />
             </span>
             <p className="text-xl font-extrabold tracking-tight md:text-[1.4rem]">
-              Tu sÃºper, mÃ¡s cerca de ti.
+              Tu súper, más cerca de ti.
             </p>
             <p className="max-w-sm text-sm leading-relaxed text-white/80">
-              Organiza tu mercado en lÃ­nea y encuentra todo lo que necesitas
+              Organiza tu mercado en línea y encuentra todo lo que necesitas
               desde cualquier lugar.
             </p>
 
@@ -288,9 +288,9 @@ export function SiteFooter() {
                     "transition-opacity duration-150 hover:opacity-90",
                     focusRing,
                   )}
-                  aria-label="Abrir perfil de LinkedIn (cÃ³digo QR)"
+                  aria-label="Abrir perfil de LinkedIn (código QR)"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element -- QR desde administraciÃ³n */}
+                  {/* eslint-disable-next-line @next/next/no-img-element -- QR desde administración */}
                   <img
                     src={qrImageUrl}
                     alt=""
@@ -301,10 +301,10 @@ export function SiteFooter() {
                 </a>
               ) : qrImageUrl ? (
                 <div className="overflow-hidden rounded-xl bg-white p-1.5 shadow-sm">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- QR desde administraciÃ³n */}
+                  {/* eslint-disable-next-line @next/next/no-img-element -- QR desde administración */}
                   <img
                     src={qrImageUrl}
-                    alt="CÃ³digo QR"
+                    alt="Código QR"
                     width={96}
                     height={96}
                     className="size-24 object-contain"
@@ -369,7 +369,7 @@ export function SiteFooter() {
 
             <div className="lg:justify-self-center">
               <p className="mb-2.5 text-center text-[0.7rem] font-bold uppercase tracking-[0.1em] text-white/55">
-                MÃ©todos de pago disponibles
+                Métodos de pago disponibles
               </p>
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <span className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-white/90">
@@ -399,7 +399,7 @@ export function SiteFooter() {
                 className="mt-0.5 size-4 shrink-0 text-[#9fd29a] lg:order-2"
               />
               <span>
-                Un proyecto en constante evoluciÃ³n, para ofrecerte una mejor
+                Un proyecto en constante evolución, para ofrecerte una mejor
                 experiencia.
               </span>
             </p>

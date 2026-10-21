@@ -34,7 +34,7 @@ const FAQ_ICONS = [
 const focusRing =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0f6a3d]";
 
-/** FAQ + soporte del inicio pÃºblico (mascota: fercho-comprando.png). */
+/** FAQ + soporte del inicio público (mascota: fercho-comprando.png). */
 export function SupportSection() {
   const faqsQuery = usePublicStorefrontFaqsQuery();
   const footerQuery = usePublicStorefrontFooterSettingsQuery();
@@ -116,7 +116,7 @@ export function SupportSection() {
               ))
             ) : faqsQuery.isError ? (
               <div className="rounded-[1.15rem] border border-sf-border bg-white p-5 text-sm text-sf-muted">
-                No pudimos cargar las preguntas frecuentes. Intenta de nuevo mÃ¡s
+                No pudimos cargar las preguntas frecuentes. Intenta de nuevo más
                 tarde.
               </div>
             ) : faqs.length === 0 ? (
@@ -217,7 +217,7 @@ export function SupportSection() {
                           Hablar con Fercho
                         </span>
                         <span className="mt-1 block text-[0.7rem] leading-snug text-white/85">
-                          PregÃºntale sobre productos, tu pedido o tu cuenta.
+                          Pregúntale sobre productos, tu pedido o tu cuenta.
                         </span>
                       </span>
                       <ArrowRightIcon
@@ -233,7 +233,7 @@ export function SupportSection() {
                       />
                     ) : (
                       <div className="rounded-2xl border border-dashed border-[#b7d1ae] bg-white/80 px-4 py-3.5 text-sm text-[#5d7268]">
-                        El correo de soporte se mostrarÃ¡ cuando estÃ© configurado.
+                        El correo de soporte se mostrará cuando esté configurado.
                       </div>
                     )}
                   </div>
@@ -242,7 +242,7 @@ export function SupportSection() {
                     aria-hidden="true"
                     className="pointer-events-none relative z-0 flex justify-center overflow-hidden sm:min-w-0 sm:flex-1 sm:justify-end sm:self-center sm:overflow-visible lg:overflow-visible"
                   >
-                    {/* Desktop ~70px a la derecha; tablet/mÃ³vil con offset menor para no salirse. */}
+                    {/* Desktop ~70px a la derecha; tablet/móvil con offset menor para no salirse. */}
                     <FerchoSupportMascot className="relative left-0 sm:left-3 md:left-5 lg:left-12 xl:left-[70px]" />
                   </div>
                 </div>
