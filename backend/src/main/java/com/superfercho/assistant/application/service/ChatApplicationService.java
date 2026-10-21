@@ -132,15 +132,25 @@ public final class ChatApplicationService implements ChatUseCase {
         Conversation current = conversation;
         List<String> executedTools = new ArrayList<>();
         int roundsUsed = 0;
+        long totalStartNanos = System.nanoTime();
         for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
-            LlmResponse response =
-                    llmPort.complete(new LlmRequest(toLlmMessages(current), tools, FerchoSystemPrompt.TEXT));
+            long llmStartNanos = System.nanoTime();
+            LlmResponse response;
+            try {
+                response = llmPort.complete(new LlmRequest(toLlmMessages(current), tools, FerchoSystemPrompt.TEXT));
+            } catch (RuntimeException exception) {
+                log.info("FERCHO_LLM round={} duration_ms={}", round + 1,
+                        (System.nanoTime() - llmStartNanos) / 1_000_000);
+                throw exception;
+            }
+            log.info("FERCHO_LLM round={} duration_ms={}", round + 1, (System.nanoTime() - llmStartNanos) / 1_000_000);
             if (!response.hasToolCalls()) {
                 String text = response.text().isBlank() ? "I could not produce a response." : response.text();
                 current = conversationStore.save(
                         current.append(Message.assistant(UUID.randomUUID(), text, now), now));
                 roundsUsed = round + 1;
-                log.info("FERCHO_TRACE rounds={} tools={}", roundsUsed, String.join(",", executedTools));
+                log.info("FERCHO_TRACE rounds={} tools={} total_duration_ms={}", roundsUsed,
+                        String.join(",", executedTools), (System.nanoTime() - totalStartNanos) / 1_000_000);
                 return new ChatResponse(
                         current.id(), text, confirmationToken != null, confirmationToken, confirmationType, authenticationRequired);
             }
@@ -151,6 +161,7 @@ public final class ChatApplicationService implements ChatUseCase {
                 domainCalls.add(new MessageToolCall(callId, call.name(), call.arguments()));
                 ToolResult result;
                 String status;
+                long toolStartNanos = System.nanoTime();
                 try {
                     result = toolRegistry.execute(ToolAccess.CUSTOMER, call.name(), call.arguments());
                     status = statusOf(result);
@@ -166,11 +177,12 @@ public final class ChatApplicationService implements ChatUseCase {
                                     ? exception.getClass().getSimpleName()
                                     : exception.getMessage());
                 }
+                log.info("FERCHO_TOOL round={} tool={} status={} duration_ms={}", round + 1, call.name(), status,
+                        (System.nanoTime() - toolStartNanos) / 1_000_000);
                 if (result.awaitsConfirmation()) {
                     confirmationToken = result.confirmationToken();
                     confirmationType = confirmationTypeOf(call.name());
                 }
-                log.info("FERCHO_TOOL round={} tool={} status={}", round + 1, call.name(), status);
                 executedTools.add(call.name());
                 toolMessages.add(Message.toolResult(
                         UUID.randomUUID(), callId, call.name(), result.content(), now));
@@ -183,7 +195,8 @@ public final class ChatApplicationService implements ChatUseCase {
         }
         String fallback = "Too many tool calls were requested in this turn.";
         current = conversationStore.save(current.append(Message.assistant(UUID.randomUUID(), fallback, now), now));
-        log.info("FERCHO_TRACE rounds={} tools={}", MAX_TOOL_ROUNDS, String.join(",", executedTools));
+        log.info("FERCHO_TRACE rounds={} tools={} total_duration_ms={}", MAX_TOOL_ROUNDS,
+                String.join(",", executedTools), (System.nanoTime() - totalStartNanos) / 1_000_000);
         return new ChatResponse(current.id(), fallback, confirmationToken != null, confirmationToken, confirmationType, authenticationRequired);
     }
 

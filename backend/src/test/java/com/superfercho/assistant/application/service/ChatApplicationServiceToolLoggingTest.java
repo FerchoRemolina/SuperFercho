@@ -105,6 +105,11 @@ class ChatApplicationServiceToolLoggingTest {
                 .toList();
     }
 
+    /** El contrato del evento es su prefijo; la duración al final es variable. */
+    private boolean hasEvent(String prefix) {
+        return ferchoLines().stream().anyMatch(line -> line.startsWith(prefix));
+    }
+
     private ChatResponse runCustomerTurn(String message) {
         when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
         when(clockPort.currentTime()).thenReturn(NOW);
@@ -122,9 +127,9 @@ class ChatApplicationServiceToolLoggingTest {
         chat.execute(new ChatCommand(null, "ver carrito", null));
 
         List<String> lines = ferchoLines();
-        assertTrue(lines.contains("FERCHO_TOOL round=1 tool=get_cart status=SUCCESS"),
+        assertTrue(hasEvent("FERCHO_TOOL round=1 tool=get_cart status=SUCCESS"),
                 "eventos capturados: " + listAppender.list.size() + " -> " + lines);
-        assertTrue(lines.contains("FERCHO_TRACE rounds=2 tools=get_cart"),
+        assertTrue(hasEvent("FERCHO_TRACE rounds=2 tools=get_cart"),
                 "eventos capturados: " + listAppender.list.size() + " -> " + lines);
         assertFalse(lines.stream().anyMatch(line -> line.contains(USER_ID.toString())));
     }
@@ -140,8 +145,8 @@ class ChatApplicationServiceToolLoggingTest {
         chat.execute(new ChatCommand(null, "ver carrito", null));
 
         List<String> lines = ferchoLines();
-        assertTrue(lines.contains("FERCHO_TOOL round=1 tool=get_cart status=FAILURE"));
-        assertTrue(lines.contains("FERCHO_TRACE rounds=2 tools=get_cart"));
+        assertTrue(hasEvent("FERCHO_TOOL round=1 tool=get_cart status=FAILURE"));
+        assertTrue(hasEvent("FERCHO_TRACE rounds=2 tools=get_cart"));
         assertFalse(lines.stream().anyMatch(line -> line.contains("boom")));
     }
 
@@ -151,14 +156,14 @@ class ChatApplicationServiceToolLoggingTest {
         when(clockPort.currentTime()).thenReturn(NOW);
         llm.enqueue(LlmResponse.toolCalls(List.of(new LlmMessage.LlmToolCall(
                 "c1", "cancel_order", Map.of("orderId", ORDER_ID.toString())))));
-        llm.enqueue(LlmResponse.text("Â¿Confirmas la cancelaciÃ³n?"));
+        llm.enqueue(LlmResponse.text("¿Confirmas la cancelación?"));
 
         ChatResponse response = chat.execute(new ChatCommand(null, "cancela mi pedido", null));
 
         assertTrue(response.awaitingConfirmation());
         List<String> lines = ferchoLines();
-        assertTrue(lines.contains("FERCHO_TOOL round=1 tool=cancel_order status=CONFIRMATION_REQUIRED"));
-        assertTrue(lines.contains("FERCHO_TRACE rounds=2 tools=cancel_order"));
+        assertTrue(hasEvent("FERCHO_TOOL round=1 tool=cancel_order status=CONFIRMATION_REQUIRED"));
+        assertTrue(hasEvent("FERCHO_TRACE rounds=2 tools=cancel_order"));
         assertFalse(lines.stream().anyMatch(line -> line.contains(ORDER_ID.toString())));
     }
 
@@ -173,8 +178,8 @@ class ChatApplicationServiceToolLoggingTest {
         chat.execute(new ChatCommand(null, "ver carrito dos veces", null));
 
         List<String> lines = ferchoLines();
-        assertTrue(lines.contains("FERCHO_TOOL round=1 tool=get_cart status=SUCCESS"));
-        assertTrue(lines.contains("FERCHO_TOOL round=2 tool=get_cart status=SUCCESS"));
-        assertTrue(lines.contains("FERCHO_TRACE rounds=3 tools=get_cart,get_cart"));
+        assertTrue(hasEvent("FERCHO_TOOL round=1 tool=get_cart status=SUCCESS"));
+        assertTrue(hasEvent("FERCHO_TOOL round=2 tool=get_cart status=SUCCESS"));
+        assertTrue(hasEvent("FERCHO_TRACE rounds=3 tools=get_cart,get_cart"));
     }
 }
