@@ -1,7 +1,9 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { cartKeys } from "@/features/cart/api";
 import {
+  addShoppingListToCart,
   addShoppingListItem,
   changeShoppingListItemQuantity,
   clearShoppingList,
@@ -18,6 +20,7 @@ import {
 import { useSession } from "@/shared/session/session-provider";
 
 const keys = shoppingListsKeys();
+const cartRoot = cartKeys().root();
 
 export function useShoppingListsQuery() {
   const { session } = useSession();
@@ -77,9 +80,21 @@ export function useAddShoppingListItemMutation() {
       shoppingListId: string;
       body: AddShoppingListItemRequest;
     }) => addShoppingListItem(shoppingListId, body),
-    onSuccess: (list) => {
-      queryClient.setQueryData(keys.detail(list.id), list);
+    onSuccess: (result) => {
+      queryClient.setQueryData(keys.detail(result.shoppingList.id), result.shoppingList);
       void queryClient.invalidateQueries({ queryKey: keys.root() });
+    },
+  });
+}
+
+export function useAddShoppingListToCartMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (shoppingListId: string) => addShoppingListToCart(shoppingListId),
+    onSuccess: (cart) => {
+      queryClient.setQueryData(cartRoot, cart);
+      void queryClient.invalidateQueries({ queryKey: cartRoot });
     },
   });
 }

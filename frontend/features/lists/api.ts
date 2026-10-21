@@ -1,4 +1,5 @@
 import { request } from "@/shared/api/client";
+import type { Cart } from "@/features/cart/api";
 
 /** Mirrors ShoppingListItemRestResponse. */
 export type ShoppingListItem = {
@@ -27,6 +28,12 @@ export type ShoppingListNameRequest = {
 export type AddShoppingListItemRequest = {
   productId: string;
   quantity: number;
+};
+
+/** Mirrors AddShoppingListItemRestResponse. */
+export type AddShoppingListItemResult = {
+  shoppingList: ShoppingList;
+  alreadyPresent: boolean;
 };
 
 /** Mirrors ChangeItemQuantityRequest. */
@@ -79,8 +86,8 @@ export async function renameShoppingList(
 export async function addShoppingListItem(
   shoppingListId: string,
   body: AddShoppingListItemRequest,
-): Promise<ShoppingList> {
-  return request<ShoppingList>(
+): Promise<AddShoppingListItemResult> {
+  return request<AddShoppingListItemResult>(
     `/shopping-lists/${encodeURIComponent(shoppingListId)}/items`,
     {
       method: "POST",
@@ -122,6 +129,20 @@ export async function clearShoppingList(
   );
 }
 
+/**
+ * Compra de la lista: una sola llamada al endpoint oficial del backend, que
+ * agrega al carrito únicamente los productos con cantidad mayor a 0. La
+ * respuesta es el carrito resultante.
+ */
+export async function addShoppingListToCart(
+  shoppingListId: string,
+): Promise<Cart> {
+  return request<Cart>(
+    `/shopping-lists/${encodeURIComponent(shoppingListId)}/add-to-cart`,
+    { method: "POST" },
+  );
+}
+
 export async function deleteShoppingList(
   shoppingListId: string,
 ): Promise<void> {
@@ -133,6 +154,30 @@ export async function deleteShoppingList(
 
 export function shoppingListItemCount(list: ShoppingList): number {
   return list.items.length;
+}
+
+/** Pertenencia producto-lista: añadir es idempotente, la cantidad no crece. */
+export function shoppingListContainsProduct(
+  list: ShoppingList,
+  productId: string,
+): boolean {
+  return list.items.some((item) => item.productId === productId);
+}
+
+/** Resumen de la compra: productos con cantidad mayor a 0 y sus unidades. */
+export type ShoppingListPurchaseSummary = {
+  itemCount: number;
+  unitCount: number;
+};
+
+export function shoppingListPurchaseSummary(
+  list: ShoppingList,
+): ShoppingListPurchaseSummary {
+  const buyable = list.items.filter((item) => item.quantity > 0);
+  return {
+    itemCount: buyable.length,
+    unitCount: buyable.reduce((sum, item) => sum + item.quantity, 0),
+  };
 }
 
 export function shoppingListUnitCount(list: ShoppingList): number {

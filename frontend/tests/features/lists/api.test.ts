@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  addShoppingListToCart,
   addShoppingListItem,
   changeShoppingListItemQuantity,
   clearShoppingList,
@@ -9,7 +10,9 @@ import {
   listShoppingLists,
   removeShoppingListItem,
   renameShoppingList,
+  shoppingListContainsProduct,
   shoppingListItemCount,
+  shoppingListPurchaseSummary,
   shoppingListsKeys,
   shoppingListUnitCount,
   validateShoppingListName,
@@ -141,10 +144,14 @@ describe("shopping lists api", () => {
   });
 
   it("adds an item with productId and quantity", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(shoppingList));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ shoppingList, alreadyPresent: false }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await addShoppingListItem(listId, { productId, quantity: 2 });
+    await expect(
+      addShoppingListItem(listId, { productId, quantity: 2 }),
+    ).resolves.toEqual({ shoppingList, alreadyPresent: false });
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(
@@ -152,6 +159,19 @@ describe("shopping lists api", () => {
     );
     expect(init.method).toBe("POST");
     expect(init.body).toBe(JSON.stringify({ productId, quantity: 2 }));
+  });
+
+  it("parses alreadyPresent when the product already belongs to the list", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ shoppingList, alreadyPresent: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      addShoppingListItem(listId, { productId, quantity: 1 }),
+    ).resolves.toEqual({ shoppingList, alreadyPresent: true });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("changes item quantity with PATCH", async () => {
@@ -205,21 +225,55 @@ describe("shopping lists api", () => {
     expect(init.method).toBe("DELETE");
   });
 
-  it("never invents a list-to-cart endpoint", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse([shoppingList]))
-      .mockResolvedValueOnce(jsonResponse(shoppingList));
+  it("buys the list with a single add-to-cart call", async () => {
+    const cart = {
+      id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      customerId,
+      status: "ACTIVE",
+      items: [
+        {
+          id: "77777777-7777-7777-7777-777777777777",
+          productId,
+          quantity: 3,
+          priceAtAddition: { amount: 6500, currency: "COP" },
+          addedAt: "2026-04-01T10:00:00Z",
+          updatedAt: "2026-04-01T10:05:00Z",
+        },
+      ],
+      createdAt: "2026-04-01T10:00:00Z",
+      updatedAt: "2026-04-01T10:05:00Z",
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(cart));
     vi.stubGlobal("fetch", fetchMock);
 
-    await listShoppingLists();
-    await addShoppingListItem(listId, { productId, quantity: 1 });
+    await expect(addShoppingListToCart(listId)).resolves.toEqual(cart);
 
-    for (const call of fetchMock.mock.calls) {
-      const url = call[0] as string;
-      expect(url).not.toContain("/cart");
-      expect(url).not.toContain("from-list");
-    }
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      `http://localhost:8080/api/v1/shopping-lists/${listId}/add-to-cart`,
+    );
+    expect(init.method).toBe("POST");
+    expect(init.body).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("summarizes only buyable items for the purchase", () => {
+    const items = (quantities: number[]) =>
+      quantities.map((quantity, index) => ({
+        id: `item-${index}`,
+        productId: `product-${index}`,
+        quantity,
+        createdAt: "2026-04-01T10:00:00Z",
+      }));
+    expect(
+      shoppingListPurchaseSummary({ ...shoppingList, items: items([3, 2, 0]) }),
+    ).toEqual({ itemCount: 2, unitCount: 5 });
+    expect(
+      shoppingListPurchaseSummary({ ...shoppingList, items: items([0, 0]) }),
+    ).toEqual({ itemCount: 0, unitCount: 0 });
+    expect(
+      shoppingListPurchaseSummary({ ...shoppingList, items: [] }),
+    ).toEqual({ itemCount: 0, unitCount: 0 });
   });
 
   it("exposes stable query keys", () => {
@@ -235,6 +289,16 @@ describe("shopping lists api", () => {
     expect(shoppingListItemCount(shoppingList)).toBe(1);
     expect(shoppingListUnitCount(shoppingList)).toBe(2);
     expect(shoppingListItemCount({ ...shoppingList, items: [] })).toBe(0);
+  });
+
+  it("detects whether a product belongs to a list", () => {
+    expect(shoppingListContainsProduct(shoppingList, productId)).toBe(true);
+    expect(
+      shoppingListContainsProduct(shoppingList, "dddddddd-dddd-dddd-dddd-dddddddddddd"),
+    ).toBe(false);
+    expect(
+      shoppingListContainsProduct({ ...shoppingList, items: [] }, productId),
+    ).toBe(false);
   });
 });
 
