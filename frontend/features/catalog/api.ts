@@ -31,6 +31,26 @@ export function isCategoryIconId(value: unknown): value is CategoryIconId {
 
 export type ProductStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
 
+/** Unidades de presentación comercial (mirrors PresentationUnit del backend). */
+export const PRESENTATION_UNITS = [
+  "G",
+  "KG",
+  "ML",
+  "L",
+  "UNIT",
+  "PACK",
+  "BOX",
+  "ROLL",
+] as const;
+
+export type PresentationUnit = (typeof PRESENTATION_UNITS)[number];
+
+/** Mirrors Presentation del backend (cantidad + unidad, independiente del stock). */
+export type Presentation = {
+  quantity: number;
+  unit: PresentationUnit;
+};
+
 /** Mirrors CategoryRestResponse for GET /api/v1/categories. */
 export type Category = {
   id: string;
@@ -42,7 +62,11 @@ export type Category = {
   updatedAt: string;
 };
 
-/** Mirrors ProductRestResponse for GET /api/v1/products. */
+/**
+ * Mirrors ProductRestResponse for GET /api/v1/products.
+ * La taxonomía (ids + nombres comerciales + presentación) la expone el
+ * backend público; los campos son opcionales por compatibilidad con fixtures.
+ */
 export type Product = {
   id: string;
   categoryId: string;
@@ -85,26 +109,6 @@ export function catalogKeys() {
     bestSellers: () => ["catalog", "best-sellers"] as const,
   };
 }
-
-/** Unidades de presentación comercial (mirrors PresentationUnit del backend). */
-export const PRESENTATION_UNITS = [
-  "G",
-  "KG",
-  "ML",
-  "L",
-  "UNIT",
-  "PACK",
-  "BOX",
-  "ROLL",
-] as const;
-
-export type PresentationUnit = (typeof PRESENTATION_UNITS)[number];
-
-/** Mirrors Presentation del backend (cantidad + unidad, independiente del stock). */
-export type Presentation = {
-  quantity: number;
-  unit: PresentationUnit;
-};
 
 export async function listCategories(): Promise<Category[]> {
   return request<Category[]>("/categories", anonymousGet);
