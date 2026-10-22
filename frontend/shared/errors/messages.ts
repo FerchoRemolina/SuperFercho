@@ -94,6 +94,10 @@ export function messageForApiProblem(problem: ApiProblem): string {
       return "No tienes permiso para esta acción.";
     case "UNAUTHENTICATED":
       return "Debes iniciar sesión para continuar.";
+    case "INVALID_STOREFRONT_CONTENT":
+      return "Revisa los datos del contenido de la tienda.";
+    case "STOREFRONT_CONTENT_NOT_FOUND":
+      return "No encontramos ese contenido de la tienda.";
     case "INTERNAL_ERROR":
       return "Ocurrió un error interno. Inténtalo más tarde.";
     default:
