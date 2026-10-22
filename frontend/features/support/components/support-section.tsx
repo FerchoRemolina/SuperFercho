@@ -73,7 +73,7 @@ export function SupportSection() {
             id="support-heading"
             className="mt-4 text-[1.85rem] font-extrabold tracking-tight text-[#143528] md:text-[2.35rem] lg:text-[2.65rem]"
           >
-            Â¿Tienes alguna duda?
+            ¿Tienes alguna duda?
             <span
               aria-hidden="true"
               className="ml-1.5 inline-block align-middle text-[#5ea85a]"

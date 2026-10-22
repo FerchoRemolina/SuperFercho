@@ -362,7 +362,7 @@ export function SiteFooter() {
           >
             <div className="space-y-1 lg:pr-4">
               <p className="text-[0.8125rem] leading-relaxed text-white/80">
-                Â© {year} SuperFercho. Todos los derechos reservados.
+                © {year} SuperFercho. Todos los derechos reservados.
               </p>
               <p>Precios expresados en pesos colombianos (COP).</p>
             </div>
