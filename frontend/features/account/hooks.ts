@@ -4,16 +4,22 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addAddress,
   addressKeys,
+  customerProfileKeys,
   deactivateAddress,
+  getCustomerProfile,
   listAddresses,
   setDefaultAddress,
   updateAddress,
+  updateCustomerProfile,
   type AddAddressRequest,
   type UpdateAddressRequest,
+  type UpdateCustomerProfileRequest,
 } from "@/features/account/api";
+import { applyCustomerProfileNamesToSession } from "@/features/account/profile-session";
 import { useSession } from "@/shared/session/session-provider";
 
 const keys = addressKeys();
+const profileKeys = customerProfileKeys();
 
 export function useAddressesQuery() {
   const { session } = useSession();
@@ -23,6 +29,31 @@ export function useAddressesQuery() {
     queryKey: keys.root(),
     queryFn: listAddresses,
     enabled,
+  });
+}
+
+export function useCustomerProfileQuery() {
+  const { session } = useSession();
+  const enabled = session?.role === "CUSTOMER";
+
+  return useQuery({
+    queryKey: profileKeys.root(),
+    queryFn: getCustomerProfile,
+    enabled,
+  });
+}
+
+export function useUpdateCustomerProfileMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: UpdateCustomerProfileRequest) =>
+      updateCustomerProfile(body),
+    onSuccess: (profile) => {
+      queryClient.setQueryData(profileKeys.root(), profile);
+      queryClient.invalidateQueries({ queryKey: profileKeys.root() });
+      applyCustomerProfileNamesToSession(profile.firstName, profile.lastName);
+    },
   });
 }
 

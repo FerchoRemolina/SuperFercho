@@ -30,6 +30,8 @@ export function messageForApiProblem(problem: ApiProblem): string {
       return "La cantidad debe ser mayor que cero.";
     case "INVALID_ADDRESS":
       return "Revisa los datos de la dirección.";
+    case "INVALID_REGISTRATION":
+      return "Revisa los datos ingresados e inténtalo de nuevo.";
     case "ADDRESS_NOT_FOUND":
       return "No encontramos esa dirección.";
     case "ADDRESS_INACTIVE":
@@ -92,6 +94,8 @@ export function messageForApiProblem(problem: ApiProblem): string {
       return "No se pudo consultar Open Food Facts. Inténtalo de nuevo o completa el producto a mano.";
     case "ACCESS_DENIED":
       return "No tienes permiso para esta acción.";
+    case "CUSTOMER_PROFILE_FORBIDDEN":
+      return "Tu cuenta no puede gestionar este perfil.";
     case "UNAUTHENTICATED":
       return "Debes iniciar sesión para continuar.";
     case "INVALID_STOREFRONT_CONTENT":

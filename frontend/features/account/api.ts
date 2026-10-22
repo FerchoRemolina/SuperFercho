@@ -89,3 +89,45 @@ export function isAddressActive(address: Address): boolean {
 export function activeAddresses(addresses: Address[]): Address[] {
   return addresses.filter(isAddressActive);
 }
+
+/** Mirrors CustomerProfileRestResponse. */
+export type CustomerProfile = {
+  id: string;
+  documentType: string;
+  documentNumber: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** Mirrors UpdateCustomerProfileRequest. Identity comes from the JWT. */
+export type UpdateCustomerProfileRequest = {
+  documentType: string;
+  documentNumber: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+};
+
+export function customerProfileKeys() {
+  return {
+    root: () => ["customer-profile"] as const,
+  };
+}
+
+export async function getCustomerProfile(): Promise<CustomerProfile> {
+  return request<CustomerProfile>("/customers/me");
+}
+
+export async function updateCustomerProfile(
+  body: UpdateCustomerProfileRequest,
+): Promise<CustomerProfile> {
+  return request<CustomerProfile>("/customers/me", {
+    method: "PUT",
+    body,
+  });
+}

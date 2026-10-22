@@ -236,6 +236,14 @@ export function SiteHeader() {
                         />
                         <div className="grid gap-0.5 py-0.5">
                           <Link
+                            href="/account/profile"
+                            role="menuitem"
+                            className={accountMenuItemClass}
+                          >
+                            <UserIcon className="h-[18px] w-[18px] shrink-0 text-sf-muted" />
+                            Mi perfil
+                          </Link>
+                          <Link
                             href="/lists"
                             role="menuitem"
                             className={accountMenuItemClass}
@@ -405,6 +413,12 @@ export function SiteHeader() {
               ))}
               {isCustomer ? (
                 <>
+                  <Link
+                    href="/account/profile"
+                    className="flex min-h-12 items-center rounded-lg px-3 text-base font-semibold text-sf-ink hover:bg-sf-bg"
+                  >
+                    Mi perfil
+                  </Link>
                   <Link
                     href="/lists"
                     className={cx(
