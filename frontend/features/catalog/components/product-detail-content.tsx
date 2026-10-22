@@ -16,6 +16,7 @@ import { Badge } from "@/shared/ui/badge";
 import { buttonClassName } from "@/shared/ui/button";
 import { Container } from "@/shared/ui/container";
 import { EmptyState } from "@/shared/ui/empty-state";
+import { PageHeader } from "@/shared/ui/page-header";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { cx } from "@/shared/utils/cx";
 
@@ -32,13 +33,16 @@ export function ProductDetailContent({ productId }: { productId: string }) {
     return (
       <Container as="main" width="wide" className="py-8 md:py-12">
         <Skeleton className="mb-4 h-9 w-32 rounded-full" />
-        <div className="grid gap-6 md:grid-cols-2 md:gap-10">
+        <Skeleton className="h-9 w-2/3" />
+        <div className="mt-6 grid gap-6 md:grid-cols-2 md:gap-10">
           <Skeleton className="aspect-square w-full rounded-2xl" />
           <div>
-            <Skeleton className="h-5 w-24 rounded-full" />
-            <Skeleton className="mt-4 h-9 w-2/3" />
+            <Skeleton className="h-8 w-28 rounded-full" />
             <Skeleton className="mt-5 h-9 w-40" />
-            <Skeleton className="mt-6 h-11 w-full max-w-xs" />
+            <div className="mt-6 rounded-2xl border border-sf-border bg-sf-surface p-4">
+              <Skeleton className="h-11 w-full max-w-xs" />
+              <Skeleton className="mt-3 h-10 w-44" />
+            </div>
             <Skeleton className="mt-4 h-24 w-full" />
           </div>
         </div>
@@ -89,19 +93,13 @@ export function ProductDetailContent({ productId }: { productId: string }) {
 
   return (
     <Container as="main" width="wide" className="py-8 md:py-12">
-      <Link
-        href="/catalog"
-        className={cx(
-          "mb-4 inline-flex min-h-9 items-center gap-1.5 rounded-full border border-sf-border bg-sf-surface px-3.5",
-          "text-sm font-semibold text-sf-muted transition-colors duration-150",
-          "hover:border-sf-primary/40 hover:text-sf-primary md:mb-6",
-        )}
-      >
-        ← Catálogo
-      </Link>
+      <PageHeader
+        back={{ href: "/catalog", label: "← Catálogo" }}
+        title={product.name}
+      />
 
-      <div className="grid gap-6 md:grid-cols-2 md:items-start md:gap-10">
-        <div className="overflow-hidden rounded-2xl border border-sf-border bg-sf-surface shadow-[0_1px_2px_rgba(23,33,27,0.06)]">
+      <div className="mt-6 grid gap-6 md:grid-cols-2 md:items-start md:gap-10">
+        <div className="group overflow-hidden rounded-2xl border border-sf-border bg-sf-surface shadow-[0_1px_2px_rgba(23,33,27,0.06)] [&_img]:transition-transform [&_img]:duration-300 group-hover:[&_img]:scale-[1.04] motion-reduce:[&_img]:transition-none">
           <ProductImage src={product.imageUrl} alt={product.name}>
             {showFavorite ? (
               <FavoriteToggle
@@ -126,22 +124,19 @@ export function ProductDetailContent({ productId }: { productId: string }) {
               {product.brand}
             </p>
           ) : null}
-          <h1 className="mt-2 break-words text-[1.5rem] font-bold leading-tight tracking-tight text-sf-ink md:text-[2rem]">
-            {product.name}
-          </h1>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <p className="text-2xl font-bold tabular-nums text-sf-ink md:text-3xl">
               {formatMoney(product.price)}
             </p>
             <Badge
               tone={availability === "Disponible" ? "primary" : "danger"}
-              className="rounded-md px-2 py-0.5 text-xs"
+              className="!rounded-full px-2.5 !py-0.5 !text-[11px] shadow-sm"
             >
               {availability}
             </Badge>
           </div>
 
-          <div className="mt-6 grid gap-2.5 border-t border-sf-border pt-6 md:gap-3">
+          <div className="mt-6 rounded-2xl border border-sf-border bg-sf-surface p-4 shadow-[0_1px_2px_rgba(23,33,27,0.06)]">
             <AddToCartButton
               productId={product.id}
               available={available}
@@ -156,20 +151,14 @@ export function ProductDetailContent({ productId }: { productId: string }) {
             <AddToListControl
               productId={product.id}
               className={cx(
-                "border-transparent bg-transparent text-sf-primary shadow-none hover:bg-sf-bg",
+                "mt-1 border-transparent bg-transparent text-sf-primary shadow-none hover:bg-sf-bg",
                 "[&_button]:min-h-10 [&_button]:border-transparent [&_button]:bg-transparent [&_button]:px-2 [&_button]:text-sm [&_button]:font-semibold [&_button]:text-sf-primary [&_button]:shadow-none [&_button]:hover:bg-sf-bg",
               )}
             />
-            <Link
-              href="/catalog"
-              className="inline-flex min-h-11 items-center text-sm font-semibold text-sf-muted transition-colors hover:text-sf-primary hover:underline"
-            >
-              Seguir viendo productos
-            </Link>
           </div>
 
           {product.description ? (
-            <div className="mt-6 rounded-2xl bg-sf-bg p-4 md:p-5">
+            <div className="mt-4 rounded-2xl bg-sf-bg p-4 md:p-5">
               <h2 className="text-sm font-semibold text-sf-ink">Descripción</h2>
               <p className="mt-1.5 text-sm leading-relaxed text-sf-muted md:text-base">
                 {product.description}

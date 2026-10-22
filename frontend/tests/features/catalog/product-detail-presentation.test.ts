@@ -22,17 +22,34 @@ describe("product detail presentation", () => {
     expect(detail).not.toContain("useAddFavoriteMutation");
   });
 
+  it("uses PageHeader navigation and keeps catalog as the back target", () => {
+    const detail = source(
+      "features/catalog/components/product-detail-content.tsx",
+    );
+    expect(detail).toContain("<PageHeader");
+    expect(detail).toContain('back={{ href: "/catalog", label: "← Catálogo" }}');
+    expect(detail).toContain("title={product.name}");
+    expect(detail).not.toContain("Seguir viendo productos");
+  });
+
   it("uses short availability labels and action visual hierarchy", () => {
     const detail = source(
       "features/catalog/components/product-detail-content.tsx",
     );
-    expect(detail).toContain("← Catálogo");
-    expect(detail).toContain('href="/catalog"');
     expect(detail).toContain("productAvailabilityLabel");
     expect(detail).not.toContain("productStockLabel");
     expect(detail).toContain("AddToCartButton");
     expect(detail).toContain("AddToListControl");
-    expect(detail).toContain("Seguir viendo productos");
     expect(detail).toContain("brandsMatchName");
+  });
+
+  it("styles the availability badge as a Customer pill and groups the purchase actions", () => {
+    const detail = source(
+      "features/catalog/components/product-detail-content.tsx",
+    );
+    expect(detail).toContain("!rounded-full px-2.5 !py-0.5 !text-[11px]");
+    expect(detail).toContain("rounded-2xl border border-sf-border bg-sf-surface p-4");
+    expect(detail).toContain("group-hover:[&_img]:scale-[1.04]");
+    expect(detail).toContain("motion-reduce:[&_img]:transition-none");
   });
 });
