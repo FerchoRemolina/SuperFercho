@@ -71,12 +71,12 @@ export function CatalogPriceFilter({
       }}
     >
       <form
-        className="grid min-w-64 gap-4 p-1.5"
+        className="grid min-w-0 sm:min-w-64 gap-4 p-1.5"
         onSubmit={apply}
         aria-label="Filtrar por precio"
       >
         <label className="grid gap-1.5">
-          <span className="flex items-center justify-between text-xs font-medium text-sf-muted">
+          <span className="flex flex-wrap items-center justify-between gap-x-2 text-xs font-medium text-sf-muted">
             Mínimo
             <span className="text-sm font-semibold tabular-nums text-sf-ink">
               {formatMoney({ amount: draftMin, currency: "COP" })}
@@ -96,12 +96,12 @@ export function CatalogPriceFilter({
                 setDraftMax(next);
               }
             }}
-            className="accent-sf-primary"
+            className="min-w-0 w-full accent-sf-primary"
             aria-label="Precio mínimo"
           />
         </label>
         <label className="grid gap-1.5">
-          <span className="flex items-center justify-between text-xs font-medium text-sf-muted">
+          <span className="flex flex-wrap items-center justify-between gap-x-2 text-xs font-medium text-sf-muted">
             Máximo
             <span className="text-sm font-semibold tabular-nums text-sf-ink">
               {formatMoney({ amount: draftMax, currency: "COP" })}
@@ -121,11 +121,11 @@ export function CatalogPriceFilter({
                 setDraftMin(next);
               }
             }}
-            className="accent-sf-primary"
+            className="min-w-0 w-full accent-sf-primary"
             aria-label="Precio máximo"
           />
         </label>
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <button
             type="button"
             className="min-h-10 px-1 text-sm font-semibold text-sf-muted transition-colors hover:text-sf-error"

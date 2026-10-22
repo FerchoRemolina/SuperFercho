@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { CheckCircleIcon, ChevronIcon } from "@/shared/ui/icons";
 import { cx } from "@/shared/utils/cx";
 
@@ -28,10 +28,17 @@ export function CatalogFilterDropdown({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [panelStyle, setPanelStyle] = useState<CSSProperties | undefined>();
   const rootRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
 
   function setOpenAndNotify(next: boolean) {
+    if (next && rootRef.current) {
+      // El panel ancla a la izquierda del trigger: si el espacio restante es
+      // menor que su ancho natural, se limita al margen visible derecho.
+      const left = rootRef.current.getBoundingClientRect().left;
+      setPanelStyle({ maxWidth: `calc(100vw - ${left}px - 1rem)` });
+    }
     setOpen(next);
     onOpenChange?.(next);
   }
@@ -94,6 +101,7 @@ export function CatalogFilterDropdown({
       {open ? (
         <div
           id={panelId}
+          style={panelStyle}
           className={cx(
             "absolute left-0 top-full z-40 mt-2 rounded-xl border border-sf-border bg-sf-surface p-2",
             "shadow-[0_12px_32px_rgba(23,33,27,0.14)]",
