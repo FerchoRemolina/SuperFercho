@@ -59,6 +59,23 @@ public final class CustomerRecord {
                 updatedAt);
     }
 
+    /**
+     * Actualiza la identificación comercial del record conservando su
+     * {@code id} (las compras lo referencian), los datos de facturación y
+     * {@code createdAt}.
+     */
+    public CustomerRecord updateDocument(
+            String documentType, String documentNumber, Instant updatedAt) {
+        requireNonNull(updatedAt, "updatedAt");
+        requireText(documentType, "documentType");
+        requireText(documentNumber, "documentNumber");
+        if (createdAt.isAfter(updatedAt)) {
+            throw new InvalidCustomerRecordException("createdAt must not be after updatedAt");
+        }
+        return new CustomerRecord(
+                id, documentType, documentNumber, billingFirstName, billingLastName, createdAt, updatedAt);
+    }
+
     public UUID id() {
         return id;
     }

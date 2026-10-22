@@ -5,6 +5,7 @@ import com.superfercho.identity.application.dto.AddressResult;
 import com.superfercho.identity.application.dto.RegisterCustomerCommand;
 import com.superfercho.identity.application.dto.RegisteredCustomer;
 import com.superfercho.identity.application.dto.SetDefaultAddressCommand;
+import com.superfercho.identity.application.dto.UpdateCustomerProfileCommand;
 import com.superfercho.identity.application.port.AccessTokenIssuer;
 import com.superfercho.identity.application.port.AddressRepository;
 import com.superfercho.identity.application.port.CurrentUserProvider;
@@ -32,6 +33,7 @@ import com.superfercho.identity.application.usecase.FinalizeStorefrontPreviewUse
 import com.superfercho.identity.application.usecase.FindAdminCustomerByDocumentUseCase;
 import com.superfercho.identity.application.usecase.GetAdminCustomerRecordUseCase;
 import com.superfercho.identity.application.usecase.GetAdminNewCustomersUseCase;
+import com.superfercho.identity.application.usecase.GetCustomerProfileUseCase;
 import com.superfercho.identity.application.usecase.GetStorefrontPreviewUseCase;
 import com.superfercho.identity.application.usecase.ListAddressesUseCase;
 import com.superfercho.identity.application.usecase.ListAdminCustomerOrdersUseCase;
@@ -41,7 +43,9 @@ import com.superfercho.identity.application.usecase.SearchAdminCustomerRecordsUs
 import com.superfercho.identity.application.usecase.SetDefaultAddressUseCase;
 import com.superfercho.identity.application.usecase.StartStorefrontPreviewUseCase;
 import com.superfercho.identity.application.usecase.UpdateAddressUseCase;
+import com.superfercho.identity.application.usecase.UpdateCustomerProfileUseCase;
 import java.time.Clock;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -128,6 +132,47 @@ public class IdentityUseCaseConfiguration {
             @Override
             public void execute() {
                 transaction.executeWithoutResult(status -> useCase.execute());
+            }
+        };
+    }
+
+    @Bean
+    GetCustomerProfileUseCase getCustomerProfileUseCase(
+            CurrentUserProvider currentUserProvider,
+            UserRepository userRepository,
+            ObjectProvider<CustomerPreviewRepository> customerPreviewRepository) {
+        return new GetCustomerProfileUseCase(
+                currentUserProvider,
+                userRepository,
+                Optional.ofNullable(customerPreviewRepository.getIfAvailable()));
+    }
+
+    @Bean
+    @ConditionalOnBean(CustomerRecordRepository.class)
+    UpdateCustomerProfileUseCase updateCustomerProfileUseCase(
+            CurrentUserProvider currentUserProvider,
+            UserRepository userRepository,
+            CustomerRecordRepository customerRecordRepository,
+            ObjectProvider<CustomerPreviewRepository> customerPreviewRepository,
+            Clock clock,
+            PlatformTransactionManager transactionManager) {
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        UpdateCustomerProfileUseCase useCase = new UpdateCustomerProfileUseCase(
+                currentUserProvider,
+                userRepository,
+                customerRecordRepository,
+                Optional.ofNullable(customerPreviewRepository.getIfAvailable()),
+                clock);
+        return new UpdateCustomerProfileUseCase(
+                currentUserProvider,
+                userRepository,
+                customerRecordRepository,
+                Optional.ofNullable(customerPreviewRepository.getIfAvailable()),
+                clock) {
+            @Override
+            public com.superfercho.identity.application.dto.CustomerProfileResult execute(
+                    UpdateCustomerProfileCommand command) {
+                return transaction.execute(status -> useCase.execute(command));
             }
         };
     }

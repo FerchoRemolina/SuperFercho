@@ -24,6 +24,7 @@ import com.superfercho.identity.application.dto.AdminCustomerAccountResult;
 import com.superfercho.identity.application.dto.AdminCustomerRecordResult;
 import com.superfercho.identity.application.dto.AdminPagedResult;
 import com.superfercho.identity.application.dto.AuthenticationResult;
+import com.superfercho.identity.application.dto.CustomerProfileResult;
 import com.superfercho.identity.application.dto.PasswordRecoveryRequestResult;
 import com.superfercho.identity.application.dto.RegisteredCustomer;
 import com.superfercho.identity.application.port.CustomerAccountAccessPort;
@@ -36,6 +37,7 @@ import com.superfercho.identity.application.usecase.DeactivateAdminCustomerAccou
 import com.superfercho.identity.application.usecase.FindAdminCustomerByDocumentUseCase;
 import com.superfercho.identity.application.usecase.GetAdminCustomerRecordUseCase;
 import com.superfercho.identity.application.usecase.GetAdminNewCustomersUseCase;
+import com.superfercho.identity.application.usecase.GetCustomerProfileUseCase;
 import com.superfercho.identity.application.usecase.ListAddressesUseCase;
 import com.superfercho.identity.application.usecase.ListAdminCustomerOrdersUseCase;
 import com.superfercho.identity.application.usecase.ListAdminCustomerPaymentsUseCase;
@@ -45,6 +47,7 @@ import com.superfercho.identity.application.usecase.RequestPasswordRecoveryUseCa
 import com.superfercho.identity.application.usecase.ResetPasswordUseCase;
 import com.superfercho.identity.application.usecase.SetDefaultAddressUseCase;
 import com.superfercho.identity.application.usecase.UpdateAddressUseCase;
+import com.superfercho.identity.application.usecase.UpdateCustomerProfileUseCase;
 import com.superfercho.identity.domain.model.Role;
 import com.superfercho.identity.domain.model.UserStatus;
 import com.superfercho.identity.infrastructure.rest.AddressController;
@@ -146,6 +149,12 @@ class HttpAuthorizationSecurityTest {
 
     @MockitoBean
     private CloseCustomerAccountUseCase closeCustomerAccountUseCase;
+
+    @MockitoBean
+    private GetCustomerProfileUseCase getCustomerProfileUseCase;
+
+    @MockitoBean
+    private UpdateCustomerProfileUseCase updateCustomerProfileUseCase;
 
     @MockitoBean
     private CustomerAccountAccessPort customerAccountAccessPort;
@@ -393,6 +402,56 @@ private com.superfercho.storefront.application.port.AdminPrincipalProvider
     @Test
     void shouldRejectCloseCustomerAccountWithAdminJwt() throws Exception {
         mockMvc.perform(delete("/api/v1/customers/me").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(accessDenied());
+    }
+
+    @Test
+    void shouldRejectCustomerProfileGetWithoutJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/customers/me")).andExpect(unauthenticated());
+    }
+
+    @Test
+    void shouldAllowCustomerProfileGetWithCustomerJwt() throws Exception {
+        when(getCustomerProfileUseCase.execute()).thenReturn(customerProfileResult());
+
+        mockMvc.perform(get("/api/v1/customers/me").header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldRejectCustomerProfileGetWithAdminJwt() throws Exception {
+        mockMvc.perform(get("/api/v1/customers/me").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
+                .andExpect(accessDenied());
+    }
+
+    @Test
+    void shouldRejectCustomerProfilePutWithoutJwt() throws Exception {
+        mockMvc.perform(put("/api/v1/customers/me")).andExpect(unauthenticated());
+    }
+
+    @Test
+    void shouldAllowCustomerProfilePutWithCustomerJwt() throws Exception {
+        when(updateCustomerProfileUseCase.execute(any())).thenReturn(customerProfileResult());
+
+        mockMvc.perform(put("/api/v1/customers/me")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(Role.CUSTOMER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "firstName": "Ada",
+                                  "lastName": "Lovelace",
+                                  "email": "ada@identity.test",
+                                  "phone": "3001234567",
+                                  "documentType": "CC",
+                                  "documentNumber": "1234567890"
+                                }
+                                """))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldRejectCustomerProfilePutWithAdminJwt() throws Exception {
+        mockMvc.perform(put("/api/v1/customers/me").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN)))
                 .andExpect(accessDenied());
     }
 
@@ -1096,6 +1155,19 @@ void shouldAllowAdminStorefrontHeroUpdateWithAdminJwt() throws Exception {
 
     private String bearer(Role role) {
         return "Bearer " + jwtAccessTokenService.issue(USER_ID, role).token();
+    }
+
+    private static CustomerProfileResult customerProfileResult() {
+        return new CustomerProfileResult(
+                USER_ID,
+                "CC",
+                "1234567890",
+                "Ada",
+                "Lovelace",
+                "ada@identity.test",
+                "3001234567",
+                NOW,
+                NOW);
     }
 
     private static ResultMatcher notBlockedBySecurity() {

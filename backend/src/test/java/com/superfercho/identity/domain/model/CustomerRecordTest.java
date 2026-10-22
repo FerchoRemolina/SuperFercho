@@ -68,4 +68,38 @@ class CustomerRecordTest {
                         Instant.parse("2026-01-02T00:00:00Z"),
                         NOW));
     }
+
+    @Test
+    void shouldUpdateDocumentPreservingIdentity() {
+        CustomerRecord record = CustomerRecord.create(ID, "CC", "12345678", "Ada", "Lovelace", NOW, NOW);
+        Instant updatedAt = NOW.plusSeconds(3600);
+
+        CustomerRecord updated = record.updateDocument("CE", "987654321", updatedAt);
+
+        assertEquals(ID, updated.id());
+        assertEquals("CE", updated.documentType());
+        assertEquals("987654321", updated.documentNumber());
+        assertEquals("Ada", updated.billingFirstName());
+        assertEquals("Lovelace", updated.billingLastName());
+        assertEquals(NOW, updated.createdAt());
+        assertEquals(updatedAt, updated.updatedAt());
+    }
+
+    @Test
+    void shouldRejectUpdateDocumentWithBlankNumber() {
+        CustomerRecord record = CustomerRecord.create(ID, "CC", "12345678", "Ada", "Lovelace", NOW, NOW);
+
+        assertThrows(
+                InvalidCustomerRecordException.class,
+                () -> record.updateDocument("CE", " ", NOW.plusSeconds(60)));
+    }
+
+    @Test
+    void shouldRejectUpdateDocumentWithUpdatedAtBeforeCreatedAt() {
+        CustomerRecord record = CustomerRecord.create(ID, "CC", "12345678", "Ada", "Lovelace", NOW, NOW);
+
+        assertThrows(
+                InvalidCustomerRecordException.class,
+                () -> record.updateDocument("CE", "987654321", NOW.minusSeconds(60)));
+    }
 }

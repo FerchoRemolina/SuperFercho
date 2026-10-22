@@ -64,6 +64,36 @@ public final class CustomerRegistrationRules {
                 command.password());
     }
 
+    /**
+     * Shared field validation for profile updates: same rules as registration
+     * (document, names, email, phone) without password. Returns the normalized
+     * values; {@code password} in the result is always null.
+     */
+    public static ValidatedRegistration validateProfile(
+            String documentType,
+            String documentNumber,
+            String firstName,
+            String lastName,
+            String email,
+            String phone) {
+        requireDocument(documentType, documentNumber);
+        String normalizedFirstName = normalizePersonName(firstName);
+        requireFirstName(normalizedFirstName);
+        String normalizedLastName = normalizePersonName(lastName);
+        requireLastName(normalizedLastName);
+        String normalizedEmail = normalizeEmail(email);
+        requireEmail(normalizedEmail);
+        requirePhone(phone);
+        return new ValidatedRegistration(
+                documentType,
+                documentNumber,
+                normalizedFirstName,
+                normalizedLastName,
+                normalizedEmail,
+                phone,
+                null);
+    }
+
     /** Shared document validation for registration and document-based password recovery. */
     public static void requireDocument(String documentType, String documentNumber) {
         requireDocumentType(documentType);

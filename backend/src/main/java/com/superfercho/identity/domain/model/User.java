@@ -220,6 +220,50 @@ public final class User {
                 updatedAt);
     }
 
+    /**
+     * Actualiza los datos personales del CUSTOMER autenticado (nombres, correo,
+     * teléfono y documento). Identidad estable: conservan {@code id},
+     * {@code passwordHash}, {@code role}, {@code status},
+     * {@code customerRecordId}, {@code deletedAt} y {@code createdAt}.
+     */
+    public User updateProfile(
+            String firstName,
+            String lastName,
+            String email,
+            String phone,
+            String documentType,
+            String documentNumber,
+            Instant updatedAt) {
+        requireNonNull(updatedAt, "updatedAt");
+        requireText(documentType, "documentType");
+        requireText(documentNumber, "documentNumber");
+        requireText(firstName, "firstName");
+        requireNonNull(lastName, "lastName");
+        requireText(email, "email");
+        requireText(phone, "phone");
+        if (createdAt.isAfter(updatedAt)) {
+            throw new InvalidUserException("updatedAt must not be before createdAt");
+        }
+        if (deletedAt != null) {
+            throw new InvalidUserException("Deleted accounts cannot be updated");
+        }
+        return new User(
+                id,
+                documentType,
+                documentNumber,
+                firstName,
+                lastName,
+                normalizeEmail(email),
+                phone,
+                passwordHash,
+                role,
+                status,
+                customerRecordId,
+                deletedAt,
+                createdAt,
+                updatedAt);
+    }
+
     private void requireLiveCustomerAccount(String action) {
         if (role != Role.CUSTOMER) {
             throw new InvalidUserException("Only CUSTOMER accounts can be " + action);

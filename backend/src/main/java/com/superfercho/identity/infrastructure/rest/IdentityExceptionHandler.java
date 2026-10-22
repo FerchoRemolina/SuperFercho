@@ -3,6 +3,7 @@ package com.superfercho.identity.infrastructure.rest;
 import com.superfercho.identity.application.exception.AddressNotFoundException;
 import com.superfercho.identity.application.exception.AddressOwnershipException;
 import com.superfercho.identity.application.exception.CloseCustomerAccountForbiddenException;
+import com.superfercho.identity.application.exception.CustomerProfileForbiddenException;
 import com.superfercho.identity.application.exception.CustomerRecordNotFoundException;
 import com.superfercho.identity.application.exception.DocumentAlreadyExistsException;
 import com.superfercho.identity.application.exception.DuplicateDefaultAddressException;
@@ -52,6 +53,11 @@ public class IdentityExceptionHandler {
     @ExceptionHandler(CloseCustomerAccountForbiddenException.class)
     ProblemDetail handleCloseCustomerAccountForbidden(CloseCustomerAccountForbiddenException exception) {
         return problem(HttpStatus.FORBIDDEN, "CLOSE_CUSTOMER_ACCOUNT_FORBIDDEN", exception.getMessage());
+    }
+
+    @ExceptionHandler(CustomerProfileForbiddenException.class)
+    ProblemDetail handleCustomerProfileForbidden(CustomerProfileForbiddenException exception) {
+        return problem(HttpStatus.FORBIDDEN, "CUSTOMER_PROFILE_FORBIDDEN", exception.getMessage());
     }
 
     @ExceptionHandler(InvalidRegistrationException.class)

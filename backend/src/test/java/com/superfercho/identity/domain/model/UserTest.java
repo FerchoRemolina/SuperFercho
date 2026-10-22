@@ -321,6 +321,113 @@ class UserTest {
                 () -> validUser().build().closeAccount(Instant.parse("2026-03-01T00:00:00Z")));
     }
 
+    @Test
+    void shouldUpdateProfilePreservingIdentity() {
+        UUID recordId = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        User user = User.create(
+                ID,
+                "CC",
+                "12345678",
+                "Ada",
+                "Lovelace",
+                "ada@example.com",
+                "3001234567",
+                "hashed-password",
+                Role.CUSTOMER,
+                UserStatus.ACTIVE,
+                recordId,
+                null,
+                CREATED_AT,
+                UPDATED_AT);
+        Instant updatedAt = Instant.parse("2026-03-01T00:00:00Z");
+
+        User updated = user.updateProfile(
+                "Ada Clará",
+                "Clará",
+                "Ada.Updated@Example.COM",
+                "3112223344",
+                "CE",
+                "987654321",
+                updatedAt);
+
+        assertEquals(ID, updated.id());
+        assertEquals("hashed-password", updated.passwordHash());
+        assertEquals(Role.CUSTOMER, updated.role());
+        assertEquals(UserStatus.ACTIVE, updated.status());
+        assertEquals(recordId, updated.customerRecordId());
+        assertEquals(null, updated.deletedAt());
+        assertEquals(CREATED_AT, updated.createdAt());
+        assertEquals("Ada Clará", updated.firstName());
+        assertEquals("Clará", updated.lastName());
+        assertEquals("ada.updated@example.com", updated.email());
+        assertEquals("3112223344", updated.phone());
+        assertEquals("CE", updated.documentType());
+        assertEquals("987654321", updated.documentNumber());
+        assertEquals(updatedAt, updated.updatedAt());
+    }
+
+    @Test
+    void shouldRejectUpdateProfileForDeletedAccount() {
+        Instant closedAt = Instant.parse("2026-02-01T00:00:00Z");
+        User closed = User.create(
+                ID,
+                "CC",
+                "12345678",
+                "Ada",
+                "Lovelace",
+                "ada@example.com",
+                "3001234567",
+                "hashed-password",
+                Role.CUSTOMER,
+                UserStatus.INACTIVE,
+                UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                closedAt,
+                CREATED_AT,
+                closedAt);
+
+        assertThrows(
+                InvalidUserException.class,
+                () -> closed.updateProfile(
+                        "Ada",
+                        "Lovelace",
+                        "ada@example.com",
+                        "3001234567",
+                        "CC",
+                        "12345678",
+                        Instant.parse("2026-03-01T00:00:00Z")));
+    }
+
+    @Test
+    void shouldRejectUpdateProfileWithBlankFields() {
+        User user = validUser().build();
+
+        assertThrows(
+                InvalidUserException.class,
+                () -> user.updateProfile(" ", "Lovelace", "ada@example.com", "3001234567", "CC", "12345678", UPDATED_AT));
+        assertThrows(
+                InvalidUserException.class,
+                () -> user.updateProfile("Ada", "Lovelace", " ", "3001234567", "CC", "12345678", UPDATED_AT));
+        assertThrows(
+                InvalidUserException.class,
+                () -> user.updateProfile("Ada", "Lovelace", "ada@example.com", "3001234567", "CC", " ", UPDATED_AT));
+    }
+
+    @Test
+    void shouldRejectUpdateProfileWithUpdatedAtBeforeCreatedAt() {
+        User user = validUser().build();
+
+        assertThrows(
+                InvalidUserException.class,
+                () -> user.updateProfile(
+                        "Ada",
+                        "Lovelace",
+                        "ada@example.com",
+                        "3001234567",
+                        "CC",
+                        "12345678",
+                        CREATED_AT.minusSeconds(1)));
+    }
+
     private static UserBuilder validUser() {
         return new UserBuilder();
     }
