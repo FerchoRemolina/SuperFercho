@@ -1,4 +1,11 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import {
   activateAdminCategory,
   activateAdminProduct,
@@ -43,6 +50,19 @@ import {
   updateAdminProduct,
   updateAdminProductType,
   updateAdminProductVariant,
+  uploadAdminMediaImage,
+  MEDIA_IMAGE_MAX_BYTES,
+  validateMediaImage,
+  listAdminStorefrontFaqs,
+  createAdminStorefrontFaq,
+  updateAdminStorefrontFaq,
+  reorderAdminStorefrontFaqs,
+  deleteAdminStorefrontFaq,
+  getAdminStorefrontFooterSettings,
+  updateAdminStorefrontFooterSettings,
+  uploadAdminStorefrontQrImage,
+  deleteAdminStorefrontQrImage,
+  type MediaImageValidationCode,
   type AdminPayment,
   type KnowledgeDocument,
 } from "@/features/admin/api";
@@ -1214,5 +1234,290 @@ describe("admin knowledge search api", () => {
     ).rejects.toMatchObject({
       problem: { status: 409, code: "KNOWLEDGE_PROCESSING_FAILED" },
     });
+  });
+});
+
+describe("admin media api", () => {
+  beforeEach(() => {
+    configureSessionPersistence(new MemoryPersistence());
+    setSession({
+      userId: "11111111-1111-1111-1111-111111111111",
+      role: "ADMIN",
+      accessToken: "admin-token",
+      expiresAt: "2099-01-01T00:00:00Z",
+    });
+  });
+
+  it("posts multipart with the file field, JWT and no manual content type", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      jsonResponse({ url: "/api/v1/media/images/abc-123.png" }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const file = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "hero.png", {
+      type: "image/png",
+    });
+
+    const uploaded = await uploadAdminMediaImage(file);
+
+    expect(uploaded).toEqual({ url: "/api/v1/media/images/abc-123.png" });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "http://localhost:8080/api/v1/admin/media/images",
+    );
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(init.method).toBe("POST");
+    expect(init.body).toBeInstanceOf(FormData);
+    const body = init.body as FormData;
+    const sent = body.get("file");
+    expect(sent).toBeInstanceOf(File);
+    expect((sent as File).name).toBe("hero.png");
+    const headers = new Headers(init.headers);
+    expect(headers.get("Authorization")).toBe("Bearer admin-token");
+    expect(headers.get("Content-Type")).toBeNull();
+  });
+
+  it("propagates 413 MEDIA_TOO_LARGE as ApiError", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      jsonResponse({ code: "MEDIA_TOO_LARGE" }, 413),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const file = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "big.png", {
+      type: "image/png",
+    });
+
+    await expect(uploadAdminMediaImage(file)).rejects.toMatchObject({
+      problem: { status: 413, code: "MEDIA_TOO_LARGE" },
+    });
+  });
+
+  it("propagates 415 MEDIA_TYPE_NOT_SUPPORTED as ApiError", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      jsonResponse({ code: "MEDIA_TYPE_NOT_SUPPORTED" }, 415),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const file = new File([new Uint8Array([1, 2, 3, 4])], "not-image.png", {
+      type: "image/png",
+    });
+
+    await expect(uploadAdminMediaImage(file)).rejects.toMatchObject({
+      problem: { status: 415, code: "MEDIA_TYPE_NOT_SUPPORTED" },
+    });
+  });
+});
+
+describe("validateMediaImage (validación cliente, solo UX)", () => {
+  function imageFile(type: string, size: number): File {
+    return new File([new Uint8Array(size)], "imagen", { type });
+  }
+
+  it("acepta PNG, JPEG y WebP dentro del límite", () => {
+    expect(validateMediaImage(imageFile("image/png", 1024))).toBeNull();
+    expect(validateMediaImage(imageFile("image/jpeg", 1024))).toBeNull();
+    expect(validateMediaImage(imageFile("image/webp", 1024))).toBeNull();
+  });
+
+  it("rechaza tipos fuera de la whitelist sin llamar al backend", () => {
+    expect(
+      validateMediaImage(imageFile("application/zip", 1024)),
+    ).toBe<MediaImageValidationCode>("MEDIA_TYPE_NOT_SUPPORTED");
+  });
+
+  it("rechaza archivos por encima de 2 MiB", () => {
+    expect(
+      validateMediaImage(imageFile("image/png", MEDIA_IMAGE_MAX_BYTES + 1)),
+    ).toBe<MediaImageValidationCode>("MEDIA_TOO_LARGE");
+  });
+
+  it("acepta exactamente 2 MiB", () => {
+    expect(validateMediaImage(imageFile("image/png", MEDIA_IMAGE_MAX_BYTES))).toBeNull();
+  });
+
+  it("rechaza archivos vacíos", () => {
+    expect(validateMediaImage(imageFile("image/png", 0))).toBe<
+      MediaImageValidationCode
+    >("MEDIA_MISSING");
+  });
+});
+
+describe("admin storefront content api", () => {
+  beforeEach(() => {
+    configureSessionPersistence(new MemoryPersistence());
+    setSession({
+      userId: "11111111-1111-1111-1111-111111111111",
+      role: "ADMIN",
+      accessToken: "admin-token",
+      expiresAt: "2099-01-01T00:00:00Z",
+    });
+  });
+
+  it("lists FAQs from the admin endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      jsonResponse([
+        {
+          id: "00000000-0000-0000-0000-00000000fa01",
+          question: "¿Cómo puedo realizar un pedido?",
+          answer: "Desde el catálogo.",
+          displayOrder: 10,
+          active: true,
+        },
+      ]),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const faqs = await listAdminStorefrontFaqs();
+
+    expect(faqs).toHaveLength(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "http://localhost:8080/api/v1/admin/storefront-content/faqs",
+    );
+  });
+
+  it("creates, updates, reorders and deletes FAQs with the real contracts", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: "00000000-0000-0000-0000-00000000fa09",
+          question: "Nueva",
+          answer: "Respuesta",
+          displayOrder: 60,
+          active: true,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: "00000000-0000-0000-0000-00000000fa09",
+          question: "Editada",
+          answer: "Respuesta 2",
+          displayOrder: 60,
+          active: false,
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createAdminStorefrontFaq({
+      question: "Nueva",
+      answer: "Respuesta",
+      displayOrder: 60,
+      active: true,
+    });
+    await updateAdminStorefrontFaq("00000000-0000-0000-0000-00000000fa09", {
+      question: "Editada",
+      answer: "Respuesta 2",
+      displayOrder: 60,
+      active: false,
+    });
+    await reorderAdminStorefrontFaqs([
+      "00000000-0000-0000-0000-00000000fa02",
+      "00000000-0000-0000-0000-00000000fa01",
+    ]);
+    await deleteAdminStorefrontFaq("00000000-0000-0000-0000-00000000fa09");
+
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: "POST" });
+    expect(fetchMock.mock.calls[1]?.[0]).toContain(
+      "/admin/storefront-content/faqs/00000000-0000-0000-0000-00000000fa09",
+    );
+    expect(fetchMock.mock.calls[2]?.[0]).toBe(
+      "http://localhost:8080/api/v1/admin/storefront-content/faqs/order",
+    );
+    expect(JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body))).toEqual({
+      orderedIds: [
+        "00000000-0000-0000-0000-00000000fa02",
+        "00000000-0000-0000-0000-00000000fa01",
+      ],
+    });
+    expect(fetchMock.mock.calls[3]?.[1]).toMatchObject({ method: "DELETE" });
+  });
+
+  it("loads footer settings from the public read endpoint without inventing defaults", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      jsonResponse({
+        supportEmail: "custom@example.com",
+        linkedinUrl: "https://www.linkedin.com/in/custom/",
+        githubUrl: "https://github.com/custom/",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const settings = await getAdminStorefrontFooterSettings();
+
+    expect(settings).toEqual({
+      supportEmail: "custom@example.com",
+      linkedinUrl: "https://www.linkedin.com/in/custom/",
+      githubUrl: "https://github.com/custom/",
+      qrImageUrl: null,
+    });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "http://localhost:8080/api/v1/storefront-content/footer-settings",
+    );
+  });
+
+  it("updates footer settings and uploads/deletes the QR image", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          supportEmail: "a@b.com",
+          linkedinUrl: "https://www.linkedin.com/in/x/",
+          githubUrl: "https://github.com/x/",
+          qrImageUrl: null,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ qrImageUrl: "/api/v1/media/images/qr.png" }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ qrImageUrl: null }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await updateAdminStorefrontFooterSettings({
+      supportEmail: "a@b.com",
+      linkedinUrl: "https://www.linkedin.com/in/x/",
+      githubUrl: "https://github.com/x/",
+    });
+    const file = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "qr.png", {
+      type: "image/png",
+    });
+    const uploaded = await uploadAdminStorefrontQrImage(file);
+    const deleted = await deleteAdminStorefrontQrImage();
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "http://localhost:8080/api/v1/admin/storefront-content/footer-settings",
+    );
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      "http://localhost:8080/api/v1/admin/storefront-content/footer-settings/qr-image",
+    );
+    expect(uploaded.qrImageUrl).toBe("/api/v1/media/images/qr.png");
+    expect(deleted.qrImageUrl).toBeNull();
+  });
+});
+
+describe("admin storefront content composition", () => {
+  it("extends the existing storefront-content page with FAQ and footer panels", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { resolve } = await import("node:path");
+    const page = readFileSync(
+      resolve(
+        process.cwd(),
+        "app/(admin)/admin/storefront-content/page.tsx",
+      ),
+      "utf8",
+    );
+    const presentation = readFileSync(
+      resolve(process.cwd(), "features/admin/presentation.ts"),
+      "utf8",
+    );
+    expect(page).toContain("AdminStorefrontFaqsPanel");
+    expect(page).toContain("AdminStorefrontFooterPanel");
+    expect(page).toContain("AdminStorefrontHeroForm");
+    expect(page).toContain('section === "faqs"');
+    expect(page).toContain('mode="contact"');
+    expect(page).toContain('mode="qr"');
+    expect(presentation).toContain('id: "storefront"');
+    expect(presentation).toContain("section=hero");
+    expect(presentation).toContain("section=faqs");
+    expect(presentation).toContain("section=footer");
+    expect(presentation).toContain("section=qr");
+    expect(presentation).toContain("QR de LinkedIn");
   });
 });
