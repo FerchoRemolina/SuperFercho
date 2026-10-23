@@ -33,6 +33,7 @@ import com.superfercho.catalog.application.usecase.ListBestSellersUseCase;
 import com.superfercho.catalog.application.usecase.ListProductTypesUseCase;
 import com.superfercho.catalog.application.usecase.ListProductVariantsUseCase;
 import com.superfercho.catalog.application.usecase.ListProductsUseCase;
+import com.superfercho.catalog.application.usecase.ResolveProductQuantityEquivalenceUseCase;
 import com.superfercho.catalog.application.usecase.RestoreProductUseCase;
 import com.superfercho.catalog.application.usecase.SearchProductsUseCase;
 import com.superfercho.catalog.application.usecase.UpdateCategoryUseCase;
@@ -184,6 +185,16 @@ public class CatalogUseCaseConfiguration {
             ProductTypeRepository productTypeRepository,
             ProductVariantRepository productVariantRepository) {
         return new GetProductUseCase(
+                productRepository, categoryRepository, productTypeRepository, productVariantRepository);
+    }
+
+    @Bean
+    ResolveProductQuantityEquivalenceUseCase resolveProductQuantityEquivalenceUseCase(
+            ProductRepository productRepository,
+            CategoryRepository categoryRepository,
+            ProductTypeRepository productTypeRepository,
+            ProductVariantRepository productVariantRepository) {
+        return new ResolveProductQuantityEquivalenceUseCase(
                 productRepository, categoryRepository, productTypeRepository, productVariantRepository);
     }
 
