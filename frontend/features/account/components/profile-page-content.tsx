@@ -26,7 +26,7 @@ export function ProfilePageContent() {
           description="Consulta y actualiza tus datos personales."
           back={{ href: "/", label: "← Inicio" }}
         />
-        <Card className="mt-6 grid gap-3 md:mt-8 md:p-8">
+        <Card className="mt-6 grid max-w-2xl gap-3 md:mt-8">
           <Skeleton className="h-11" />
           <Skeleton className="h-11" />
           <div className="grid gap-3 sm:grid-cols-2">
@@ -51,7 +51,7 @@ export function ProfilePageContent() {
           description="Consulta y actualiza tus datos personales."
           back={{ href: "/", label: "← Inicio" }}
         />
-        <div className="mt-6 grid gap-4 md:mt-8">
+        <div className="mt-6 grid max-w-2xl gap-4 md:mt-8">
           <Alert tone="error" title="No se pudo cargar tu perfil">
             {message}
           </Alert>
@@ -76,7 +76,15 @@ export function ProfilePageContent() {
         description="Consulta y actualiza tus datos personales."
         back={{ href: "/", label: "← Inicio" }}
       />
-      <Card className="mt-6 grid gap-4 md:mt-8 md:p-8">
+      <Card className="mt-6 grid max-w-2xl gap-4 md:mt-8">
+        <div>
+          <h2 className="text-base font-semibold text-sf-ink md:text-lg">
+            Datos personales
+          </h2>
+          <p className="mt-1 text-sm text-sf-muted">
+            Esta información se usa para tus pedidos y tu cuenta.
+          </p>
+        </div>
         <ProfileForm
           profile={profile}
           pending={updateMutation.isPending}

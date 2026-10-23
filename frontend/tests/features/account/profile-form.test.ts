@@ -3,6 +3,17 @@ import { ApiError } from "@/shared/errors/api-problem";
 import { profileServerFeedback } from "@/features/account/components/profile-form";
 
 describe("profileServerFeedback", () => {
+  it("shows no feedback when no mutation error exists (initial load and after success)", () => {
+    expect(profileServerFeedback(null)).toEqual({
+      fieldErrors: {},
+      general: null,
+    });
+    expect(profileServerFeedback(undefined)).toEqual({
+      fieldErrors: {},
+      general: null,
+    });
+  });
+
   it("maps duplicate document errors to the document field", () => {
     const feedback = profileServerFeedback(
       new ApiError({ status: 409, code: "DOCUMENT_ALREADY_EXISTS" }),

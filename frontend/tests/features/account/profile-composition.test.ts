@@ -68,6 +68,41 @@ describe("customer profile composition", () => {
     expect(form).toContain("email: message");
   });
 
+  it("never shows update feedback before the user attempts to save", () => {
+    const hooks = source("features/account/hooks.ts");
+    const form = source("features/account/components/profile-form.tsx");
+    const content = source(
+      "features/account/components/profile-page-content.tsx",
+    );
+
+    // El PUT solo se dispara desde el submit del formulario.
+    expect(form).not.toContain("mutate(");
+    expect(content.match(/updateMutation\.mutate/g)?.length).toBe(1);
+    // Un error de PUT previo no se restaura al reentrar a la página.
+    expect(hooks).toContain("gcTime: 0");
+    // El estado nulo (carga inicial / éxito) no produce mensaje rojo.
+    expect(form).toContain("if (error == null)");
+  });
+
+  it("renders a single feedback block: success or error, never both", () => {
+    const form = source("features/account/components/profile-form.tsx");
+    // Cadena excluyente: éxito → error general → nada.
+    expect(form).toContain(
+      ") : serverFeedback.general ? (",
+    );
+    expect(form).toContain("saved && !pending");
+    expect(form.match(/Alert tone="success"/g)?.length).toBe(1);
+    expect(form.match(/Alert tone="error"/g)?.length).toBe(1);
+  });
+
+  it("keeps user input intact when a save fails", () => {
+    const form = source("features/account/components/profile-form.tsx");
+    // Los valores solo se inicializan una vez desde el perfil del query;
+    // un error del servidor no reinicializa el formulario.
+    expect(form.match(/profileToValues\(profile\)/g)?.length).toBe(1);
+    expect(form).toContain("useState<ProfileFormValues>(() =>");
+  });
+
   it("exposes a friendly message for customer profile forbidden", () => {
     const messages = source("shared/errors/messages.ts");
     expect(messages).toContain('case "CUSTOMER_PROFILE_FORBIDDEN"');

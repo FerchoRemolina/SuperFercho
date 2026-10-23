@@ -41,6 +41,10 @@ export function profileServerFeedback(error: unknown): {
   fieldErrors: Partial<ProfileFormValues>;
   general: string | null;
 } {
+  if (error == null) {
+    // Carga inicial o último guardado exitoso: no hay nada que reportar.
+    return { fieldErrors: {}, general: null };
+  }
   if (!isApiError(error)) {
     return {
       fieldErrors: {},
@@ -115,8 +119,7 @@ export function ProfileForm({
         <Alert tone="success" title="Perfil actualizado">
           Tus datos se guardaron correctamente.
         </Alert>
-      ) : null}
-      {serverFeedback.general ? (
+      ) : serverFeedback.general ? (
         <Alert tone="error" title="No se pudo actualizar el perfil">
           {serverFeedback.general}
         </Alert>
@@ -196,7 +199,7 @@ export function ProfileForm({
         onChange={(event) => update("phone", event.target.value)}
       />
       <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={pending} className="w-full sm:w-auto">
           {pending ? "Guardando…" : "Guardar cambios"}
         </Button>
       </div>

@@ -49,6 +49,8 @@ export function useUpdateCustomerProfileMutation() {
   return useMutation({
     mutationFn: (body: UpdateCustomerProfileRequest) =>
       updateCustomerProfile(body),
+    // No restaurar el estado (p. ej. un error) al volver a montar la página.
+    gcTime: 0,
     onSuccess: (profile) => {
       queryClient.setQueryData(profileKeys.root(), profile);
       queryClient.invalidateQueries({ queryKey: profileKeys.root() });
