@@ -3,6 +3,7 @@ export type ApiProblem = {
   code?: string;
   title?: string;
   detail?: string;
+  properties?: Record<string, unknown>;
 };
 
 export class ApiError extends Error {
@@ -30,6 +31,7 @@ export function parseApiProblem(status: number, body: unknown): ApiProblem {
     code: optionalString(body.code),
     title: optionalString(body.title),
     detail: optionalString(body.detail),
+    properties: isRecord(body.properties) ? body.properties : undefined,
   };
 }
 

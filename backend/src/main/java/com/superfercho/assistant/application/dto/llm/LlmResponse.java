@@ -2,19 +2,23 @@ package com.superfercho.assistant.application.dto.llm;
 
 import java.util.List;
 
-public record LlmResponse(String text, List<LlmMessage.LlmToolCall> toolCalls) {
+public record LlmResponse(String text, List<LlmMessage.LlmToolCall> toolCalls, LlmUsage usage) {
 
     public LlmResponse {
         text = text == null ? "" : text;
-        toolCalls = toolCalls == null ? List.of() : List.copyOf(toolCalls);
+        toolCalls = List.copyOf(toolCalls == null ? List.of() : toolCalls);
     }
 
     public static LlmResponse text(String text) {
-        return new LlmResponse(text, List.of());
+        return new LlmResponse(text, List.of(), null);
     }
 
     public static LlmResponse toolCalls(List<LlmMessage.LlmToolCall> toolCalls) {
-        return new LlmResponse("", List.copyOf(toolCalls));
+        return new LlmResponse("", toolCalls, null);
+    }
+
+    public static LlmResponse withUsage(LlmResponse base, LlmUsage usage) {
+        return new LlmResponse(base.text, base.toolCalls, usage);
     }
 
     public boolean hasToolCalls() {

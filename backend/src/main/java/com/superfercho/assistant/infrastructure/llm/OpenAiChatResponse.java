@@ -5,7 +5,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-record OpenAiChatResponse(List<OpenAiChoice> choices) {}
+record OpenAiChatResponse(List<OpenAiChoice> choices, OpenAiUsage usage) {}
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+record OpenAiUsage(
+        @JsonProperty("prompt_tokens") Integer promptTokens,
+        @JsonProperty("completion_tokens") Integer completionTokens,
+        @JsonProperty("total_tokens") Integer totalTokens) {
+}
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 record OpenAiChoice(OpenAiResponseMessage message) {}

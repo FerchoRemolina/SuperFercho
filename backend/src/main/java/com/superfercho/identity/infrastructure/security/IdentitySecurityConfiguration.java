@@ -114,6 +114,8 @@ public class IdentitySecurityConfiguration {
                         .hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/admin/orders")
                         .hasRole("ADMIN")
+                        .requestMatchers("/api/v1/admin/fercho/**")
+                        .hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/admin/orders/**")
                         .hasRole("ADMIN")
                         .requestMatchers("/api/v1/admin/customers", "/api/v1/admin/customers/**")

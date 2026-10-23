@@ -44,6 +44,12 @@ superfercho:
       model: ${SUPERFERCHO_OPENAI_CHAT_MODEL:gpt-4o-mini}
       connect-timeout: ${SUPERFERCHO_OPENAI_CHAT_CONNECT_TIMEOUT:5s}
       read-timeout: ${SUPERFERCHO_OPENAI_CHAT_READ_TIMEOUT:60s}
+    fercho:
+      limits:
+        max-requests-per-window: ${SUPERFERCHO_FERCHO_MAX_REQUESTS:30}
+        window: ${SUPERFERCHO_FERCHO_WINDOW:24h}
+        pause: ${SUPERFERCHO_FERCHO_PAUSE:30m}
+        recidive-window: ${SUPERFERCHO_FERCHO_RECIDIVE_WINDOW:24h}
   catalog:
     openfoodfacts:
       base-url: ${SUPERFERCHO_OFF_BASE_URL:https://world.openfoodfacts.org}

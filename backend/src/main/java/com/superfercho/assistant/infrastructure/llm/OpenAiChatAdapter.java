@@ -7,6 +7,7 @@ import com.superfercho.assistant.application.dto.llm.LlmMessage;
 import com.superfercho.assistant.application.dto.llm.LlmRequest;
 import com.superfercho.assistant.application.dto.llm.LlmResponse;
 import com.superfercho.assistant.application.dto.llm.LlmToolDefinition;
+import com.superfercho.assistant.application.dto.llm.LlmUsage;
 import com.superfercho.assistant.application.exception.LlmProviderException;
 import com.superfercho.assistant.application.port.out.LLMPort;
 import com.superfercho.assistant.domain.model.MessageRole;
@@ -141,15 +142,28 @@ public final class OpenAiChatAdapter implements LLMPort {
         if (choice == null || choice.message() == null) {
             throw new LlmProviderException("llm provider returned an invalid result");
         }
+        LlmUsage usage = toLlmUsage(response.usage());
         OpenAiResponseMessage message = choice.message();
         if (message.toolCalls() != null && !message.toolCalls().isEmpty()) {
             List<LlmMessage.LlmToolCall> calls = new ArrayList<>();
             for (OpenAiResponseToolCall toolCall : message.toolCalls()) {
                 calls.add(toLlmToolCall(toolCall));
             }
-            return LlmResponse.toolCalls(calls);
+            return LlmResponse.withUsage(LlmResponse.toolCalls(calls), usage);
         }
-        return LlmResponse.text(message.content() == null ? "" : message.content());
+        return LlmResponse.withUsage(
+                LlmResponse.text(message.content() == null ? "" : message.content()), usage);
+    }
+
+    /** Null cuando el proveedor no entrega tokens válidos; nunca se inventa. */
+    private static LlmUsage toLlmUsage(OpenAiUsage usage) {
+        if (usage == null
+                || usage.promptTokens() == null
+                || usage.completionTokens() == null
+                || usage.totalTokens() == null) {
+            return null;
+        }
+        return new LlmUsage(usage.promptTokens(), usage.completionTokens(), usage.totalTokens());
     }
 
     private LlmMessage.LlmToolCall toLlmToolCall(OpenAiResponseToolCall toolCall) {

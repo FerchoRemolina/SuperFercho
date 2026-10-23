@@ -829,6 +829,12 @@ export const ADMIN_NAV_TREE: AdminNavNode[] = [
         label: "Gestión del conocimiento",
         match: "prefix",
       },
+      {
+        kind: "leaf",
+        href: "/admin/fercho",
+        label: "Supervisión de uso",
+        match: "exact",
+      },
     ],
   },
 ];

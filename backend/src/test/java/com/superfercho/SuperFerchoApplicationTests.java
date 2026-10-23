@@ -2,6 +2,8 @@ package com.superfercho;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.superfercho.assistant.application.fercho.FerchoSupervisionPort;
+import com.superfercho.assistant.infrastructure.rest.FerchoAdminController;
 import com.superfercho.identity.application.port.CurrentUserProvider;
 import com.superfercho.identity.application.port.PasswordHasher;
 import com.superfercho.identity.infrastructure.configuration.LocalDevAdminRunner;
@@ -41,5 +43,9 @@ class SuperFerchoApplicationTests {
         assertThat(currentUserProvider).isNotNull();
         assertThat(securityFilterChain).isNotNull();
         assertThat(applicationContext.getBeanNamesForType(LocalDevAdminRunner.class)).isEmpty();
+        // Perfil test: sin DataSource/JPA. El adaptador JPA y el REST admin de Fercho
+        // no se registran; las rutas se cubren en WebMvcTest y Testcontainers.
+        assertThat(applicationContext.getBeanNamesForType(FerchoAdminController.class)).isEmpty();
+        assertThat(applicationContext.getBeanNamesForType(FerchoSupervisionPort.class)).isEmpty();
     }
 }

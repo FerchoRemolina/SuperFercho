@@ -1496,3 +1496,91 @@ export async function deleteAdminStorefrontQrImage(): Promise<AdminStorefrontQrI
     { method: "DELETE" },
   );
 }
+
+// --- Supervisión administrativa de Fercho ---
+
+export type AdminFerchoSummary = {
+  windowStart: string;
+  windowEnd: string;
+  acceptedRequests: number;
+  rejectedRequests: number;
+  llmCalls: number;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  estimatedCost: string | null;
+  costEstimated: boolean;
+  activeAutoPauses: number;
+  activeSuspensions: number;
+  openAlerts: number;
+};
+
+export type AdminFerchoAlert = {
+  id: string;
+  userId: string;
+  status: string;
+  reason: string;
+  windowStartedAt: string;
+  acceptedRequests: number;
+  llmCalls: number;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  estimatedCost: string | null;
+  model: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+  decidedBy: string | null;
+  decisionNote: string | null;
+  restrictionId: string | null;
+};
+
+export type AdminFerchoRestriction = {
+  id: string;
+  userId: string;
+  type: string;
+  reason: string;
+  createdAt: string;
+  createdBy: string | null;
+  expiresAt: string;
+  liftedAt: string | null;
+  liftedBy: string | null;
+  note: string | null;
+};
+
+export function getAdminFerchoSummary(windowHours: number) {
+  return request<AdminFerchoSummary>(
+    `/admin/fercho/summary?windowHours=${windowHours}`,
+  );
+}
+
+export function getAdminFerchoAlerts(status?: string) {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  return request<AdminFerchoAlert[]>(`/admin/fercho/alerts${query}`);
+}
+
+export function getAdminFerchoRestrictions(activeOnly: boolean) {
+  return request<AdminFerchoRestriction[]>(
+    `/admin/fercho/restrictions?activeOnly=${activeOnly}`,
+  );
+}
+
+export function resolveAdminFerchoAlert(
+  alertId: string,
+  action: "DISMISS" | "WARN" | "SUSPEND",
+  note: string,
+  suspensionHours?: number,
+) {
+  return request<{ suspensionId: string | null }>(
+    `/admin/fercho/alerts/${alertId}/decision`,
+    {
+      method: "POST",
+      body: { action, note, suspensionHours: suspensionHours ?? null },
+    },
+  );
+}
+
+export function liftAdminFerchoRestriction(restrictionId: string, note: string) {
+  return request<AdminFerchoRestriction>(
+    `/admin/fercho/restrictions/${restrictionId}/lift`,
+    { method: "POST", body: { note } },
+  );
+}
