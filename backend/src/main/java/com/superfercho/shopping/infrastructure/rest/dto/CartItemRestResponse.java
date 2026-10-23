@@ -10,6 +10,8 @@ public record CartItemRestResponse(
         UUID productId,
         int quantity,
         Money priceAtAddition,
+        Money currentUnitPrice,
+        Money currentLineAmount,
         Instant addedAt,
         Instant updatedAt) {
 
@@ -19,6 +21,8 @@ public record CartItemRestResponse(
                 item.productId(),
                 item.quantity(),
                 item.priceAtAddition(),
+                item.currentUnitPrice(),
+                item.currentLineAmount(),
                 item.addedAt(),
                 item.updatedAt());
     }

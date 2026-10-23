@@ -108,18 +108,18 @@ class ShoppingCartAdapterTest {
     }
 
     private static CartResponse cartWithItems() {
-        return new CartResponse(
+        return CartResponse.of(
                 CART_ID,
                 CUSTOMER_ID,
                 CartStatus.ACTIVE,
                 List.of(
-                        new CartItemResponse(MILK_ITEM_ID, MILK_ID, 2, MILK_PRICE, NOW, NOW),
-                        new CartItemResponse(BREAD_ITEM_ID, BREAD_ID, 1, BREAD_PRICE, NOW, NOW)),
+                        CartItemResponse.of(MILK_ITEM_ID, MILK_ID, 2, MILK_PRICE, NOW, NOW),
+                        CartItemResponse.of(BREAD_ITEM_ID, BREAD_ID, 1, BREAD_PRICE, NOW, NOW)),
                 NOW,
                 NOW);
     }
 
     private static CartResponse emptyCart() {
-        return new CartResponse(CART_ID, CUSTOMER_ID, CartStatus.ACTIVE, List.of(), NOW, NOW);
+        return CartResponse.of(CART_ID, CUSTOMER_ID, CartStatus.ACTIVE, List.of(), NOW, NOW);
     }
 }

@@ -95,7 +95,13 @@ class InactiveProductShoppingAvailabilityTest {
         ProductCatalogAdapter catalog = new ProductCatalogAdapter(new FindProductPriceUseCase(
                 productRepository, categoryRepository, productTypeRepository, productVariantRepository));
         cartService = new CartApplicationService(
-                currentUserProvider, cartRepository, shoppingListRepository, catalog, clockPort);
+                currentUserProvider,
+                cartRepository,
+                shoppingListRepository,
+                catalog,
+                clockPort,
+                org.mockito.Mockito.mock(
+                        com.superfercho.shopping.application.port.out.CartAddOperationPort.class));
         shoppingListService = new ShoppingListApplicationService(
                 currentUserProvider, shoppingListRepository, catalog, clockPort);
     }

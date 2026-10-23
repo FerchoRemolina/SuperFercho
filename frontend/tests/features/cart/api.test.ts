@@ -2,12 +2,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   addProductToCart,
   cartKeys,
-  cartLinesDisplayAmount,
   cartUnitCount,
   changeCartItemQuantity,
   clearCart,
   getCart,
   lineDisplayAmount,
+  officialCartQuote,
   removeCartItem,
   type Cart,
 } from "@/features/cart/api";
@@ -44,12 +44,16 @@ const cart: Cart = {
       productId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
       quantity: 2,
       priceAtAddition: { amount: 10.5, currency: "COP" },
+      currentUnitPrice: { amount: 12, currency: "COP" },
+      currentLineAmount: { amount: 24, currency: "COP" },
       addedAt: "2026-04-01T10:00:00Z",
       updatedAt: "2026-04-01T10:05:00Z",
     },
   ],
   createdAt: "2026-04-01T10:00:00Z",
   updatedAt: "2026-04-01T10:05:00Z",
+  currentSubtotal: { amount: 24, currency: "COP" },
+  currentPricingComplete: true,
 };
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -145,15 +149,18 @@ describe("cart api", () => {
     expect(cartKeys().root()).toEqual(["cart"]);
   });
 
-  it("counts units and presents line amounts from priceAtAddition", () => {
+  it("counts units and uses the backend quote instead of summing historical prices", () => {
     expect(cartUnitCount(cart)).toBe(2);
     expect(lineDisplayAmount(cart.items[0])).toEqual({
       amount: 21,
       currency: "COP",
     });
-    expect(cartLinesDisplayAmount(cart)).toEqual({
-      amount: 21,
+    expect(officialCartQuote(cart)).toEqual({
+      amount: 24,
       currency: "COP",
     });
+    expect(
+      officialCartQuote({ ...cart, currentPricingComplete: false }),
+    ).toBeNull();
   });
 });

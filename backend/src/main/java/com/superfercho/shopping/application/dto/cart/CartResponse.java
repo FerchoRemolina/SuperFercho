@@ -1,5 +1,6 @@
 package com.superfercho.shopping.application.dto.cart;
 
+import com.superfercho.platform.money.Money;
 import com.superfercho.shopping.domain.model.Cart;
 import com.superfercho.shopping.domain.model.CartStatus;
 import java.time.Instant;
@@ -12,15 +13,32 @@ public record CartResponse(
         CartStatus status,
         List<CartItemResponse> items,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        Money currentSubtotal,
+        boolean currentPricingComplete) {
 
-    public static CartResponse from(Cart cart) {
+    public static CartResponse of(
+            UUID id,
+            UUID customerId,
+            CartStatus status,
+            List<CartItemResponse> items,
+            Instant createdAt,
+            Instant updatedAt) {
+        boolean empty = items.isEmpty();
+        return new CartResponse(
+                id, customerId, status, items, createdAt, updatedAt, empty ? Money.copZero() : null, empty);
+    }
+
+    public static CartResponse from(
+            Cart cart, List<CartItemResponse> pricedItems, Money currentSubtotal, boolean currentPricingComplete) {
         return new CartResponse(
                 cart.id(),
                 cart.customerId(),
                 cart.status(),
-                cart.items().stream().map(CartItemResponse::from).toList(),
+                List.copyOf(pricedItems),
                 cart.createdAt(),
-                cart.updatedAt());
+                cart.updatedAt(),
+                currentSubtotal,
+                currentPricingComplete);
     }
 }

@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import type { CartItem } from "@/features/cart/api";
-import { lineDisplayAmount } from "@/features/cart/api";
 import { QuantityStepper } from "@/features/cart/components/quantity-stepper";
 import { useRemoveCartItemMutation } from "@/features/cart/hooks";
 import { cartStockWarning } from "@/features/cart/stock";
@@ -26,10 +25,11 @@ export function CartLine({
 }) {
   const removeMutation = useRemoveCartItemMutation();
   const name = product?.name ?? "Producto no disponible";
-  const lineAmount = lineDisplayAmount(item);
-  const currentPrice = product?.price;
+  const currentPrice = item.currentUnitPrice ?? product?.price;
+  const lineAmount = item.currentLineAmount;
   const priceChanged =
     currentPrice !== undefined &&
+    currentPrice !== null &&
     (currentPrice.amount !== item.priceAtAddition.amount ||
       currentPrice.currency !== item.priceAtAddition.currency);
 
@@ -106,7 +106,7 @@ export function CartLine({
 
       <div className="col-span-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 md:col-span-1 md:flex-col md:items-end">
         <p className="text-lg font-bold tabular-nums text-sf-ink">
-          {formatMoney(lineAmount)}
+          {lineAmount ? formatMoney(lineAmount) : "Precio no disponible"}
         </p>
         <div className="flex items-center gap-2">
           <QuantityStepper

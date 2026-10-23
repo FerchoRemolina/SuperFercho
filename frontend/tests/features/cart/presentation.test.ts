@@ -14,6 +14,8 @@ describe("cart presentation", () => {
     const line = source("features/cart/components/cart-line.tsx");
     expect(line).toContain("line-clamp-2");
     expect(line).toContain("priceChanged");
+    expect(line).toContain("currentLineAmount");
+    expect(line).toContain("Precio no disponible");
     expect(line).toContain("Agotado");
     expect(line).toContain("text-sf-error");
     expect(line).toContain("QuantityStepper");
@@ -24,7 +26,9 @@ describe("cart presentation", () => {
   it("keeps checkout primary and softens clear-cart / follow shopping", () => {
     const summary = source("features/cart/components/cart-summary.tsx");
     const page = source("features/cart/components/cart-page-content.tsx");
-    expect(summary).toContain("Subtotal");
+    expect(summary).toContain("Estimado vigente");
+    expect(summary).toContain("officialCartQuote");
+    expect(summary).not.toContain("cartLinesDisplayAmount");
     expect(summary).not.toContain("Suma de líneas");
     expect(summary).toContain("Ir a pagar");
     expect(summary).toContain("Seguir comprando");

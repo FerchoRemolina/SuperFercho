@@ -1,5 +1,6 @@
 package com.superfercho.shopping.infrastructure.persistence;
 
+import com.superfercho.shopping.application.exception.DuplicateCartAddOperationException;
 import com.superfercho.shopping.application.exception.DuplicateCustomerCartException;
 import com.superfercho.shopping.application.exception.DuplicateFavoriteException;
 import com.superfercho.shopping.application.exception.DuplicateShoppingListItemException;
@@ -11,6 +12,7 @@ final class ShoppingConstraintViolationTranslator {
     private static final String CUSTOMER_PRODUCT_FAVORITE_CONSTRAINT = "uk_shopping_favorites_customer_product";
     private static final String LIST_PRODUCT_SHOPPING_LIST_ITEM_CONSTRAINT =
             "uk_shopping_shopping_list_items_list_product";
+    private static final String CART_ADD_OPERATION_CONSTRAINT = "uk_shopping_cart_add_operations_operation_id";
 
     private ShoppingConstraintViolationTranslator() {
     }
@@ -25,6 +27,9 @@ final class ShoppingConstraintViolationTranslator {
         }
         if (detail.contains(LIST_PRODUCT_SHOPPING_LIST_ITEM_CONSTRAINT)) {
             return withCause(new DuplicateShoppingListItemException(), exception);
+        }
+        if (detail.contains(CART_ADD_OPERATION_CONSTRAINT)) {
+            return withCause(new DuplicateCartAddOperationException(), exception);
         }
         return exception;
     }

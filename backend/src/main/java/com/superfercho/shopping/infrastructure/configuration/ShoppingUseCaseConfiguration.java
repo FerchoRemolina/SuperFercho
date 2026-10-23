@@ -1,6 +1,8 @@
 package com.superfercho.shopping.infrastructure.configuration;
 
 import com.superfercho.shopping.application.port.CurrentUserProvider;
+import com.superfercho.shopping.application.port.in.ApplyIdempotentCartAddUseCase;
+import com.superfercho.shopping.application.port.out.CartAddOperationPort;
 import com.superfercho.shopping.application.port.out.CartRepositoryPort;
 import com.superfercho.shopping.application.port.out.ClockPort;
 import com.superfercho.shopping.application.port.out.FavoriteRepositoryPort;
@@ -15,6 +17,8 @@ import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Configuration
 @Profile("!test")
@@ -31,9 +35,22 @@ public class ShoppingUseCaseConfiguration {
             CartRepositoryPort cartRepository,
             ShoppingListRepositoryPort shoppingListRepository,
             ProductCatalogPort productCatalogPort,
-            ClockPort clockPort) {
+            ClockPort clockPort,
+            CartAddOperationPort cartAddOperationPort) {
         return new CartApplicationService(
-                currentUserProvider, cartRepository, shoppingListRepository, productCatalogPort, clockPort);
+                currentUserProvider,
+                cartRepository,
+                shoppingListRepository,
+                productCatalogPort,
+                clockPort,
+                cartAddOperationPort);
+    }
+
+    @Bean
+    ApplyIdempotentCartAddUseCase applyIdempotentCartAddUseCase(
+            CartApplicationService cartApplicationService, PlatformTransactionManager transactionManager) {
+        return new TransactionalApplyIdempotentCartAddUseCase(
+                cartApplicationService, new TransactionTemplate(transactionManager));
     }
 
     @Bean

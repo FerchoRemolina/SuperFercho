@@ -3,6 +3,7 @@ package com.superfercho.shopping.infrastructure.persistence;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.superfercho.shopping.application.exception.DuplicateCartAddOperationException;
 import com.superfercho.shopping.application.exception.DuplicateCustomerCartException;
 import com.superfercho.shopping.application.exception.DuplicateFavoriteException;
 import com.superfercho.shopping.application.exception.DuplicateShoppingListItemException;
@@ -38,6 +39,16 @@ class ShoppingConstraintViolationTranslatorTest {
         RuntimeException translated = ShoppingConstraintViolationTranslator.translate(violation);
 
         assertTrue(translated instanceof DuplicateShoppingListItemException);
+        assertSame(violation, translated.getCause());
+    }
+
+    @Test
+    void shouldTranslateDuplicateCartAddOperationConstraint() {
+        DataIntegrityViolationException violation = violation("uk_shopping_cart_add_operations_operation_id");
+
+        RuntimeException translated = ShoppingConstraintViolationTranslator.translate(violation);
+
+        assertTrue(translated instanceof DuplicateCartAddOperationException);
         assertSame(violation, translated.getCause());
     }
 

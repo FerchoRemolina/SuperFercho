@@ -2,7 +2,6 @@ package com.superfercho.orders.domain.model;
 
 import com.superfercho.orders.domain.exception.InvalidOrderItemException;
 import com.superfercho.platform.money.Money;
-import java.math.BigDecimal;
 import java.util.UUID;
 
 public record OrderItem(
@@ -38,7 +37,7 @@ public record OrderItem(
 
     private static Money subtotalOf(Money unitPrice, int quantity) {
         requireNonNull(unitPrice, "unitPrice");
-        return new Money(unitPrice.amount().multiply(BigDecimal.valueOf(quantity)), unitPrice.currency());
+        return unitPrice.times(quantity);
     }
 
     private static void requireNonNull(Object value, String field) {

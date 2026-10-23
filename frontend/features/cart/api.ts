@@ -10,6 +10,8 @@ export type CartItem = {
   productId: string;
   quantity: number;
   priceAtAddition: Money;
+  currentUnitPrice?: Money | null;
+  currentLineAmount?: Money | null;
   addedAt: string;
   updatedAt: string;
 };
@@ -21,6 +23,8 @@ export type Cart = {
   items: CartItem[];
   createdAt: string;
   updatedAt: string;
+  currentSubtotal?: Money | null;
+  currentPricingComplete?: boolean;
 };
 
 /** Mirrors AddItemRequest. */
@@ -82,33 +86,23 @@ export function cartUnitCount(cart: Cart | undefined): number {
 }
 
 /**
- * Presentation of quantity × priceAtAddition. Not a backend total and not
- * the amount charged at checkout.
+ * Historical quantity × priceAtAddition. Not an official backend total.
  */
 export function lineDisplayAmount(item: CartItem): Money {
   return scaleMoney(item.priceAtAddition, item.quantity);
 }
 
-export function cartLinesDisplayAmount(cart: Cart): Money | null {
-  if (cart.items.length === 0) {
+export function officialCartQuote(cart: Cart): Money | null {
+  if (cart.currentPricingComplete !== true || !cart.currentSubtotal) {
     return null;
   }
-  return cart.items
-    .map(lineDisplayAmount)
-    .reduce((total, line) => addMoney(total, line));
+  return cart.currentSubtotal;
 }
 
 function scaleMoney(money: Money, quantity: number): Money {
   return {
     amount: roundMoneyAmount(money.amount * quantity),
     currency: money.currency,
-  };
-}
-
-function addMoney(left: Money, right: Money): Money {
-  return {
-    amount: roundMoneyAmount(left.amount + right.amount),
-    currency: left.currency,
   };
 }
 

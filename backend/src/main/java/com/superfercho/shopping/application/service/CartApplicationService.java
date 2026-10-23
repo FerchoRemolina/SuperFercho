@@ -3,11 +3,15 @@ package com.superfercho.shopping.application.service;
 import com.superfercho.platform.money.Money;
 import com.superfercho.shopping.application.dto.ProductCatalogInfo;
 import com.superfercho.shopping.application.dto.cart.AddProductToCartCommand;
+import com.superfercho.shopping.application.dto.cart.CartAddOperation;
 import com.superfercho.shopping.application.dto.cart.CartResponse;
 import com.superfercho.shopping.application.dto.cart.ChangeCartItemQuantityCommand;
 import com.superfercho.shopping.application.dto.cart.ClearCartCommand;
+import com.superfercho.shopping.application.dto.cart.IdempotentAddProductToCartCommand;
+import com.superfercho.shopping.application.dto.cart.IdempotentCartAddResult;
 import com.superfercho.shopping.application.dto.cart.RemoveProductFromCartCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.AddShoppingListToCartCommand;
+import com.superfercho.shopping.application.exception.CartAddOperationConflictException;
 import com.superfercho.shopping.application.exception.CartNotFoundException;
 import com.superfercho.shopping.application.exception.DuplicateCustomerCartException;
 import com.superfercho.shopping.application.exception.ProductNotFoundException;
@@ -19,10 +23,12 @@ import com.superfercho.shopping.application.port.in.ChangeCartItemQuantityUseCas
 import com.superfercho.shopping.application.port.in.ClearCartUseCase;
 import com.superfercho.shopping.application.port.in.GetCartUseCase;
 import com.superfercho.shopping.application.port.in.RemoveProductFromCartUseCase;
+import com.superfercho.shopping.application.port.out.CartAddOperationPort;
 import com.superfercho.shopping.application.port.out.CartRepositoryPort;
 import com.superfercho.shopping.application.port.out.ClockPort;
 import com.superfercho.shopping.application.port.out.ProductCatalogPort;
 import com.superfercho.shopping.application.port.out.ShoppingListRepositoryPort;
+import com.superfercho.shopping.domain.exception.InvalidCartItemException;
 import com.superfercho.shopping.domain.model.Cart;
 import com.superfercho.shopping.domain.model.CartStatus;
 import com.superfercho.shopping.domain.model.ShoppingList;
@@ -30,6 +36,7 @@ import com.superfercho.shopping.domain.model.ShoppingListItem;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public final class CartApplicationService
@@ -45,24 +52,27 @@ public final class CartApplicationService
     private final ShoppingListRepositoryPort shoppingListRepository;
     private final ProductCatalogPort productCatalogPort;
     private final ClockPort clockPort;
+    private final CartAddOperationPort cartAddOperationPort;
 
     public CartApplicationService(
             CurrentUserProvider currentUserProvider,
             CartRepositoryPort cartRepository,
             ShoppingListRepositoryPort shoppingListRepository,
             ProductCatalogPort productCatalogPort,
-            ClockPort clockPort) {
+            ClockPort clockPort,
+            CartAddOperationPort cartAddOperationPort) {
         this.currentUserProvider = currentUserProvider;
         this.cartRepository = cartRepository;
         this.shoppingListRepository = shoppingListRepository;
         this.productCatalogPort = productCatalogPort;
         this.clockPort = clockPort;
+        this.cartAddOperationPort = cartAddOperationPort;
     }
 
     @Override
     public CartResponse execute() {
         UUID currentUserId = currentUserProvider.getCurrentUserId();
-        return CartResponse.from(getOrCreateCart(currentUserId));
+        return priced(getOrCreateCart(currentUserId));
     }
 
     @Override
@@ -72,6 +82,38 @@ public final class CartApplicationService
         Money price = requireProduct(command.productId()).currentPrice();
         return addProducts(
                 currentUserId, now, List.of(new ProductAddition(command.productId(), command.quantity(), price)));
+    }
+
+    public IdempotentCartAddResult execute(IdempotentAddProductToCartCommand command) {
+        UUID customerId = currentUserProvider.getCurrentUserId();
+        requireIdempotentCommand(command);
+        Instant now = clockPort.currentTime();
+        Optional<CartAddOperation> existing = cartAddOperationPort.findAndLock(command.operationId());
+        if (existing.isPresent()) {
+            return replayOrConflict(existing.get(), customerId, command);
+        }
+        Money price = requireProduct(command.productId()).currentPrice();
+        CartResponse cart = addProducts(
+                customerId, now, List.of(new ProductAddition(command.productId(), command.quantity(), price)));
+        cartAddOperationPort.save(new CartAddOperation(
+                command.operationId(), customerId, command.productId(), command.quantity(), now));
+        return IdempotentCartAddResult.applied(cart);
+    }
+
+    public Optional<IdempotentCartAddResult> replayIfApplied(UUID operationId, int quantity) {
+        UUID customerId = currentUserProvider.getCurrentUserId();
+        if (operationId == null || quantity < 1) {
+            return Optional.empty();
+        }
+        Optional<CartAddOperation> existing = cartAddOperationPort.find(operationId);
+        if (existing.isEmpty() || !existing.get().customerId().equals(customerId)) {
+            return Optional.empty();
+        }
+        CartAddOperation operation = existing.get();
+        if (operation.quantity() != quantity) {
+            throw new CartAddOperationConflictException(operationId);
+        }
+        return Optional.of(IdempotentCartAddResult.replayed(priced(getOrCreateCart(customerId))));
     }
 
     @Override
@@ -88,7 +130,7 @@ public final class CartApplicationService
             additions.add(new ProductAddition(item.productId(), item.quantity(), price));
         }
         if (additions.isEmpty()) {
-            return CartResponse.from(getOrCreateCart(currentUserId));
+            return priced(getOrCreateCart(currentUserId));
         }
         return addProducts(currentUserId, clockPort.currentTime(), additions);
     }
@@ -98,7 +140,7 @@ public final class CartApplicationService
         UUID currentUserId = currentUserProvider.getCurrentUserId();
         Instant now = clockPort.currentTime();
         Cart updated = requireCart(currentUserId).changeQuantity(command.productId(), command.quantity(), now);
-        return CartResponse.from(cartRepository.save(updated));
+        return priced(cartRepository.save(updated));
     }
 
     @Override
@@ -106,7 +148,7 @@ public final class CartApplicationService
         UUID currentUserId = currentUserProvider.getCurrentUserId();
         Instant now = clockPort.currentTime();
         Cart updated = requireCart(currentUserId).removeProduct(command.productId(), now);
-        return CartResponse.from(cartRepository.save(updated));
+        return priced(cartRepository.save(updated));
     }
 
     @Override
@@ -114,16 +156,16 @@ public final class CartApplicationService
         UUID currentUserId = currentUserProvider.getCurrentUserId();
         Instant now = clockPort.currentTime();
         Cart updated = requireCart(currentUserId).clear(now);
-        return CartResponse.from(cartRepository.save(updated));
+        return priced(cartRepository.save(updated));
     }
 
     private CartResponse addProducts(UUID customerId, Instant now, List<ProductAddition> additions) {
         Cart cart = cartRepository.findByCustomerId(customerId).orElseGet(() -> newCart(customerId, now));
         try {
-            return CartResponse.from(cartRepository.save(applyAdditions(cart, additions, now)));
+            return priced(cartRepository.save(applyAdditions(cart, additions, now)));
         } catch (DuplicateCustomerCartException exception) {
             Cart winner = cartRepository.findByCustomerId(customerId).orElseThrow(() -> exception);
-            return CartResponse.from(cartRepository.save(applyAdditions(winner, additions, now)));
+            return priced(cartRepository.save(applyAdditions(winner, additions, now)));
         }
     }
 
@@ -167,8 +209,29 @@ public final class CartApplicationService
         return shoppingList;
     }
 
+    private CartResponse priced(Cart cart) {
+        return CartPricing.of(cart, productCatalogPort);
+    }
+
     private ProductCatalogInfo requireProduct(UUID productId) {
         return productCatalogPort.getProduct(productId).orElseThrow(() -> new ProductNotFoundException(productId));
+    }
+
+    private static void requireIdempotentCommand(IdempotentAddProductToCartCommand command) {
+        if (command == null || command.operationId() == null || command.productId() == null) {
+            throw new InvalidCartItemException("idempotent cart add requires operationId and productId");
+        }
+        if (command.quantity() <= 0) {
+            throw new InvalidCartItemException("quantity must be greater than 0");
+        }
+    }
+
+    private IdempotentCartAddResult replayOrConflict(
+            CartAddOperation existing, UUID customerId, IdempotentAddProductToCartCommand command) {
+        if (!existing.matches(customerId, command.productId(), command.quantity())) {
+            throw new CartAddOperationConflictException(command.operationId());
+        }
+        return IdempotentCartAddResult.replayed(priced(getOrCreateCart(customerId)));
     }
 
     private record ProductAddition(UUID productId, int quantity, Money price) {}

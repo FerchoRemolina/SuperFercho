@@ -72,7 +72,7 @@ class CartControllerTest {
 
     @Test
     void shouldGetCart() throws Exception {
-        when(getCartUseCase.execute()).thenReturn(cartWithItem(2));
+        when(getCartUseCase.execute()).thenReturn(pricedCartWithItem(2));
 
         mockMvc.perform(get("/api/v1/cart"))
                 .andExpect(status().isOk())
@@ -83,7 +83,12 @@ class CartControllerTest {
                 .andExpect(jsonPath("$.items[0].quantity").value(2))
                 .andExpect(jsonPath("$.items[0].priceAtAddition.amount").value(10.50))
                 .andExpect(jsonPath("$.items[0].priceAtAddition.currency").value("COP"))
+                .andExpect(jsonPath("$.items[0].currentUnitPrice.amount").value(10.50))
+                .andExpect(jsonPath("$.items[0].currentLineAmount.amount").value(21.00))
                 .andExpect(jsonPath("$.items[0].stock").doesNotExist())
+                .andExpect(jsonPath("$.currentSubtotal.amount").value(21.00))
+                .andExpect(jsonPath("$.currentSubtotal.currency").value("COP"))
+                .andExpect(jsonPath("$.currentPricingComplete").value(true))
                 .andExpect(jsonPath("$.createdAt").value(CREATED_AT.toString()))
                 .andExpect(jsonPath("$.updatedAt").value(UPDATED_AT.toString()));
 
@@ -175,16 +180,24 @@ class CartControllerTest {
     }
 
     private static CartResponse emptyCart() {
-        return new CartResponse(CART_ID, CUSTOMER_ID, CartStatus.ACTIVE, List.of(), CREATED_AT, UPDATED_AT);
+        return CartResponse.of(CART_ID, CUSTOMER_ID, CartStatus.ACTIVE, List.of(), CREATED_AT, UPDATED_AT);
     }
 
     private static CartResponse cartWithItem(int quantity) {
+        return pricedCartWithItem(quantity);
+    }
+
+    private static CartResponse pricedCartWithItem(int quantity) {
+        Money line = PRICE.times(quantity);
         return new CartResponse(
                 CART_ID,
                 CUSTOMER_ID,
                 CartStatus.ACTIVE,
-                List.of(new CartItemResponse(ITEM_ID, PRODUCT_ID, quantity, PRICE, CREATED_AT, UPDATED_AT)),
+                List.of(new CartItemResponse(
+                        ITEM_ID, PRODUCT_ID, quantity, PRICE, PRICE, line, CREATED_AT, UPDATED_AT)),
                 CREATED_AT,
-                UPDATED_AT);
+                UPDATED_AT,
+                line,
+                true);
     }
 }

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { Cart } from "@/features/cart/api";
-import { cartLinesDisplayAmount, cartUnitCount } from "@/features/cart/api";
+import { cartUnitCount, officialCartQuote } from "@/features/cart/api";
 import { useClearCartMutation } from "@/features/cart/hooks";
 import { isApiError } from "@/shared/errors/api-problem";
 import { messageForApiProblem } from "@/shared/errors/messages";
@@ -16,7 +16,7 @@ export function CartSummary({ cart }: { cart: Cart }) {
   const clearMutation = useClearCartMutation();
   const [confirming, setConfirming] = useState(false);
   const unitCount = cartUnitCount(cart);
-  const linesTotal = cartLinesDisplayAmount(cart);
+  const quote = officialCartQuote(cart);
 
   const errorMessage =
     clearMutation.isError && isApiError(clearMutation.error)
@@ -39,17 +39,21 @@ export function CartSummary({ cart }: { cart: Cart }) {
           <dt className="text-sf-muted">Unidades</dt>
           <dd className="font-semibold tabular-nums text-sf-ink">{unitCount}</dd>
         </div>
-        {linesTotal ? (
+        {quote ? (
           <div className="mt-1 flex items-baseline justify-between gap-4 border-t border-sf-border pt-2.5">
-            <dt className="text-base font-semibold text-sf-ink">Subtotal</dt>
+            <dt className="text-base font-semibold text-sf-ink">Estimado vigente</dt>
             <dd className="text-xl font-bold tabular-nums text-sf-ink">
-              {formatMoney(linesTotal)}
+              {formatMoney(quote)}
             </dd>
           </div>
+        ) : cart.items.length > 0 ? (
+          <p className="mt-1 border-t border-sf-border pt-2.5 text-sm text-sf-muted">
+            No hay un total oficial: falta el precio vigente de al menos un producto.
+          </p>
         ) : null}
       </dl>
       <p className="text-xs leading-relaxed text-sf-muted">
-        Precios al agregar. Sin envío, impuestos ni descuentos.
+        Precio actual del catálogo. El cobro lo confirma el checkout. Sin envío, impuestos ni descuentos.
       </p>
       {errorMessage ? (
         <Alert tone="error" title="No se pudo vaciar">

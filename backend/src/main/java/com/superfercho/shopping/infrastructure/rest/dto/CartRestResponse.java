@@ -1,5 +1,6 @@
 package com.superfercho.shopping.infrastructure.rest.dto;
 
+import com.superfercho.platform.money.Money;
 import com.superfercho.shopping.application.dto.cart.CartResponse;
 import java.time.Instant;
 import java.util.List;
@@ -11,7 +12,9 @@ public record CartRestResponse(
         String status,
         List<CartItemRestResponse> items,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        Money currentSubtotal,
+        boolean currentPricingComplete) {
 
     public static CartRestResponse from(CartResponse cart) {
         return new CartRestResponse(
@@ -20,6 +23,8 @@ public record CartRestResponse(
                 cart.status().name(),
                 cart.items().stream().map(CartItemRestResponse::from).toList(),
                 cart.createdAt(),
-                cart.updatedAt());
+                cart.updatedAt(),
+                cart.currentSubtotal(),
+                cart.currentPricingComplete());
     }
 }

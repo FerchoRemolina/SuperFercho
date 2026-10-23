@@ -337,11 +337,11 @@ class ShoppingListControllerTest {
     }
 
     private static CartResponse cartWithItem(int quantity) {
-        return new CartResponse(
+        return CartResponse.of(
                 CART_ID,
                 CUSTOMER_ID,
                 com.superfercho.shopping.domain.model.CartStatus.ACTIVE,
-                List.of(new CartItemResponse(ITEM_ID, PRODUCT_ID, quantity, PRICE, CREATED_AT, UPDATED_AT)),
+                List.of(CartItemResponse.of(ITEM_ID, PRODUCT_ID, quantity, PRICE, CREATED_AT, UPDATED_AT)),
                 CREATED_AT,
                 UPDATED_AT);
     }

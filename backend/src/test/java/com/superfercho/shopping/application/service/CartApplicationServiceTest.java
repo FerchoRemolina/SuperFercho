@@ -1,6 +1,8 @@
 package com.superfercho.shopping.application.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -13,7 +15,11 @@ import com.superfercho.identity.application.exception.UnauthenticatedUserExcepti
 import com.superfercho.platform.money.Money;
 import com.superfercho.shopping.application.dto.ProductCatalogInfo;
 import com.superfercho.shopping.application.dto.cart.AddProductToCartCommand;
+import com.superfercho.shopping.application.dto.cart.CartAddOperation;
 import com.superfercho.shopping.application.dto.cart.CartResponse;
+import com.superfercho.shopping.application.dto.cart.IdempotentAddProductToCartCommand;
+import com.superfercho.shopping.application.dto.cart.IdempotentCartAddResult;
+import com.superfercho.shopping.application.exception.CartAddOperationConflictException;
 import com.superfercho.shopping.application.dto.cart.ChangeCartItemQuantityCommand;
 import com.superfercho.shopping.application.dto.cart.ClearCartCommand;
 import com.superfercho.shopping.application.dto.cart.RemoveProductFromCartCommand;
@@ -23,6 +29,7 @@ import com.superfercho.shopping.application.exception.DuplicateCustomerCartExcep
 import com.superfercho.shopping.application.exception.ProductNotFoundException;
 import com.superfercho.shopping.application.exception.ShoppingListNotFoundException;
 import com.superfercho.shopping.application.port.CurrentUserProvider;
+import com.superfercho.shopping.application.port.out.CartAddOperationPort;
 import com.superfercho.shopping.application.port.out.CartRepositoryPort;
 import com.superfercho.shopping.application.port.out.ClockPort;
 import com.superfercho.shopping.application.port.out.ProductCatalogPort;
@@ -76,18 +83,27 @@ class CartApplicationServiceTest {
     @Mock
     private ClockPort clockPort;
 
+    @Mock
+    private CartAddOperationPort cartAddOperationPort;
+
     private CartApplicationService cartService;
 
     @BeforeEach
     void setUp() {
         cartService = new CartApplicationService(
-                currentUserProvider, cartRepository, shoppingListRepository, productCatalogPort, clockPort);
+                currentUserProvider,
+                cartRepository,
+                shoppingListRepository,
+                productCatalogPort,
+                clockPort,
+                cartAddOperationPort);
     }
 
     @Test
     void shouldGetExistingCartForCurrentUserFromProvider() {
         when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cartWithMilk()));
+        givenCurrentPrice(MILK_ID, MILK_PRICE);
 
         CartResponse response = cartService.execute();
 
@@ -98,7 +114,10 @@ class CartApplicationServiceTest {
         assertEquals(CartStatus.ACTIVE, response.status());
         assertEquals(1, response.items().size());
         assertEquals(MILK_ID, response.items().get(0).productId());
+        assertEquals(Money.cop(new BigDecimal("21.00")), response.currentSubtotal());
+        assertTrue(response.currentPricingComplete());
         verify(cartRepository, never()).save(any());
+        verify(productCatalogPort).getProduct(MILK_ID);
     }
 
     @Test
@@ -115,7 +134,10 @@ class CartApplicationServiceTest {
         assertTrue(response.items().isEmpty());
         assertEquals(NOW, response.createdAt());
         assertEquals(NOW, response.updatedAt());
+        assertEquals(Money.copZero(), response.currentSubtotal());
+        assertTrue(response.currentPricingComplete());
         verify(cartRepository).save(any(Cart.class));
+        verify(productCatalogPort, never()).getProduct(any());
     }
 
     @Test
@@ -164,7 +186,7 @@ class CartApplicationServiceTest {
         assertEquals(2, response.items().get(0).quantity());
         assertEquals(MILK_PRICE, response.items().get(0).priceAtAddition());
         assertEquals(NOW, response.updatedAt());
-        verify(productCatalogPort).getProduct(MILK_ID);
+        verify(productCatalogPort, times(2)).getProduct(MILK_ID);
         verify(cartRepository).save(any(Cart.class));
     }
 
@@ -183,8 +205,10 @@ class CartApplicationServiceTest {
         assertEquals(ITEM_ID, response.items().get(0).id());
         assertEquals(5, response.items().get(0).quantity());
         assertEquals(MILK_PRICE, response.items().get(0).priceAtAddition());
+        assertEquals(Money.cop(new BigDecimal("99.00")), response.items().get(0).currentUnitPrice());
+        assertEquals(Money.cop(new BigDecimal("495.00")), response.currentSubtotal());
         assertEquals(NOW, response.updatedAt());
-        verify(productCatalogPort).getProduct(MILK_ID);
+        verify(productCatalogPort, times(2)).getProduct(MILK_ID);
         verify(cartRepository).save(any(Cart.class));
     }
 
@@ -257,8 +281,8 @@ class CartApplicationServiceTest {
         assertEquals(1, response.items().get(1).quantity());
         assertEquals(BREAD_PRICE, response.items().get(1).priceAtAddition());
         assertEquals(NOW, response.updatedAt());
-        verify(productCatalogPort).getProduct(MILK_ID);
-        verify(productCatalogPort).getProduct(BREAD_ID);
+        verify(productCatalogPort, times(2)).getProduct(MILK_ID);
+        verify(productCatalogPort, times(2)).getProduct(BREAD_ID);
         verify(cartRepository).save(any(Cart.class));
     }
 
@@ -287,7 +311,7 @@ class CartApplicationServiceTest {
         assertEquals(1, response.items().size());
         assertEquals(MILK_ID, response.items().get(0).productId());
         assertEquals(2, response.items().get(0).quantity());
-        verify(productCatalogPort).getProduct(MILK_ID);
+        verify(productCatalogPort, times(2)).getProduct(MILK_ID);
         verify(productCatalogPort, never()).getProduct(BREAD_ID);
         verify(cartRepository).save(any(Cart.class));
     }
@@ -304,12 +328,13 @@ class CartApplicationServiceTest {
         when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(list));
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cartWithMilk()));
+        givenCurrentPrice(MILK_ID, MILK_PRICE);
 
         CartResponse response = cartService.execute(new AddShoppingListToCartCommand(LIST_ID));
 
         assertEquals(CART_ID, response.id());
         assertEquals(1, response.items().size());
-        verify(productCatalogPort, never()).getProduct(any());
+        verify(productCatalogPort).getProduct(MILK_ID);
         verify(cartRepository, never()).save(any());
     }
 
@@ -360,13 +385,14 @@ class CartApplicationServiceTest {
         when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
         when(shoppingListRepository.findById(LIST_ID)).thenReturn(Optional.of(emptyList()));
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cartWithMilk()));
+        givenCurrentPrice(MILK_ID, MILK_PRICE);
 
         CartResponse response = cartService.execute(new AddShoppingListToCartCommand(LIST_ID));
 
         assertEquals(CART_ID, response.id());
         assertEquals(1, response.items().size());
         assertEquals(MILK_ID, response.items().get(0).productId());
-        verify(productCatalogPort, never()).getProduct(any());
+        verify(productCatalogPort).getProduct(MILK_ID);
         verify(cartRepository, never()).save(any());
     }
 
@@ -468,13 +494,15 @@ class CartApplicationServiceTest {
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cartWithMilk()));
         when(clockPort.currentTime()).thenReturn(NOW);
         when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        givenCurrentPrice(MILK_ID, MILK_PRICE);
 
         CartResponse response = cartService.execute(new ChangeCartItemQuantityCommand(MILK_ID, 4));
 
         assertEquals(4, response.items().get(0).quantity());
         assertEquals(NOW, response.updatedAt());
+        assertEquals(Money.cop(new BigDecimal("42.00")), response.currentSubtotal());
         verify(cartRepository).save(any(Cart.class));
-        verify(productCatalogPort, never()).getProduct(any());
+        verify(productCatalogPort).getProduct(MILK_ID);
     }
 
     @Test
@@ -485,11 +513,13 @@ class CartApplicationServiceTest {
         when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cart));
         when(clockPort.currentTime()).thenReturn(NOW);
         when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        givenCurrentPrice(BREAD_ID, BREAD_PRICE);
 
         CartResponse response = cartService.execute(new RemoveProductFromCartCommand(MILK_ID));
 
         assertEquals(1, response.items().size());
         assertEquals(BREAD_ID, response.items().get(0).productId());
+        assertEquals(BREAD_PRICE, response.currentSubtotal());
         verify(cartRepository).save(any(Cart.class));
     }
 
@@ -505,6 +535,8 @@ class CartApplicationServiceTest {
         assertTrue(response.items().isEmpty());
         assertEquals(CART_ID, response.id());
         assertEquals(NOW, response.updatedAt());
+        assertEquals(Money.copZero(), response.currentSubtotal());
+        assertTrue(response.currentPricingComplete());
         verify(cartRepository).save(any(Cart.class));
     }
 
@@ -571,6 +603,111 @@ class CartApplicationServiceTest {
 
         assertThrows(UnauthenticatedUserException.class, () -> cartService.execute(new ClearCartCommand()));
         verify(cartRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldNotInventCartTotalWhenCurrentPriceIsMissing() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cartWithMilk()));
+        when(productCatalogPort.getProduct(MILK_ID)).thenReturn(Optional.empty());
+
+        CartResponse response = cartService.execute();
+
+        assertEquals(CUSTOMER_ID, response.customerId());
+        assertNull(response.currentSubtotal());
+        assertFalse(response.currentPricingComplete());
+        assertNull(response.items().get(0).currentUnitPrice());
+        verify(cartRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldApplyIdempotentAddOnceAndRecordReceipt() {
+        UUID operationId = UUID.fromString("55555555-5555-5555-5555-555555555555");
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        when(cartAddOperationPort.findAndLock(operationId)).thenReturn(Optional.empty());
+        when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(emptyCart()));
+        when(clockPort.currentTime()).thenReturn(NOW);
+        when(productCatalogPort.getProduct(MILK_ID)).thenReturn(Optional.of(new ProductCatalogInfo(MILK_ID, MILK_PRICE)));
+        when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        IdempotentCartAddResult result =
+                cartService.execute(new IdempotentAddProductToCartCommand(operationId, MILK_ID, 2));
+
+        assertFalse(result.replayed());
+        assertEquals(2, result.cart().items().get(0).quantity());
+        verify(cartRepository).save(any(Cart.class));
+        ArgumentCaptor<CartAddOperation> captor = ArgumentCaptor.forClass(CartAddOperation.class);
+        verify(cartAddOperationPort).save(captor.capture());
+        assertEquals(operationId, captor.getValue().operationId());
+        assertEquals(CUSTOMER_ID, captor.getValue().customerId());
+        assertEquals(MILK_ID, captor.getValue().productId());
+        assertEquals(2, captor.getValue().quantity());
+    }
+
+    @Test
+    void shouldReplayIdempotentAddWithSameFingerprintWithoutSavingCart() {
+        UUID operationId = UUID.fromString("55555555-5555-5555-5555-555555555555");
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        when(cartAddOperationPort.findAndLock(operationId))
+                .thenReturn(Optional.of(new CartAddOperation(operationId, CUSTOMER_ID, MILK_ID, 2, NOW)));
+        when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cartWithMilk()));
+        givenCurrentPrice(MILK_ID, MILK_PRICE);
+
+        IdempotentCartAddResult result =
+                cartService.execute(new IdempotentAddProductToCartCommand(operationId, MILK_ID, 2));
+
+        assertTrue(result.replayed());
+        assertEquals(2, result.cart().items().get(0).quantity());
+        verify(cartRepository, never()).save(any());
+        verify(cartAddOperationPort, never()).save(any());
+    }
+
+    @Test
+    void shouldConflictWhenIdempotentKeyHasDifferentProductOrQuantity() {
+        UUID operationId = UUID.fromString("55555555-5555-5555-5555-555555555555");
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        when(cartAddOperationPort.findAndLock(operationId))
+                .thenReturn(Optional.of(new CartAddOperation(operationId, CUSTOMER_ID, MILK_ID, 2, NOW)));
+
+        assertThrows(
+                CartAddOperationConflictException.class,
+                () -> cartService.execute(new IdempotentAddProductToCartCommand(operationId, MILK_ID, 3)));
+        assertThrows(
+                CartAddOperationConflictException.class,
+                () -> cartService.execute(new IdempotentAddProductToCartCommand(operationId, BREAD_ID, 2)));
+        verify(cartRepository, never()).save(any());
+    }
+
+    @Test
+    void ordinaryAddRemainsAdditiveAfterIdempotentReceiptExists() {
+        UUID operationId = UUID.fromString("55555555-5555-5555-5555-555555555555");
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        when(cartRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cartWithMilk()));
+        when(clockPort.currentTime()).thenReturn(NOW);
+        when(productCatalogPort.getProduct(MILK_ID))
+                .thenReturn(Optional.of(new ProductCatalogInfo(MILK_ID, MILK_PRICE)));
+        when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CartResponse response = cartService.execute(new AddProductToCartCommand(MILK_ID, 3));
+
+        assertEquals(5, response.items().get(0).quantity());
+        verify(cartAddOperationPort, never()).save(any());
+        verify(cartAddOperationPort, never()).findAndLock(operationId);
+    }
+
+    @Test
+    void replayIfAppliedReturnsEmptyForOtherCustomer() {
+        UUID operationId = UUID.fromString("55555555-5555-5555-5555-555555555555");
+        when(currentUserProvider.getCurrentUserId()).thenReturn(CUSTOMER_ID);
+        when(cartAddOperationPort.find(operationId))
+                .thenReturn(Optional.of(new CartAddOperation(operationId, OTHER_CUSTOMER_ID, MILK_ID, 2, NOW)));
+
+        assertTrue(cartService.replayIfApplied(operationId, 2).isEmpty());
+        verify(cartRepository, never()).save(any());
+    }
+
+    private void givenCurrentPrice(UUID productId, Money price) {
+        when(productCatalogPort.getProduct(productId)).thenReturn(Optional.of(new ProductCatalogInfo(productId, price)));
     }
 
     private Cart emptyCart() {

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.superfercho.platform.time.ClockConfiguration;
 import com.superfercho.shopping.application.port.CurrentUserProvider;
+import com.superfercho.shopping.application.port.out.CartAddOperationPort;
 import com.superfercho.shopping.application.port.out.CartRepositoryPort;
 import com.superfercho.shopping.application.port.out.ClockPort;
 import com.superfercho.shopping.application.port.out.FavoriteRepositoryPort;
@@ -38,6 +39,16 @@ class ShoppingApplicationWiringTest {
         @Bean
         CartRepositoryPort cartRepositoryPort() {
             return Mockito.mock(CartRepositoryPort.class);
+        }
+
+        @Bean
+        CartAddOperationPort cartAddOperationPort() {
+            return Mockito.mock(CartAddOperationPort.class);
+        }
+
+        @Bean
+        org.springframework.transaction.PlatformTransactionManager transactionManager() {
+            return Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class);
         }
 
         @Bean

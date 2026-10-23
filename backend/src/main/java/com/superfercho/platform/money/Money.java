@@ -30,4 +30,23 @@ public record Money(BigDecimal amount, String currency) {
     public static Money cop(BigDecimal amount) {
         return new Money(amount, COP);
     }
+
+    public static Money copZero() {
+        return cop(new BigDecimal("0.00"));
+    }
+
+    public Money times(int quantity) {
+        if (quantity < 0) {
+            throw new IllegalArgumentException("quantity must not be negative");
+        }
+        return new Money(amount.multiply(BigDecimal.valueOf(quantity)), currency);
+    }
+
+    public Money plus(Money other) {
+        Objects.requireNonNull(other, "other");
+        if (!currency.equals(other.currency)) {
+            throw new IllegalArgumentException("currency mismatch");
+        }
+        return new Money(amount.add(other.amount), currency);
+    }
 }

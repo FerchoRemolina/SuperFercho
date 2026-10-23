@@ -169,6 +169,8 @@ class CloseCustomerAccountIntegrationTest {
         assertThat(count("select count(*) from shopping.favorites where customer_id = ?", customerId)).isZero();
         assertThat(count("select count(*) from shopping.shopping_lists where customer_id = ?", customerId))
                 .isZero();
+        assertThat(count("select count(*) from shopping.cart_add_operations where customer_id = ?", customerId))
+                .isZero();
         assertThat(count(
                         "select count(*) from orders.checkout_idempotency where customer_id = ?",
                         customerId))
@@ -182,6 +184,10 @@ class CloseCustomerAccountIntegrationTest {
         assertThat(count("select count(*) from shopping.carts where customer_id = ?", otherCustomerId))
                 .isEqualTo(1);
         assertThat(count("select count(*) from shopping.favorites where customer_id = ?", otherCustomerId))
+                .isEqualTo(1);
+        assertThat(count(
+                        "select count(*) from shopping.cart_add_operations where customer_id = ?",
+                        otherCustomerId))
                 .isEqualTo(1);
 
         closeCustomerAccountUseCase.execute();
@@ -267,6 +273,17 @@ class CloseCustomerAccountIntegrationTest {
                 listId,
                 customerId,
                 java.sql.Timestamp.from(NOW),
+                java.sql.Timestamp.from(NOW));
+        jdbcTemplate.update(
+                """
+                insert into shopping.cart_add_operations (
+                    id, operation_id, customer_id, product_id, quantity, created_at)
+                values (?, ?, ?, ?, 2, ?)
+                """,
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                customerId,
+                productId,
                 java.sql.Timestamp.from(NOW));
         jdbcTemplate.update(
                 """
