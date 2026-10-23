@@ -10,6 +10,8 @@ public interface PendingSensitiveActionStore {
 
     Optional<PendingSensitiveAction> findByToken(String token);
 
+    Optional<PendingSensitiveAction> findByUserId(UUID userId);
+
     void delete(String token);
 
     void deleteByUserId(UUID userId);

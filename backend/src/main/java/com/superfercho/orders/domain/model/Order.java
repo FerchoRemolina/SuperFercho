@@ -201,7 +201,11 @@ public final class Order {
     }
 
     public boolean isCustomerCancellable(Instant currentTime) {
-        requireNonNull(currentTime, "currentTime");
+        return isCustomerCancellable(status, confirmedAt, currentTime);
+    }
+
+    public static boolean isCustomerCancellable(OrderStatus status, Instant confirmedAt, Instant currentTime) {
+        requireStaticNonNull(currentTime, "currentTime");
         if (status != OrderStatus.CONFIRMED || confirmedAt == null) {
             return false;
         }

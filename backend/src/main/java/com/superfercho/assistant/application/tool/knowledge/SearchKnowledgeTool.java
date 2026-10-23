@@ -27,7 +27,7 @@ public final class SearchKnowledgeTool implements AssistantTool {
 
     @Override
     public String description() {
-        return "Search documentary knowledge such as recipes and guides. Not a source of prices or stock.";
+        return "Search supermarket documentary knowledge such as store hours, policies, and shopping guides. Not a source of recipes, prices, stock, payments, or order status.";
     }
 
     @Override

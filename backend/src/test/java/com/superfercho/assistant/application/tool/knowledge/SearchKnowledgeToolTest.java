@@ -1,5 +1,6 @@
 package com.superfercho.assistant.application.tool.knowledge;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -20,6 +21,19 @@ class SearchKnowledgeToolTest {
 
     @Mock
     private SearchKnowledgeUseCase searchKnowledgeUseCase;
+
+    @Test
+    void descriptionDoesNotInviteRecipesOrTransactionalData() {
+        String description = new SearchKnowledgeTool(searchKnowledgeUseCase).description().toLowerCase();
+
+        assertTrue(description.contains("supermarket"));
+        assertTrue(description.contains("not a source of recipes"));
+        assertTrue(description.contains("prices"));
+        assertTrue(description.contains("stock"));
+        assertTrue(description.contains("payments"));
+        assertTrue(description.contains("order status"));
+        assertFalse(description.contains("such as recipes"));
+    }
 
     @Test
     void delegatesToSearchKnowledgeUseCase() {

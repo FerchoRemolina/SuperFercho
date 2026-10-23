@@ -396,6 +396,9 @@ class OrderTest {
                 .startPreparation(CREATED_AT.plusSeconds(120))
                 .isCustomerCancellable(CREATED_AT.plusSeconds(120)));
         assertFalse(confirmed.cancel(CREATED_AT).isCustomerCancellable(CREATED_AT));
+        assertTrue(Order.isCustomerCancellable(OrderStatus.CONFIRMED, CREATED_AT, WITHIN_WINDOW));
+        assertFalse(Order.isCustomerCancellable(OrderStatus.PREPARING, CREATED_AT, WITHIN_WINDOW));
+        assertFalse(Order.isCustomerCancellable(OrderStatus.CONFIRMED, CREATED_AT, AFTER_DEADLINE));
     }
 
     @Test

@@ -22,6 +22,14 @@ public final class InMemoryPendingSensitiveActionStore implements PendingSensiti
     }
 
     @Override
+    public Optional<PendingSensitiveAction> findByUserId(UUID userId) {
+        if (userId == null) {
+            return Optional.empty();
+        }
+        return byToken.values().stream().filter(action -> userId.equals(action.userId())).findFirst();
+    }
+
+    @Override
     public void delete(String token) {
         byToken.remove(token);
     }
