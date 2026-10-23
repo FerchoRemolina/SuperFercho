@@ -1,5 +1,8 @@
 package com.superfercho.assistant.application.tool.shopping;
 
+import com.superfercho.assistant.application.port.out.ClockPort;
+import com.superfercho.assistant.application.port.out.CurrentUserProvider;
+import com.superfercho.assistant.application.port.out.PackageSelectionProposalStore;
 import com.superfercho.assistant.application.tool.AssistantTool;
 import com.superfercho.shopping.application.port.in.AddProductToCartUseCase;
 import com.superfercho.shopping.application.port.in.AddProductToShoppingListUseCase;
@@ -26,10 +29,14 @@ public final class ShoppingAssistantTools {
             AddProductToCartUseCase addProductToCartUseCase,
             ChangeCartItemQuantityUseCase changeCartItemQuantityUseCase,
             RemoveProductFromCartUseCase removeProductFromCartUseCase,
-            ClearCartUseCase clearCartUseCase) {
+            ClearCartUseCase clearCartUseCase,
+            CurrentUserProvider currentUserProvider,
+            ClockPort clockPort,
+            PackageSelectionProposalStore packageSelectionProposalStore) {
         return List.of(
                 new GetCartTool(getCartUseCase),
-                new AddCartItemTool(addProductToCartUseCase),
+                new AddCartItemTool(
+                        addProductToCartUseCase, currentUserProvider, clockPort, packageSelectionProposalStore),
                 new ChangeCartItemQuantityTool(changeCartItemQuantityUseCase),
                 new RemoveCartItemTool(removeProductFromCartUseCase),
                 new ClearCartTool(clearCartUseCase));

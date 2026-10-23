@@ -3,11 +3,14 @@ package com.superfercho.assistant.application.tool;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
+import com.superfercho.assistant.application.port.out.ClockPort;
 import com.superfercho.assistant.application.port.out.CurrentUserProvider;
+import com.superfercho.assistant.application.port.out.PackageSelectionProposalStore;
 import com.superfercho.assistant.application.port.out.PendingSensitiveActionStore;
 import com.superfercho.catalog.application.usecase.GetProductUseCase;
 import com.superfercho.catalog.application.usecase.ListCategoriesUseCase;
 import com.superfercho.catalog.application.usecase.ListProductsUseCase;
+import com.superfercho.catalog.application.usecase.ResolveProductQuantityEquivalenceUseCase;
 import com.superfercho.catalog.application.usecase.SearchProductsUseCase;
 import com.superfercho.identity.application.usecase.ListAddressesUseCase;
 import com.superfercho.knowledge.application.usecase.SearchKnowledgeUseCase;
@@ -32,13 +35,14 @@ import org.junit.jupiter.api.Test;
 
 class AssistantToolAllowlistGuardTest {
 
-    private static final int EXPECTED_TOOL_COUNT = 24;
+    private static final int EXPECTED_TOOL_COUNT = 25;
 
     private static final List<String> EXPECTED_TOOL_NAMES = List.of(
             "search_products",
             "get_product",
             "list_products",
             "list_categories",
+            "resolve_quantity_equivalence",
             "get_cart",
             "add_cart_item",
             "change_cart_item_quantity",
@@ -74,6 +78,7 @@ class AssistantToolAllowlistGuardTest {
         return AssistantToolAllowlist.create(
                 mock(SearchProductsUseCase.class),
                 mock(GetProductUseCase.class),
+                mock(ResolveProductQuantityEquivalenceUseCase.class),
                 mock(ListProductsUseCase.class),
                 mock(ListCategoriesUseCase.class),
                 mock(GetCartUseCase.class),
@@ -93,7 +98,9 @@ class AssistantToolAllowlistGuardTest {
                 mock(ListOrdersUseCase.class),
                 mock(GetOrderUseCase.class),
                 mock(CurrentUserProvider.class),
+                mock(ClockPort.class),
                 mock(PendingSensitiveActionStore.class),
+                mock(PackageSelectionProposalStore.class),
                 mock(ListAddressesUseCase.class),
                 mock(SearchKnowledgeUseCase.class));
     }
@@ -108,7 +115,11 @@ class AssistantToolAllowlistGuardTest {
                 .toList();
 
         assertThat(publicNames).containsExactlyInAnyOrder(
-                "search_products", "get_product", "list_products", "list_categories");
+                "search_products",
+                "get_product",
+                "list_products",
+                "list_categories",
+                "resolve_quantity_equivalence");
         assertThat(registry.allowlist())
                 .allSatisfy(tool -> assertThat(tool.access()).isIn(ToolAccess.PUBLIC, ToolAccess.CUSTOMER));
     }

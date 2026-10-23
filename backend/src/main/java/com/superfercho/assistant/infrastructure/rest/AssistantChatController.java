@@ -2,6 +2,7 @@ package com.superfercho.assistant.infrastructure.rest;
 
 import com.superfercho.assistant.application.dto.chat.ChatCommand;
 import com.superfercho.assistant.application.dto.chat.ExplicitConfirmation;
+import com.superfercho.assistant.application.dto.chat.PackageSelection;
 import com.superfercho.assistant.application.port.in.ChatUseCase;
 import com.superfercho.assistant.infrastructure.rest.dto.ChatRequest;
 import com.superfercho.assistant.infrastructure.rest.dto.ChatRestResponse;
@@ -27,7 +28,14 @@ public class AssistantChatController {
         ExplicitConfirmation confirmation = request.confirmation() == null
                 ? null
                 : new ExplicitConfirmation(request.confirmation().token());
+        PackageSelection packageSelection = request.packageSelection() == null
+                ? null
+                : new PackageSelection(
+                        request.packageSelection().proposalId(),
+                        request.packageSelection().packageCount() == null
+                                ? 0
+                                : request.packageSelection().packageCount());
         return ChatRestResponse.from(chatUseCase.execute(new ChatCommand(
-                request.conversationId(), request.message(), confirmation)));
+                request.conversationId(), request.message(), confirmation, packageSelection)));
     }
 }

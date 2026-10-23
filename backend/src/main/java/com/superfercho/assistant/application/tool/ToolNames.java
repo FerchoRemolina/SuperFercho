@@ -6,6 +6,7 @@ public final class ToolNames {
     public static final String GET_PRODUCT = "get_product";
     public static final String LIST_PRODUCTS = "list_products";
     public static final String LIST_CATEGORIES = "list_categories";
+    public static final String RESOLVE_QUANTITY_EQUIVALENCE = "resolve_quantity_equivalence";
 
     public static final String GET_CART = "get_cart";
     public static final String ADD_CART_ITEM = "add_cart_item";

@@ -1,4 +1,8 @@
-import type { ChatRequest, ChatRestResponse } from "@/features/assistant/api";
+import type {
+  ChatRequest,
+  ChatRestResponse,
+  PackageProposal,
+} from "@/features/assistant/api";
 import type { PendingConfirmation } from "@/features/assistant/presentation";
 
 export function messageChatBody(
@@ -21,6 +25,17 @@ export function confirmationChatBody(
   };
 }
 
+export function packageSelectionChatBody(
+  conversationId: string,
+  proposalId: string,
+  packageCount: number,
+): ChatRequest {
+  return {
+    conversationId,
+    packageSelection: { proposalId, packageCount },
+  };
+}
+
 export function pendingFromResponse(
   response: ChatRestResponse,
 ): PendingConfirmation | null {
@@ -35,4 +50,14 @@ export function pendingFromResponse(
     };
   }
   return null;
+}
+
+export function packageProposalFromResponse(
+  response: ChatRestResponse,
+): PackageProposal | null {
+  const proposal = response.packageProposal;
+  if (!proposal || !proposal.proposalId || proposal.options.length === 0) {
+    return null;
+  }
+  return proposal;
 }

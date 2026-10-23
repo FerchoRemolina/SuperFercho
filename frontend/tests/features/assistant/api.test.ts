@@ -3,6 +3,8 @@ import { postAssistantChat } from "@/features/assistant/api";
 import {
   confirmationChatBody,
   messageChatBody,
+  packageProposalFromResponse,
+  packageSelectionChatBody,
   pendingFromResponse,
 } from "@/features/assistant/chat-request";
 import {
@@ -156,6 +158,54 @@ describe("assistant api", () => {
     });
   });
 
+  it("posts packageSelection through /assistant/chat without userId", async () => {
+    configureSessionPersistence(new MemoryPersistence());
+    setSession({
+      userId: "11111111-1111-1111-1111-111111111111",
+      role: "CUSTOMER",
+      accessToken: "access-token",
+      expiresAt: "2099-01-01T00:00:00Z",
+    });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          conversationId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          assistantMessage: "Agregué 2 paquete(s)",
+          awaitingConfirmation: false,
+          confirmationToken: null,
+          confirmationType: null,
+          packageProposal: null,
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await postAssistantChat(
+      packageSelectionChatBody(
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "cccccccc-cccc-cccc-cccc-cccccccccccc",
+        2,
+      ),
+    );
+
+    const sent = JSON.parse(
+      String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body),
+    ) as Record<string, unknown>;
+    expect(sent).toEqual({
+      conversationId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      packageSelection: {
+        proposalId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+        packageCount: 2,
+      },
+    });
+    expect(sent).not.toHaveProperty("userId");
+    expect(sent).not.toHaveProperty("confirmation");
+  });
+
   it("surfaces LLM_PROVIDER_FAILED without inventing a fake assistant reply", async () => {
     configureSessionPersistence(new MemoryPersistence());
     setSession({
@@ -207,6 +257,77 @@ describe("assistant chat request helpers", () => {
         awaitingConfirmation: false,
         confirmationToken: null,
         confirmationType: null,
+      }),
+    ).toBeNull();
+  });
+
+  it("sends packageSelection without confirmation, message, or userId", () => {
+    expect(
+      packageSelectionChatBody(
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "cccccccc-cccc-cccc-cccc-cccccccccccc",
+        2,
+      ),
+    ).toEqual({
+      conversationId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      packageSelection: {
+        proposalId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+        packageCount: 2,
+      },
+    });
+    expect(
+      packageSelectionChatBody(
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "cccccccc-cccc-cccc-cccc-cccccccccccc",
+        2,
+      ),
+    ).not.toHaveProperty("confirmation");
+    expect(
+      packageSelectionChatBody(
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "cccccccc-cccc-cccc-cccc-cccccccccccc",
+        2,
+      ),
+    ).not.toHaveProperty("message");
+    expect(
+      packageSelectionChatBody(
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "cccccccc-cccc-cccc-cccc-cccccccccccc",
+        2,
+      ),
+    ).not.toHaveProperty("userId");
+  });
+
+  it("replaces chips from packageProposal and clears them when the field is absent", () => {
+    expect(
+      packageProposalFromResponse({
+        conversationId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        assistantMessage: "Elige",
+        awaitingConfirmation: false,
+        confirmationToken: null,
+        confirmationType: null,
+        packageProposal: {
+          proposalId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          productId: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+          productName: "Arroz",
+          presentationQuantity: "1.000",
+          presentationUnit: "KG",
+          requestedQuantity: "2.300",
+          requestedUnit: "KG",
+          options: [
+            { packageCount: 2, physicalTotalBase: "2000.000", baseUnit: "G" },
+          ],
+        },
+      })?.proposalId,
+    ).toBe("cccccccc-cccc-cccc-cccc-cccccccccccc");
+    expect(
+      packageProposalFromResponse({
+        conversationId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        assistantMessage: "Listo",
+        awaitingConfirmation: false,
+        confirmationToken: null,
+        confirmationType: null,
+        packageProposal: null,
       }),
     ).toBeNull();
   });

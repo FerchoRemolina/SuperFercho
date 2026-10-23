@@ -1,14 +1,17 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   postAssistantChat,
   type ChatRestResponse,
+  type PackageProposal,
 } from "@/features/assistant/api";
 import {
   confirmationChatBody,
   messageChatBody,
+  packageProposalFromResponse,
+  packageSelectionChatBody,
   pendingFromResponse,
 } from "@/features/assistant/chat-request";
 import { invalidateAfterAssistantChat } from "@/features/assistant/invalidate";
@@ -17,14 +20,68 @@ import {
   confirmationDescription,
   confirmationTitle,
   nextMessageId,
+  packageOptionLabel,
+  packageProposalTitle,
   type ChatThreadMessage,
   type PendingConfirmation,
 } from "@/features/assistant/presentation";
-import { isApiError } from "@/shared/errors/api-problem";
+import { isApiError, type ApiProblem } from "@/shared/errors/api-problem";
 import { messageForApiProblem } from "@/shared/errors/messages";
 import { Alert } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { Container } from "@/shared/ui/container";
+
+/** La autoridad del vencimiento siempre es el backend (pausedUntil/remainingSeconds). */
+type FerchoPause = {
+  code: "FERCHO_PAUSED" | "FERCHO_SUSPENDED" | "FERCHO_UNAVAILABLE";
+  message: string;
+  /** Milisegundo absoluto (Date.now) estimado de vencimiento; null = sin dato. */
+  expiresAtMs: number | null;
+};
+
+function pauseRemainingSeconds(
+  pause: FerchoPause,
+  nowMs: number,
+): number | null {
+  if (pause.code === "FERCHO_SUSPENDED" || pause.code === "FERCHO_UNAVAILABLE") {
+    return null;
+  }
+  if (pause.expiresAtMs === null) {
+    return null;
+  }
+  return Math.max(0, Math.ceil((pause.expiresAtMs - nowMs) / 1000));
+}
+
+function formatRemaining(totalSeconds: number): string {
+  const safe = Math.max(0, Math.floor(totalSeconds));
+  const minutes = Math.floor(safe / 60);
+  const seconds = safe % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function ferchoPauseFromError(problem: ApiProblem): FerchoPause | null {
+  if (
+    problem.code !== "FERCHO_PAUSED" &&
+    problem.code !== "FERCHO_SUSPENDED" &&
+    problem.code !== "FERCHO_UNAVAILABLE"
+  ) {
+    return null;
+  }
+  const rawSeconds = problem.properties?.["remainingSeconds"];
+  const pausedUntilRaw = problem.properties?.["pausedUntil"];
+  const pausedUntilMs =
+    typeof pausedUntilRaw === "string" ? Date.parse(pausedUntilRaw) : Number.NaN;
+  const expiresAtMs = Number.isNaN(pausedUntilMs)
+    ? typeof rawSeconds === "number" && Number.isFinite(rawSeconds) && rawSeconds >= 0
+      ? Date.now() + rawSeconds * 1000
+      : null
+    : pausedUntilMs;
+  return {
+    code: problem.code,
+    message: messageForApiProblem(problem),
+    expiresAtMs,
+  };
+}
 
 export function AssistantChat() {
   const queryClient = useQueryClient();
@@ -34,8 +91,27 @@ export function AssistantChat() {
   const [draft, setDraft] = useState("");
   const [pendingConfirmation, setPendingConfirmation] =
     useState<PendingConfirmation | null>(null);
+  const [packageProposal, setPackageProposal] =
+    useState<PackageProposal | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [pause, setPause] = useState<FerchoPause | null>(null);
+  const [nowTick, setNowTick] = useState(() => Date.now());
+
+  const pauseSecondsLeft =
+    pause === null
+      ? null
+      : pauseRemainingSeconds(pause, nowTick);
+
+  useEffect(() => {
+    if (pause === null || pauseSecondsLeft === null) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setNowTick(Date.now());
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [pause, pauseSecondsLeft]);
 
   function resetConversation() {
     if (sending) {
@@ -45,6 +121,7 @@ export function AssistantChat() {
     setMessages([]);
     setDraft("");
     setPendingConfirmation(null);
+    setPackageProposal(null);
     setError(null);
   }
 
@@ -63,6 +140,7 @@ export function AssistantChat() {
     ];
     setMessages(withAssistant);
     setPendingConfirmation(pendingFromResponse(response));
+    setPackageProposal(packageProposalFromResponse(response));
     invalidateAfterAssistantChat(queryClient);
   }
 
@@ -89,6 +167,14 @@ export function AssistantChat() {
       );
       applyAssistantResponse(response, withUser);
     } catch (caught) {
+      if (isApiError(caught)) {
+        const pause = ferchoPauseFromError(caught.problem);
+        if (pause !== null) {
+          setPause(pause);
+          setError(pause.message);
+          return;
+        }
+      }
       setError(
         isApiError(caught)
           ? messageForApiProblem(caught.problem)
@@ -126,6 +212,32 @@ export function AssistantChat() {
       return;
     }
     setPendingConfirmation(null);
+  }
+
+  async function selectPackage(packageCount: number) {
+    if (!packageProposal || !conversationId || sending || pendingConfirmation) {
+      return;
+    }
+    setError(null);
+    setSending(true);
+    try {
+      const response = await postAssistantChat(
+        packageSelectionChatBody(
+          conversationId,
+          packageProposal.proposalId,
+          packageCount,
+        ),
+      );
+      applyAssistantResponse(response, messages);
+    } catch (caught) {
+      setError(
+        isApiError(caught)
+          ? messageForApiProblem(caught.problem)
+          : "No se pudo agregar esa cantidad de paquetes.",
+      );
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -182,11 +294,64 @@ export function AssistantChat() {
           ) : null}
         </div>
 
-        {error ? (
+        {pause ? (
+          <div className="border-t border-sf-border px-4 py-3 md:px-6">
+            <Alert
+              tone={pause.code === "FERCHO_PAUSED" ? "warning" : "error"}
+              title={
+                pause.code === "FERCHO_SUSPENDED"
+                  ? "Fercho suspendido temporalmente"
+                  : pause.code === "FERCHO_UNAVAILABLE"
+                    ? "Fercho no disponible"
+                    : "Fercho está descansando"
+              }
+            >
+              <p>{pause.message}</p>
+              {pauseSecondsLeft !== null && pauseSecondsLeft > 0 ? (
+                <p className="mt-1 text-sm font-semibold tabular-nums">
+                  Podrás escribirme de nuevo en{" "}
+                  {formatRemaining(pauseSecondsLeft)}.
+                </p>
+              ) : null}
+              {pause.code !== "FERCHO_PAUSED" ? (
+                <p className="mt-1 text-sm">
+                  El resto de la tienda sigue funcionando con normalidad.
+                </p>
+              ) : null}
+            </Alert>
+          </div>
+        ) : null}
+
+        {error && pause === null ? (
           <div className="border-t border-sf-border px-4 py-3 md:px-6">
             <Alert tone="error" title="No se pudo completar">
               {error}
             </Alert>
+          </div>
+        ) : null}
+
+        {packageProposal && !pendingConfirmation ? (
+          <div className="border-t border-sf-border px-4 py-4 md:px-6">
+            <p className="text-sm font-semibold text-sf-ink">
+              {packageProposalTitle(packageProposal)}
+            </p>
+            <p className="mt-1 text-sm text-sf-muted">
+              Elige un número de paquetes. Un «sí» por chat no agrega al
+              carrito.
+            </p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              {packageProposal.options.map((option) => (
+                <Button
+                  key={`${packageProposal.proposalId}-${option.packageCount}`}
+                  type="button"
+                  variant="secondary"
+                  disabled={sending}
+                  onClick={() => void selectPackage(option.packageCount)}
+                >
+                  {packageOptionLabel(option)}
+                </Button>
+              ))}
+            </div>
           </div>
         ) : null}
 
@@ -246,6 +411,7 @@ export function AssistantChat() {
             disabled={
               sending ||
               pendingConfirmation !== null ||
+              (pause !== null && pauseSecondsLeft !== null && pauseSecondsLeft > 0) ||
               draft.trim().length === 0
             }
           >

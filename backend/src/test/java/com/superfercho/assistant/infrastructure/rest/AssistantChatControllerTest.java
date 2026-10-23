@@ -12,6 +12,15 @@ import com.superfercho.assistant.application.confirmation.SensitiveActionType;
 import com.superfercho.assistant.application.dto.chat.ChatCommand;
 import com.superfercho.assistant.application.dto.chat.ChatResponse;
 import com.superfercho.assistant.application.dto.chat.ExplicitConfirmation;
+import com.superfercho.assistant.application.dto.chat.PackageProposalOptionView;
+import com.superfercho.assistant.application.dto.chat.PackageProposalView;
+import com.superfercho.assistant.application.dto.chat.PackageSelection;
+import com.superfercho.assistant.application.exception.FerchoPausedException;
+import com.superfercho.assistant.application.exception.InvalidPackageSelectionException;
+import com.superfercho.catalog.domain.model.PresentationUnit;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
 import com.superfercho.assistant.application.exception.ConversationNotFoundException;
 import com.superfercho.assistant.application.exception.InvalidChatRequestException;
 import com.superfercho.assistant.application.exception.InvalidConfirmationException;
@@ -177,6 +186,32 @@ class AssistantChatControllerTest {
     }
 
     @Test
+    void shouldMapPauseWithReadableUtf8Detail() throws Exception {
+        Instant pausedUntil = Instant.parse("2026-01-01T00:30:00Z");
+        when(chatUseCase.execute(any()))
+                .thenThrow(new FerchoPausedException(
+                        "FERCHO_PAUSED",
+                        "Fercho est\u00e1 tomando un descanso. Int\u00e9ntalo m\u00e1s tarde.",
+                        1800,
+                        pausedUntil));
+
+        mockMvc.perform(post("/api/v1/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "message": "hola"
+                                }
+                                """))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("FERCHO_PAUSED"))
+                .andExpect(jsonPath("$.detail").value("Fercho est\u00e1 tomando un descanso. Int\u00e9ntalo m\u00e1s tarde."))
+                .andExpect(jsonPath("$.detail").value(Matchers.not(Matchers.containsString("\u00c3"))))
+                .andExpect(jsonPath("$.remainingSeconds").value(1800))
+                .andExpect(jsonPath("$.pausedUntil").value(pausedUntil.toString()));
+    }
+
+    @Test
     void shouldMapMissingConversationToNotFound() throws Exception {
         when(chatUseCase.execute(any())).thenThrow(new ConversationNotFoundException());
 
@@ -257,6 +292,115 @@ class AssistantChatControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.code").value("INVALID_TOOL_ARGUMENTS"));
+    }
+
+    @Test
+    void shouldForwardPackageSelectionWithoutInvokingConfirmation() throws Exception {
+        UUID proposalId = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        when(chatUseCase.execute(any()))
+                .thenReturn(new ChatResponse(
+                        CONVERSATION_ID,
+                        "Agregué 2 paquete(s) de Arroz (1 KG) al carrito.",
+                        false,
+                        null,
+                        null,
+                        false,
+                        null));
+
+        mockMvc.perform(post("/api/v1/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "conversationId": "%s",
+                                  "packageSelection": {
+                                    "proposalId": "%s",
+                                    "packageCount": 2
+                                  }
+                                }
+                                """.formatted(CONVERSATION_ID, proposalId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.packageProposal").value(Matchers.nullValue()))
+                .andExpect(jsonPath("$.awaitingConfirmation").value(false));
+
+        verify(chatUseCase)
+                .execute(new ChatCommand(CONVERSATION_ID, null, null, new PackageSelection(proposalId, 2)));
+    }
+
+    @Test
+    void shouldRejectCombinedConfirmationAndPackageSelection() throws Exception {
+        when(chatUseCase.execute(any()))
+                .thenThrow(new InvalidChatRequestException("a turn cannot combine confirmation and packageSelection"));
+
+        mockMvc.perform(post("/api/v1/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "conversationId": "%s",
+                                  "confirmation": { "token": "%s" },
+                                  "packageSelection": {
+                                    "proposalId": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                                    "packageCount": 2
+                                  }
+                                }
+                                """.formatted(CONVERSATION_ID, CONFIRMATION_TOKEN)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_CHAT_REQUEST"));
+    }
+
+    @Test
+    void shouldMapInvalidPackageSelectionWithoutLeakingOwnership() throws Exception {
+        when(chatUseCase.execute(any()))
+                .thenThrow(new InvalidPackageSelectionException("package selection does not belong to the authenticated user"));
+
+        mockMvc.perform(post("/api/v1/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "packageSelection": {
+                                    "proposalId": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                                    "packageCount": 2
+                                  }
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_PACKAGE_SELECTION"))
+                .andExpect(jsonPath("$.detail").value("Invalid package selection"))
+                .andExpect(content().string(Matchers.not(Matchers.containsString("does not belong"))));
+    }
+
+    @Test
+    void shouldExposePackageProposalChipsOnTextResponses() throws Exception {
+        UUID proposalId = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        UUID productId = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
+        when(chatUseCase.execute(any()))
+                .thenReturn(new ChatResponse(
+                        CONVERSATION_ID,
+                        "Elige paquetes",
+                        false,
+                        null,
+                        null,
+                        false,
+                        new PackageProposalView(
+                                proposalId,
+                                productId,
+                                "Arroz",
+                                new BigDecimal("1.000"),
+                                PresentationUnit.KG,
+                                new BigDecimal("2.300"),
+                                PresentationUnit.KG,
+                                List.of(new PackageProposalOptionView(
+                                        2, new BigDecimal("2000.000"), PresentationUnit.G)))));
+
+        mockMvc.perform(post("/api/v1/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "message": "quiero 2.3 kg de arroz"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.packageProposal.proposalId").value(proposalId.toString()))
+                .andExpect(jsonPath("$.packageProposal.options[0].packageCount").value(2));
     }
 
     @Test

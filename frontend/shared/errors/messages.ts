@@ -78,6 +78,8 @@ export function messageForApiProblem(problem: ApiProblem): string {
       return "El mensaje no es válido. Revisa el texto e inténtalo de nuevo.";
     case "INVALID_CONFIRMATION":
       return "La confirmación ya no es válida. Vuelve a solicitar la acción con Fercho.";
+    case "INVALID_PACKAGE_SELECTION":
+      return "Esa selección de paquetes ya no es válida. Vuelve a pedir la cantidad a Fercho.";
     case "CONVERSATION_NOT_FOUND":
       return "No encontramos esa conversación. Inicia una nueva.";
     case "LLM_PROVIDER_FAILED":
@@ -102,6 +104,12 @@ export function messageForApiProblem(problem: ApiProblem): string {
       return "Revisa los datos del contenido de la tienda.";
     case "STOREFRONT_CONTENT_NOT_FOUND":
       return "No encontramos ese contenido de la tienda.";
+    case "FERCHO_PAUSED":
+      return "¡Uy, creo que me estoy cansando! 😅 Hemos hablado bastante. Dame un respiro y volvemos a conversar cuando termine mi pausa. ¡Aquí te espero para ayudarte con tus compras! 🛒";
+    case "FERCHO_SUSPENDED":
+      return "Tu acceso a Fercho está suspendido temporalmente. Pronto volveré a estar disponible para ayudarte.";
+    case "FERCHO_UNAVAILABLE":
+      return "Fercho no puede atender mensajes en este momento. Inténtalo más tarde mientras sigues usando la tienda.";
     case "INTERNAL_ERROR":
       return "Ocurrió un error interno. Inténtalo más tarde.";
     default:

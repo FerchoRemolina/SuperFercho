@@ -7,6 +7,7 @@ import com.superfercho.assistant.application.tool.ToolParameter;
 import com.superfercho.assistant.application.tool.ToolResult;
 import com.superfercho.assistant.application.tool.ToolRisk;
 import com.superfercho.assistant.application.tool.ToolSchema;
+import com.superfercho.shopping.application.dto.cart.CartResponse;
 import com.superfercho.shopping.application.dto.shoppinglist.AddProductToShoppingListCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.AddShoppingListToCartCommand;
 import com.superfercho.shopping.application.dto.shoppinglist.ChangeShoppingListItemQuantityCommand;
@@ -231,7 +232,11 @@ final class ChangeShoppingListItemQuantityTool implements AssistantTool {
         return ToolSchema.of(
                 new ToolParameter("shoppingListId", "uuid", true, "Shopping list id"),
                 new ToolParameter("productId", "uuid", true, "Product id"),
-                new ToolParameter("quantity", "integer", true, "Quantity greater than 0"));
+                new ToolParameter(
+                        "quantity",
+                        "integer",
+                        true,
+                        "Quantity greater than or equal to 0. Zero keeps the product on the list without including it in a purchase."));
     }
 
     @Override
@@ -245,7 +250,7 @@ final class ChangeShoppingListItemQuantityTool implements AssistantTool {
                 new ChangeShoppingListItemQuantityCommand(
                         arguments.requireUuid("shoppingListId"),
                         arguments.requireUuid("productId"),
-                        arguments.requirePositiveInt("quantity")))));
+                        arguments.requireNonNegativeInt("quantity")))));
     }
 }
 
@@ -337,7 +342,7 @@ final class AddShoppingListToCartTool implements AssistantTool {
 
     @Override
     public String description() {
-        return "Add every product from a shopping list into the authenticated customer's cart.";
+        return "Add purchasable items from a shopping list into the authenticated customer's cart immediately. This updates the cart now; it is not a placed order. Items with quantity 0 stay on the list and are not added. Reversible with cart tools; no extra confirmation.";
     }
 
     @Override
@@ -352,7 +357,11 @@ final class AddShoppingListToCartTool implements AssistantTool {
 
     @Override
     public ToolResult execute(ToolArguments arguments) {
-        return ToolResult.success(String.valueOf(addShoppingListToCartUseCase.execute(
-                new AddShoppingListToCartCommand(arguments.requireUuid("shoppingListId")))));
+        CartResponse cart = addShoppingListToCartUseCase.execute(
+                new AddShoppingListToCartCommand(arguments.requireUuid("shoppingListId")));
+        return ToolResult.success(
+                "Cart updated immediately from the shopping list; this is not a placed order. "
+                        + "Items with quantity 0 stay on the list and were not added. cart="
+                        + cart);
     }
 }

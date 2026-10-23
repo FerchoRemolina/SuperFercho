@@ -1,4 +1,8 @@
-import type { SensitiveActionType } from "@/features/assistant/api";
+import type {
+  PackageProposal,
+  PackageProposalOption,
+  SensitiveActionType,
+} from "@/features/assistant/api";
 
 export type ChatThreadMessage = {
   id: string;
@@ -36,6 +40,14 @@ export function confirmationConfirmLabel(type: SensitiveActionType): string {
     case "CANCEL_ORDER":
       return "Confirmar cancelación";
   }
+}
+
+export function packageProposalTitle(proposal: PackageProposal): string {
+  return `Elige paquetes de ${proposal.productName}`;
+}
+
+export function packageOptionLabel(option: PackageProposalOption): string {
+  return `${option.packageCount} paquete(s) · ${option.physicalTotalBase} ${option.baseUnit}`;
 }
 
 export function nextMessageId(

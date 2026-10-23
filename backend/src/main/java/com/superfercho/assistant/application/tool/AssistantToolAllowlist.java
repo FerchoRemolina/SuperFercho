@@ -1,10 +1,13 @@
 package com.superfercho.assistant.application.tool;
 
+import com.superfercho.assistant.application.port.out.ClockPort;
 import com.superfercho.assistant.application.port.out.CurrentUserProvider;
+import com.superfercho.assistant.application.port.out.PackageSelectionProposalStore;
 import com.superfercho.assistant.application.port.out.PendingSensitiveActionStore;
 import com.superfercho.assistant.application.tool.catalog.GetProductTool;
 import com.superfercho.assistant.application.tool.catalog.ListCategoriesTool;
 import com.superfercho.assistant.application.tool.catalog.ListProductsTool;
+import com.superfercho.assistant.application.tool.catalog.ResolveQuantityEquivalenceTool;
 import com.superfercho.assistant.application.tool.catalog.SearchProductsTool;
 import com.superfercho.assistant.application.tool.identity.ListAddressesTool;
 import com.superfercho.assistant.application.tool.knowledge.SearchKnowledgeTool;
@@ -15,6 +18,7 @@ import com.superfercho.assistant.application.tool.shopping.ShoppingAssistantTool
 import com.superfercho.catalog.application.usecase.GetProductUseCase;
 import com.superfercho.catalog.application.usecase.ListCategoriesUseCase;
 import com.superfercho.catalog.application.usecase.ListProductsUseCase;
+import com.superfercho.catalog.application.usecase.ResolveProductQuantityEquivalenceUseCase;
 import com.superfercho.catalog.application.usecase.SearchProductsUseCase;
 import com.superfercho.identity.application.usecase.ListAddressesUseCase;
 import com.superfercho.knowledge.application.usecase.SearchKnowledgeUseCase;
@@ -44,6 +48,7 @@ public final class AssistantToolAllowlist {
     public static ToolRegistry create(
             SearchProductsUseCase searchProductsUseCase,
             GetProductUseCase getProductUseCase,
+            ResolveProductQuantityEquivalenceUseCase resolveProductQuantityEquivalenceUseCase,
             ListProductsUseCase listProductsUseCase,
             ListCategoriesUseCase listCategoriesUseCase,
             GetCartUseCase getCartUseCase,
@@ -63,7 +68,9 @@ public final class AssistantToolAllowlist {
             ListOrdersUseCase listOrdersUseCase,
             GetOrderUseCase getOrderUseCase,
             CurrentUserProvider currentUserProvider,
+            ClockPort clockPort,
             PendingSensitiveActionStore pendingSensitiveActionStore,
+            PackageSelectionProposalStore packageSelectionProposalStore,
             ListAddressesUseCase listAddressesUseCase,
             SearchKnowledgeUseCase searchKnowledgeUseCase) {
         List<AssistantTool> tools = new ArrayList<>();
@@ -71,12 +78,20 @@ public final class AssistantToolAllowlist {
         tools.add(new GetProductTool(getProductUseCase));
         tools.add(new ListProductsTool(listProductsUseCase));
         tools.add(new ListCategoriesTool(listCategoriesUseCase));
+        tools.add(new ResolveQuantityEquivalenceTool(
+                resolveProductQuantityEquivalenceUseCase,
+                currentUserProvider,
+                clockPort,
+                packageSelectionProposalStore));
         tools.addAll(ShoppingAssistantTools.cart(
                 getCartUseCase,
                 addProductToCartUseCase,
                 changeCartItemQuantityUseCase,
                 removeProductFromCartUseCase,
-                clearCartUseCase));
+                clearCartUseCase,
+                currentUserProvider,
+                clockPort,
+                packageSelectionProposalStore));
         tools.addAll(ShoppingAssistantTools.lists(
                 listShoppingListsUseCase,
                 getShoppingListUseCase,
@@ -88,7 +103,7 @@ public final class AssistantToolAllowlist {
                 clearShoppingListUseCase,
                 addShoppingListToCartUseCase));
         tools.addAll(OrdersAssistantTools.query(listOrdersUseCase, getOrderUseCase));
-        tools.add(new CancelOrderTool(currentUserProvider, pendingSensitiveActionStore));
+        tools.add(new CancelOrderTool(currentUserProvider, getOrderUseCase, clockPort, pendingSensitiveActionStore));
         tools.add(new CheckoutTool(
                 currentUserProvider, getCartUseCase, getProductUseCase, pendingSensitiveActionStore));
         tools.add(new ListAddressesTool(listAddressesUseCase));

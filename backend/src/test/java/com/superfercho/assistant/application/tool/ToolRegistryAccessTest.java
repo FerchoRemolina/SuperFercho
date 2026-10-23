@@ -19,9 +19,13 @@ import com.superfercho.catalog.application.usecase.GetProductUseCase;
 import com.superfercho.catalog.application.usecase.ListCategoriesUseCase;
 import com.superfercho.catalog.application.usecase.ListProductsUseCase;
 import com.superfercho.catalog.application.usecase.SearchProductsUseCase;
+import com.superfercho.shopping.application.dto.cart.CartResponse;
 import com.superfercho.shopping.application.port.in.GetCartUseCase;
+import com.superfercho.shopping.domain.model.CartStatus;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -82,7 +86,14 @@ class ToolRegistryAccessTest {
 
     @Test
     void customerCanExecuteCustomerTool() {
-        when(getCartUseCase.execute()).thenReturn(null);
+        when(getCartUseCase.execute())
+                .thenReturn(CartResponse.of(
+                        UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                        UUID.fromString("11111111-1111-1111-1111-111111111111"),
+                        CartStatus.ACTIVE,
+                        List.of(),
+                        Instant.parse("2026-04-01T10:00:00Z"),
+                        Instant.parse("2026-04-01T10:00:00Z")));
 
         ToolResult result = registry().execute(ToolAccess.CUSTOMER, "get_cart", Map.of());
 

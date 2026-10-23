@@ -3,6 +3,7 @@ package com.superfercho.assistant.application.tool;
 import com.superfercho.assistant.application.exception.InvalidToolArgumentsException;
 import com.superfercho.platform.money.Money;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -79,6 +80,14 @@ public final class ToolArguments {
         return value;
     }
 
+    public int requireNonNegativeInt(String name) {
+        int value = requireInt(name);
+        if (value < 0) {
+            throw new InvalidToolArgumentsException(name + " must be greater than or equal to 0");
+        }
+        return value;
+    }
+
     public Optional<Integer> optionalInt(String name) {
         if (!values.containsKey(name) || values.get(name) == null) {
             return Optional.empty();
@@ -102,6 +111,28 @@ public final class ToolArguments {
         }
     }
 
+    public BigDecimal requirePositiveDecimal(String name) {
+        Object value = require(name);
+        BigDecimal decimal;
+        try {
+            decimal = toFiniteDecimal(value);
+        } catch (IllegalArgumentException exception) {
+            throw new InvalidToolArgumentsException(name + " must be a finite decimal");
+        }
+        if (decimal.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidToolArgumentsException(name + " must be greater than 0");
+        }
+        return decimal;
+    }
+
+    public String requireOneOf(String name, Set<String> allowed) {
+        String text = requireText(name).toUpperCase(Locale.ROOT);
+        if (!allowed.contains(text)) {
+            throw new InvalidToolArgumentsException(name + " must be one of " + allowed);
+        }
+        return text;
+    }
+
     public Map<String, Object> asMap() {
         return values;
     }
@@ -112,14 +143,77 @@ public final class ToolArguments {
 
     private int requireInt(String name) {
         Object value = require(name);
-        if (value instanceof Number number) {
-            return number.intValue();
-        }
         try {
-            return Integer.parseInt(String.valueOf(value));
-        } catch (NumberFormatException exception) {
+            return toExactInt(value);
+        } catch (ArithmeticException | IllegalArgumentException exception) {
             throw new InvalidToolArgumentsException(name + " must be an integer");
         }
+    }
+
+    private static int toExactInt(Object value) {
+        if (value instanceof Boolean
+                || value instanceof Map<?, ?>
+                || value instanceof Iterable<?>
+                || value instanceof UUID) {
+            throw new IllegalArgumentException("not an integer");
+        }
+        BigDecimal decimal;
+        if (value instanceof BigDecimal bigDecimal) {
+            decimal = bigDecimal;
+        } else if (value instanceof BigInteger bigInteger) {
+            decimal = new BigDecimal(bigInteger);
+        } else if (value instanceof Byte
+                || value instanceof Short
+                || value instanceof Integer
+                || value instanceof Long) {
+            decimal = BigDecimal.valueOf(((Number) value).longValue());
+        } else if (value instanceof Float || value instanceof Double) {
+            double number = ((Number) value).doubleValue();
+            if (!Double.isFinite(number)) {
+                throw new IllegalArgumentException("not an integer");
+            }
+            decimal = BigDecimal.valueOf(number);
+        } else {
+            String text = String.valueOf(value).trim();
+            if (text.isEmpty()) {
+                throw new IllegalArgumentException("not an integer");
+            }
+            decimal = new BigDecimal(text);
+        }
+        return decimal.intValueExact();
+    }
+
+    private static BigDecimal toFiniteDecimal(Object value) {
+        if (value instanceof Boolean
+                || value instanceof Map<?, ?>
+                || value instanceof Iterable<?>
+                || value instanceof UUID) {
+            throw new IllegalArgumentException("not a decimal");
+        }
+        if (value instanceof BigDecimal bigDecimal) {
+            return bigDecimal;
+        }
+        if (value instanceof BigInteger bigInteger) {
+            return new BigDecimal(bigInteger);
+        }
+        if (value instanceof Byte
+                || value instanceof Short
+                || value instanceof Integer
+                || value instanceof Long) {
+            return BigDecimal.valueOf(((Number) value).longValue());
+        }
+        if (value instanceof Float || value instanceof Double) {
+            double number = ((Number) value).doubleValue();
+            if (!Double.isFinite(number)) {
+                throw new IllegalArgumentException("not a decimal");
+            }
+            return BigDecimal.valueOf(number);
+        }
+        String text = String.valueOf(value).trim();
+        if (text.isEmpty()) {
+            throw new IllegalArgumentException("not a decimal");
+        }
+        return new BigDecimal(text);
     }
 
     private Object require(String name) {

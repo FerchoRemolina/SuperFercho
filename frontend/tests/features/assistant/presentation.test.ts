@@ -8,6 +8,8 @@ import {
   confirmationDescription,
   confirmationTitle,
   nextMessageId,
+  packageOptionLabel,
+  packageProposalTitle,
 } from "@/features/assistant/presentation";
 
 describe("assistant presentation", () => {
@@ -20,6 +22,29 @@ describe("assistant presentation", () => {
     );
     expect(confirmationDescription("CHECKOUT")).toContain("pedido");
     expect(confirmationDescription("CANCEL_ORDER")).toContain("cancelación");
+  });
+
+  it("labels package chips without reusing checkout copy", () => {
+    const proposal = {
+      proposalId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+      productId: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+      productName: "Arroz",
+      presentationQuantity: "1.000",
+      presentationUnit: "KG",
+      requestedQuantity: "2.300",
+      requestedUnit: "KG",
+      options: [
+        { packageCount: 2, physicalTotalBase: "2000.000", baseUnit: "G" },
+      ],
+    };
+    expect(packageProposalTitle(proposal)).toBe("Elige paquetes de Arroz");
+    expect(packageOptionLabel(proposal.options[0])).toBe(
+      "2 paquete(s) · 2000.000 G",
+    );
+    expect(packageProposalTitle(proposal)).not.toBe(confirmationTitle("CHECKOUT"));
+    expect(packageOptionLabel(proposal.options[0])).not.toBe(
+      confirmationConfirmLabel("CHECKOUT"),
+    );
   });
 
   it("builds stable local message ids", () => {

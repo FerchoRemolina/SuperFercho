@@ -24,9 +24,17 @@ import com.superfercho.assistant.infrastructure.conversation.InMemoryConversatio
 import com.superfercho.assistant.infrastructure.llm.FakeLlmAdapter;
 import com.superfercho.assistant.application.tool.orders.CancelOrderTool;
 import com.superfercho.assistant.application.tool.shopping.GetCartTool;
+import com.superfercho.orders.application.dto.GetOrderCommand;
+import com.superfercho.orders.application.dto.OrderResult;
+import com.superfercho.orders.application.dto.ShippingAddressResult;
 import com.superfercho.orders.application.port.in.CancelOrderUseCase;
 import com.superfercho.orders.application.port.in.CheckoutUseCase;
+import com.superfercho.orders.application.usecase.GetOrderUseCase;
+import com.superfercho.orders.domain.model.OrderStatus;
+import com.superfercho.platform.money.Money;
+import com.superfercho.shopping.application.dto.cart.CartResponse;
 import com.superfercho.shopping.application.port.in.GetCartUseCase;
+import com.superfercho.shopping.domain.model.CartStatus;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -61,21 +69,36 @@ class ChatApplicationServiceToolLoggingTest {
     @Mock
     private CancelOrderUseCase cancelOrderUseCase;
 
+    @Mock
+    private GetOrderUseCase getOrderUseCase;
+
     private FakeLlmAdapter llm;
     private InMemoryConversationStore conversations;
     private InMemoryPendingSensitiveActionStore pending;
+    private final com.superfercho.assistant.application.fercho.FerchoUsageGate ferchoUsageGate =
+            org.mockito.Mockito.mock(com.superfercho.assistant.application.fercho.FerchoUsageGate.class);
+    private final com.superfercho.assistant.application.fercho.FerchoLimits ferchoLimits =
+            new com.superfercho.assistant.application.fercho.FerchoLimits(
+                    30, java.time.Duration.ofHours(24), java.time.Duration.ofMinutes(30), java.time.Duration.ofHours(24));
     private ChatApplicationService chat;
     private ListAppender<ILoggingEvent> listAppender;
     private Logger chatLogger;
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient()
+                .when(ferchoUsageGate.evaluateAndReserve(
+                                org.mockito.ArgumentMatchers.any(),
+                                org.mockito.ArgumentMatchers.any(),
+                                org.mockito.ArgumentMatchers.any()))
+                .thenReturn(com.superfercho.assistant.application.fercho.FerchoTurnDecision.accepted(
+                        UUID.randomUUID()));
         llm = new FakeLlmAdapter();
         conversations = new InMemoryConversationStore();
         pending = new InMemoryPendingSensitiveActionStore();
         List<AssistantTool> tools = List.of(
                 new GetCartTool(getCartUseCase),
-                new CancelOrderTool(currentUserProvider, pending));
+                new CancelOrderTool(currentUserProvider, getOrderUseCase, clockPort, pending));
         chat = new ChatApplicationService(
                 currentUserProvider,
                 clockPort,
@@ -84,7 +107,12 @@ class ChatApplicationServiceToolLoggingTest {
                 llm,
                 new ToolRegistry(tools),
                 checkoutUseCase,
-                cancelOrderUseCase);
+                cancelOrderUseCase,
+                ferchoUsageGate,
+                ferchoLimits,
+                new com.superfercho.assistant.infrastructure.packagesel.InMemoryPackageSelectionProposalStore(),
+                org.mockito.Mockito.mock(com.superfercho.shopping.application.port.in.ApplyIdempotentCartAddUseCase.class),
+                org.mockito.Mockito.mock(com.superfercho.catalog.application.usecase.GetProductUseCase.class));
 
         chatLogger = (Logger) LoggerFactory.getLogger(ChatApplicationService.class);
         listAppender = new ListAppender<>();
@@ -120,7 +148,7 @@ class ChatApplicationServiceToolLoggingTest {
     void shouldLogSuccessfulToolExecution() {
         when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
         when(clockPort.currentTime()).thenReturn(NOW);
-        when(getCartUseCase.execute()).thenReturn(null);
+        when(getCartUseCase.execute()).thenReturn(emptyCart());
         llm.enqueue(LlmResponse.toolCalls(List.of(new LlmMessage.LlmToolCall("c1", "get_cart", Map.of()))));
         llm.enqueue(LlmResponse.text("Listo."));
 
@@ -154,6 +182,7 @@ class ChatApplicationServiceToolLoggingTest {
     void shouldLogConfirmationRequiredToolExecution() {
         when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
         when(clockPort.currentTime()).thenReturn(NOW);
+        when(getOrderUseCase.execute(new GetOrderCommand(ORDER_ID))).thenReturn(cancellableOrder());
         llm.enqueue(LlmResponse.toolCalls(List.of(new LlmMessage.LlmToolCall(
                 "c1", "cancel_order", Map.of("orderId", ORDER_ID.toString())))));
         llm.enqueue(LlmResponse.text("¿Confirmas la cancelación?"));
@@ -163,7 +192,7 @@ class ChatApplicationServiceToolLoggingTest {
         assertTrue(response.awaitingConfirmation());
         List<String> lines = ferchoLines();
         assertTrue(hasEvent("FERCHO_TOOL round=1 tool=cancel_order status=CONFIRMATION_REQUIRED"));
-        assertTrue(hasEvent("FERCHO_TRACE rounds=2 tools=cancel_order"));
+        assertTrue(hasEvent("FERCHO_TRACE rounds=1 tools=cancel_order"));
         assertFalse(lines.stream().anyMatch(line -> line.contains(ORDER_ID.toString())));
     }
 
@@ -171,6 +200,7 @@ class ChatApplicationServiceToolLoggingTest {
     void shouldLogMultipleRoundsAndToolTrace() {
         when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
         when(clockPort.currentTime()).thenReturn(NOW);
+        when(getCartUseCase.execute()).thenReturn(emptyCart());
         llm.enqueue(LlmResponse.toolCalls(List.of(new LlmMessage.LlmToolCall("c1", "get_cart", Map.of()))));
         llm.enqueue(LlmResponse.toolCalls(List.of(new LlmMessage.LlmToolCall("c2", "get_cart", Map.of()))));
         llm.enqueue(LlmResponse.text("Listo."));
@@ -181,5 +211,33 @@ class ChatApplicationServiceToolLoggingTest {
         assertTrue(hasEvent("FERCHO_TOOL round=1 tool=get_cart status=SUCCESS"));
         assertTrue(hasEvent("FERCHO_TOOL round=2 tool=get_cart status=SUCCESS"));
         assertTrue(hasEvent("FERCHO_TRACE rounds=3 tools=get_cart,get_cart"));
+    }
+
+    private static CartResponse emptyCart() {
+        return CartResponse.of(
+                UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                USER_ID,
+                CartStatus.ACTIVE,
+                List.of(),
+                NOW,
+                NOW);
+    }
+
+    private static OrderResult cancellableOrder() {
+        return new OrderResult(
+                ORDER_ID,
+                "SF-1",
+                USER_ID,
+                OrderStatus.CONFIRMED,
+                List.of(),
+                Money.cop(new java.math.BigDecimal("10.50")),
+                Money.cop(new java.math.BigDecimal("10.50")),
+                new ShippingAddressResult("Ada", "Calle 1", null, "Bogotá", "Cundinamarca", "300"),
+                UUID.randomUUID(),
+                NOW,
+                NOW,
+                null,
+                NOW,
+                null);
     }
 }

@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.superfercho.assistant.application.exception.InvalidToolArgumentsException;
 import com.superfercho.assistant.application.exception.ToolNotAllowedException;
 import java.util.List;
@@ -57,6 +59,21 @@ class ToolRegistryTest {
         assertThrows(InvalidToolArgumentsException.class, () -> registry.execute("echo", Map.of()));
     }
 
+    @Test
+    void shouldAcceptExactIntegerAndRejectFractionalQuantity() throws Exception {
+        ToolRegistry quantities = new ToolRegistry(List.of(new QuantityTool()));
+        ObjectMapper mapper = new ObjectMapper();
+
+        ToolResult accepted = quantities.execute(
+                "qty", mapper.readValue("{\"quantity\":3}", new TypeReference<Map<String, Object>>() {}));
+        assertTrue(accepted.success());
+        assertEquals("3", accepted.content());
+
+        Map<String, Object> fractional =
+                mapper.readValue("{\"quantity\":2.9}", new TypeReference<Map<String, Object>>() {});
+        assertThrows(InvalidToolArgumentsException.class, () -> quantities.execute("qty", fractional));
+    }
+
     private static final class EchoTool implements AssistantTool {
 
         @Override
@@ -82,6 +99,34 @@ class ToolRegistryTest {
         @Override
         public ToolResult execute(ToolArguments arguments) {
             return ToolResult.success(arguments.requireText("text"));
+        }
+    }
+
+    private static final class QuantityTool implements AssistantTool {
+
+        @Override
+        public String name() {
+            return "qty";
+        }
+
+        @Override
+        public String description() {
+            return "Quantity";
+        }
+
+        @Override
+        public ToolSchema schema() {
+            return ToolSchema.of(new ToolParameter("quantity", "integer", true, "Quantity"));
+        }
+
+        @Override
+        public ToolRisk risk() {
+            return ToolRisk.LOW_RISK;
+        }
+
+        @Override
+        public ToolResult execute(ToolArguments arguments) {
+            return ToolResult.success(String.valueOf(arguments.requirePositiveInt("quantity")));
         }
     }
 }

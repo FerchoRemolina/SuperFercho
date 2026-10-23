@@ -18,6 +18,9 @@ import com.superfercho.assistant.application.dto.llm.LlmMessage;
 import com.superfercho.assistant.application.dto.llm.LlmRequest;
 import com.superfercho.assistant.application.dto.llm.LlmResponse;
 import com.superfercho.assistant.application.dto.llm.LlmToolDefinition;
+import com.superfercho.assistant.application.fercho.FerchoLimits;
+import com.superfercho.assistant.application.fercho.FerchoTurnDecision;
+import com.superfercho.assistant.application.fercho.FerchoUsageGate;
 import com.superfercho.assistant.application.exception.ConversationNotFoundException;
 import com.superfercho.assistant.application.exception.InvalidChatRequestException;
 import com.superfercho.assistant.application.exception.InvalidConfirmationException;
@@ -51,11 +54,15 @@ import com.superfercho.knowledge.application.usecase.SearchKnowledgeUseCase;
 import com.superfercho.orders.application.dto.CancelOrderCommand;
 import com.superfercho.orders.application.dto.CheckoutCommand;
 import com.superfercho.orders.application.dto.CheckoutResult;
+import com.superfercho.orders.application.dto.GetOrderCommand;
 import com.superfercho.orders.application.dto.OrderResult;
 import com.superfercho.orders.application.dto.PaymentStatus;
 import com.superfercho.orders.application.dto.ShippingAddressResult;
+import com.superfercho.orders.application.exception.OrderNotFoundException;
+import com.superfercho.orders.application.exception.OrderOwnershipException;
 import com.superfercho.orders.application.port.in.CancelOrderUseCase;
 import com.superfercho.orders.application.port.in.CheckoutUseCase;
+import com.superfercho.orders.application.usecase.GetOrderUseCase;
 import com.superfercho.orders.domain.model.OrderStatus;
 import com.superfercho.platform.money.Money;
 import com.superfercho.shopping.application.dto.cart.CartItemResponse;
@@ -104,24 +111,36 @@ class ChatApplicationServiceTest {
     private CancelOrderUseCase cancelOrderUseCase;
 
     @Mock
+    private GetOrderUseCase getOrderUseCase;
+
+    @Mock
     private SearchKnowledgeUseCase searchKnowledgeUseCase;
 
     private FakeLlmAdapter llm;
     private InMemoryConversationStore conversations;
     private InMemoryPendingSensitiveActionStore pending;
+    private com.superfercho.assistant.infrastructure.packagesel.InMemoryPackageSelectionProposalStore packageProposals;
+    @Mock
+    private FerchoUsageGate ferchoUsageGate;
+    @Mock
+    private com.superfercho.shopping.application.port.in.ApplyIdempotentCartAddUseCase applyIdempotentCartAddUseCase;
     private ChatApplicationService chat;
+    private FerchoLimits ferchoLimits;
 
     @BeforeEach
     void setUp() {
         llm = new FakeLlmAdapter();
         conversations = new InMemoryConversationStore();
         pending = new InMemoryPendingSensitiveActionStore();
+        packageProposals = new com.superfercho.assistant.infrastructure.packagesel.InMemoryPackageSelectionProposalStore();
         List<AssistantTool> tools = List.of(
                 new GetCartTool(getCartUseCase),
                 new GetProductTool(getProductUseCase),
                 new SearchKnowledgeTool(searchKnowledgeUseCase),
                 new CheckoutTool(currentUserProvider, getCartUseCase, getProductUseCase, pending),
-                new CancelOrderTool(currentUserProvider, pending));
+                new CancelOrderTool(currentUserProvider, getOrderUseCase, clockPort, pending));
+        ferchoLimits = new FerchoLimits(30, java.time.Duration.ofHours(24), java.time.Duration.ofMinutes(30), java.time.Duration.ofHours(24));
+        org.mockito.Mockito.lenient().when(ferchoUsageGate.evaluateAndReserve(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(FerchoTurnDecision.accepted(UUID.randomUUID()));
         chat = new ChatApplicationService(
                 currentUserProvider,
                 clockPort,
@@ -130,7 +149,12 @@ class ChatApplicationServiceTest {
                 llm,
                 new ToolRegistry(tools),
                 checkoutUseCase,
-                cancelOrderUseCase);
+                cancelOrderUseCase,
+                ferchoUsageGate,
+                ferchoLimits,
+                packageProposals,
+                applyIdempotentCartAddUseCase,
+                getProductUseCase);
     }
 
     @Test
@@ -159,7 +183,7 @@ class ChatApplicationServiceTest {
         LlmRequest request = llm.requests().get(0);
         assertEquals(FerchoSystemPrompt.TEXT, request.systemPrompt());
         assertTrue(request.systemPrompt().contains("Eres Fercho"));
-        assertTrue(request.systemPrompt().contains("NO es fuente de precios"));
+        assertTrue(request.systemPrompt().contains("NO es fuente de recetas, precios, stock, pagos ni estados de pedido"));
         assertTrue(request.systemPrompt().contains("checkout y cancel_order son acciones sensibles"));
         assertEquals(1, request.messages().size());
         assertEquals("hola", request.messages().get(0).content());
@@ -252,14 +276,17 @@ class ChatApplicationServiceTest {
                 "c1",
                 ToolNames.CHECKOUT,
                 Map.of("addressId", ADDRESS_ID.toString(), "paymentMethod", "SIMULATED_CARD")))));
-        llm.enqueue(LlmResponse.text("¿Confirmas la compra?"));
+        llm.enqueue(LlmResponse.text("Ya está pagado."));
 
         ChatResponse response = chat.execute(new ChatCommand(null, "quiero pagar", null));
 
         assertTrue(response.awaitingConfirmation());
         assertEquals(SensitiveActionType.CHECKOUT, response.confirmationType());
         assertNotNull(response.confirmationToken());
+        assertEquals(FerchoSensitiveActionCopy.pending(SensitiveActionType.CHECKOUT), response.assistantMessage());
+        assertEquals(1, llm.requests().size());
         verify(checkoutUseCase, never()).execute(any());
+        assertFalse(response.assistantMessage().toLowerCase().contains("pagado"));
     }
 
     @Test
@@ -280,30 +307,38 @@ class ChatApplicationServiceTest {
         ChatResponse confirmed = chat.execute(new ChatCommand(
                 prepared.conversationId(), null, new ExplicitConfirmation(prepared.confirmationToken())));
 
-        assertTrue(confirmed.assistantMessage().contains("Checkout confirmed"));
+        assertEquals(
+                FerchoSensitiveActionCopy.checkoutSucceeded("SF-1", OrderStatus.CONFIRMED),
+                confirmed.assistantMessage());
         verify(checkoutUseCase).execute(any(CheckoutCommand.class));
         assertFalse(confirmed.awaitingConfirmation());
+        assertFalse(confirmed.assistantMessage().contains("preparado"));
     }
 
     @Test
     void cancelWithoutConfirmationDoesNotExecuteCancelUseCase() {
         when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
         when(clockPort.currentTime()).thenReturn(NOW);
+        stubCancellableOwnedOrder();
         llm.enqueue(LlmResponse.toolCalls(List.of(new LlmMessage.LlmToolCall(
                 "c1", ToolNames.CANCEL_ORDER, Map.of("orderId", ORDER_ID.toString())))));
-        llm.enqueue(LlmResponse.text("¿Confirmas la cancelación?"));
+        llm.enqueue(LlmResponse.text("El pedido ya quedó cancelado."));
 
         ChatResponse response = chat.execute(new ChatCommand(null, "cancela el pedido", null));
 
         assertTrue(response.awaitingConfirmation());
         assertEquals(SensitiveActionType.CANCEL_ORDER, response.confirmationType());
+        assertEquals(FerchoSensitiveActionCopy.pending(SensitiveActionType.CANCEL_ORDER), response.assistantMessage());
+        assertEquals(1, llm.requests().size());
         verify(cancelOrderUseCase, never()).execute(any());
+        assertFalse(response.assistantMessage().contains("ya quedó cancelado"));
     }
 
     @Test
     void confirmedCancellationDelegatesToCancelOrderUseCase() {
         when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
         when(clockPort.currentTime()).thenReturn(NOW);
+        stubCancellableOwnedOrder();
         when(cancelOrderUseCase.execute(new CancelOrderCommand(ORDER_ID))).thenReturn(order());
         llm.enqueue(LlmResponse.toolCalls(List.of(new LlmMessage.LlmToolCall(
                 "c1", ToolNames.CANCEL_ORDER, Map.of("orderId", ORDER_ID.toString())))));
@@ -313,7 +348,9 @@ class ChatApplicationServiceTest {
         ChatResponse confirmed = chat.execute(new ChatCommand(
                 prepared.conversationId(), null, new ExplicitConfirmation(prepared.confirmationToken())));
 
-        assertTrue(confirmed.assistantMessage().contains("Cancellation confirmed"));
+        assertEquals(
+                FerchoSensitiveActionCopy.cancellationSucceeded("SF-1", OrderStatus.CANCELLED),
+                confirmed.assistantMessage());
         verify(cancelOrderUseCase).execute(new CancelOrderCommand(ORDER_ID));
     }
 
@@ -334,7 +371,67 @@ class ChatApplicationServiceTest {
         ChatResponse unconfirmed = chat.execute(new ChatCommand(prepared.conversationId(), "sí", null));
 
         verify(checkoutUseCase, never()).execute(any());
-        assertEquals("Ok, ya lo pagué.", unconfirmed.assistantMessage());
+        assertEquals(1, llm.requests().size());
+        assertTrue(unconfirmed.awaitingConfirmation());
+        assertEquals(prepared.confirmationToken(), unconfirmed.confirmationToken());
+        assertEquals(
+                FerchoSensitiveActionCopy.pending(SensitiveActionType.CHECKOUT), unconfirmed.assistantMessage());
+        assertFalse(unconfirmed.assistantMessage().toLowerCase().contains("pagué"));
+        List<Message> stored = conversations.findById(unconfirmed.conversationId()).orElseThrow().messages();
+        assertTrue(stored.stream().noneMatch(message -> "Ok, ya lo pagué.".equals(message.content())));
+    }
+
+    @Test
+    void confirmedCheckoutFailureDoesNotEmitSuccessMessage() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(clockPort.currentTime()).thenReturn(NOW);
+        when(getCartUseCase.execute()).thenReturn(cartWithMilk());
+        when(getProductUseCase.execute(any(GetProductCommand.class))).thenReturn(product());
+        when(checkoutUseCase.execute(any(CheckoutCommand.class))).thenThrow(new IllegalStateException("payment declined"));
+        llm.enqueue(LlmResponse.toolCalls(List.of(new LlmMessage.LlmToolCall(
+                "c1",
+                ToolNames.CHECKOUT,
+                Map.of("addressId", ADDRESS_ID.toString(), "paymentMethod", "SIMULATED_CARD")))));
+
+        ChatResponse prepared = chat.execute(new ChatCommand(null, "checkout", null));
+        assertThrows(
+                IllegalStateException.class,
+                () -> chat.execute(new ChatCommand(
+                        prepared.conversationId(), null, new ExplicitConfirmation(prepared.confirmationToken()))));
+
+        verify(checkoutUseCase).execute(any(CheckoutCommand.class));
+        List<Message> stored = conversations.findById(prepared.conversationId()).orElseThrow().messages();
+        String success = FerchoSensitiveActionCopy.checkoutSucceeded("SF-1", OrderStatus.CONFIRMED);
+        assertTrue(stored.stream().noneMatch(message -> success.equals(message.content())));
+        assertEquals(
+                FerchoSensitiveActionCopy.pending(SensitiveActionType.CHECKOUT),
+                stored.get(stored.size() - 1).content());
+        assertTrue(pending.findByToken(prepared.confirmationToken()).isPresent());
+    }
+
+    @Test
+    void confirmedCancellationFailureDoesNotEmitSuccessMessage() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(clockPort.currentTime()).thenReturn(NOW);
+        stubCancellableOwnedOrder();
+        when(cancelOrderUseCase.execute(new CancelOrderCommand(ORDER_ID)))
+                .thenThrow(new IllegalStateException("order cannot be cancelled"));
+        llm.enqueue(LlmResponse.toolCalls(List.of(new LlmMessage.LlmToolCall(
+                "c1", ToolNames.CANCEL_ORDER, Map.of("orderId", ORDER_ID.toString())))));
+
+        ChatResponse prepared = chat.execute(new ChatCommand(null, "cancelar", null));
+        assertThrows(
+                IllegalStateException.class,
+                () -> chat.execute(new ChatCommand(
+                        prepared.conversationId(), null, new ExplicitConfirmation(prepared.confirmationToken()))));
+
+        verify(cancelOrderUseCase).execute(new CancelOrderCommand(ORDER_ID));
+        List<Message> stored = conversations.findById(prepared.conversationId()).orElseThrow().messages();
+        String success = FerchoSensitiveActionCopy.cancellationSucceeded("SF-1", OrderStatus.CANCELLED);
+        assertTrue(stored.stream().noneMatch(message -> success.equals(message.content())));
+        assertEquals(
+                FerchoSensitiveActionCopy.pending(SensitiveActionType.CANCEL_ORDER),
+                stored.get(stored.size() - 1).content());
     }
 
     @Test
@@ -350,6 +447,56 @@ class ChatApplicationServiceTest {
                         started.conversationId(), null, new ExplicitConfirmation("missing-token"))));
         verify(checkoutUseCase, never()).execute(any());
         verify(cancelOrderUseCase, never()).execute(any());
+    }
+
+    @Test
+    void cancelMissingOrderDoesNotRequestConfirmation() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(clockPort.currentTime()).thenReturn(NOW);
+        when(getOrderUseCase.execute(new GetOrderCommand(ORDER_ID))).thenThrow(new OrderNotFoundException(ORDER_ID));
+        llm.enqueue(LlmResponse.toolCalls(List.of(new LlmMessage.LlmToolCall(
+                "c1", ToolNames.CANCEL_ORDER, Map.of("orderId", ORDER_ID.toString())))));
+        llm.enqueue(LlmResponse.text("No encontré ese pedido."));
+
+        ChatResponse response = chat.execute(new ChatCommand(null, "cancela el pedido", null));
+
+        assertFalse(response.awaitingConfirmation());
+        assertEquals("No encontré ese pedido.", response.assistantMessage());
+        verify(cancelOrderUseCase, never()).execute(any());
+        assertTrue(pending.findByUserId(USER_ID).isEmpty());
+    }
+
+    @Test
+    void cancelForeignOrderDoesNotRequestConfirmation() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(clockPort.currentTime()).thenReturn(NOW);
+        when(getOrderUseCase.execute(new GetOrderCommand(ORDER_ID)))
+                .thenThrow(new OrderOwnershipException(OTHER_USER_ID, ORDER_ID));
+        llm.enqueue(LlmResponse.toolCalls(List.of(new LlmMessage.LlmToolCall(
+                "c1", ToolNames.CANCEL_ORDER, Map.of("orderId", ORDER_ID.toString())))));
+        llm.enqueue(LlmResponse.text("No encontré ese pedido."));
+
+        ChatResponse response = chat.execute(new ChatCommand(null, "cancela el pedido", null));
+
+        assertFalse(response.awaitingConfirmation());
+        verify(cancelOrderUseCase, never()).execute(any());
+        assertTrue(pending.findByUserId(USER_ID).isEmpty());
+    }
+
+    @Test
+    void cancelNonCancellableOrderDoesNotRequestConfirmation() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(clockPort.currentTime()).thenReturn(NOW);
+        when(getOrderUseCase.execute(new GetOrderCommand(ORDER_ID))).thenReturn(preparingOrder());
+        llm.enqueue(LlmResponse.toolCalls(List.of(new LlmMessage.LlmToolCall(
+                "c1", ToolNames.CANCEL_ORDER, Map.of("orderId", ORDER_ID.toString())))));
+        llm.enqueue(LlmResponse.text("Ese pedido ya no se puede cancelar."));
+
+        ChatResponse response = chat.execute(new ChatCommand(null, "cancela el pedido", null));
+
+        assertFalse(response.awaitingConfirmation());
+        verify(cancelOrderUseCase, never()).execute(any());
+        assertTrue(pending.findByUserId(USER_ID).isEmpty());
     }
 
     @Test
@@ -398,15 +545,15 @@ class ChatApplicationServiceTest {
     }
 
     private static CartResponse emptyCart() {
-        return new CartResponse(CART_ID, USER_ID, CartStatus.ACTIVE, List.of(), NOW, NOW);
+        return CartResponse.of(CART_ID, USER_ID, CartStatus.ACTIVE, List.of(), NOW, NOW);
     }
 
     private static CartResponse cartWithMilk() {
-        return new CartResponse(
+        return CartResponse.of(
                 CART_ID,
                 USER_ID,
                 CartStatus.ACTIVE,
-                List.of(new CartItemResponse(
+                List.of(CartItemResponse.of(
                         ITEM_ID, PRODUCT_ID, 2, Money.cop(new BigDecimal("10.50")), NOW, NOW)),
                 NOW,
                 NOW);
@@ -431,20 +578,36 @@ class ChatApplicationServiceTest {
                 NOW);
     }
 
+    private void stubCancellableOwnedOrder() {
+        when(getOrderUseCase.execute(new GetOrderCommand(ORDER_ID))).thenReturn(cancellableOrder());
+    }
+
+    private static OrderResult cancellableOrder() {
+        return orderResult(OrderStatus.CONFIRMED, NOW, null);
+    }
+
+    private static OrderResult preparingOrder() {
+        return orderResult(OrderStatus.PREPARING, NOW, null);
+    }
+
     private static OrderResult order() {
+        return orderResult(OrderStatus.CANCELLED, null, NOW);
+    }
+
+    private static OrderResult orderResult(OrderStatus status, Instant confirmedAt, Instant cancelledAt) {
         return new OrderResult(
                 ORDER_ID,
                 "SF-1",
-                UUID.fromString("11111111-1111-1111-1111-111111111111"),
-                OrderStatus.CANCELLED,
+                USER_ID,
+                status,
                 List.of(),
                 Money.cop(new BigDecimal("10.50")),
                 Money.cop(new BigDecimal("10.50")),
                 new ShippingAddressResult("Ada", "Calle 1", null, "Bogotá", "Cundinamarca", "300"),
                 UUID.randomUUID(),
                 NOW,
-                null,
-                NOW,
+                confirmedAt,
+                cancelledAt,
                 NOW,
                 null);
     }

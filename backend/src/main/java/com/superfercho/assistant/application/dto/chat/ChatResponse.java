@@ -9,4 +9,23 @@ public record ChatResponse(
         boolean awaitingConfirmation,
         String confirmationToken,
         SensitiveActionType confirmationType,
-        boolean authenticationRequired) {}
+        boolean authenticationRequired,
+        PackageProposalView packageProposal) {
+
+    public ChatResponse(
+            UUID conversationId,
+            String assistantMessage,
+            boolean awaitingConfirmation,
+            String confirmationToken,
+            SensitiveActionType confirmationType,
+            boolean authenticationRequired) {
+        this(
+                conversationId,
+                assistantMessage,
+                awaitingConfirmation,
+                confirmationToken,
+                confirmationType,
+                authenticationRequired,
+                null);
+    }
+}

@@ -192,6 +192,23 @@ class CheckoutUseCaseTest {
     }
 
     @Test
+    void shouldPriceOrderFromCatalogNotCartPriceAtAddition() {
+        Money staleCartPrice = Money.cop(new BigDecimal("99.00"));
+        givenReadyCartAndCatalog();
+        when(shoppingCartPort.getActiveCart(CUSTOMER_ID))
+                .thenReturn(new CartSnapshot(CART_ID, List.of(new CartItemSnapshot(PRODUCT_ID, QUANTITY, staleCartPrice))));
+        givenApprovedCardPayment();
+
+        CheckoutResult result = checkout.execute(cardCommand());
+
+        assertEquals(Money.cop(new BigDecimal("21.00")), result.total());
+        ArgumentCaptor<Order> saved = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(saved.capture());
+        assertEquals(PRICE, saved.getValue().items().get(0).unitPrice());
+        assertEquals(staleCartPrice, shoppingCartPort.getActiveCart(CUSTOMER_ID).items().get(0).priceAtAddition());
+    }
+
+    @Test
     void shouldRejectChangedPriceWithoutAcceptance() {
         givenReadyCartAndCatalog();
         when(productCatalogPort.getProduct(PRODUCT_ID))

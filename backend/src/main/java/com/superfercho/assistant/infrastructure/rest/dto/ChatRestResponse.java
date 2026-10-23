@@ -2,6 +2,7 @@ package com.superfercho.assistant.infrastructure.rest.dto;
 
 import com.superfercho.assistant.application.confirmation.SensitiveActionType;
 import com.superfercho.assistant.application.dto.chat.ChatResponse;
+import com.superfercho.assistant.application.dto.chat.PackageProposalView;
 import java.util.UUID;
 
 public record ChatRestResponse(
@@ -10,7 +11,8 @@ public record ChatRestResponse(
         boolean awaitingConfirmation,
         String confirmationToken,
         SensitiveActionType confirmationType,
-        boolean authenticationRequired) {
+        boolean authenticationRequired,
+        PackageProposalView packageProposal) {
 
     public static ChatRestResponse from(ChatResponse response) {
         return new ChatRestResponse(
@@ -19,6 +21,7 @@ public record ChatRestResponse(
                 response.awaitingConfirmation(),
                 response.confirmationToken(),
                 response.confirmationType(),
-                response.authenticationRequired());
+                response.authenticationRequired(),
+                response.packageProposal());
     }
 }

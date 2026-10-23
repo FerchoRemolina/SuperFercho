@@ -26,6 +26,7 @@ describe("assistant composition", () => {
     expect(api).toContain('method: "POST"');
     expect(chat).toContain("postAssistantChat");
     expect(chat).toContain("confirmationChatBody");
+    expect(chat).toContain("packageSelectionChatBody");
     expect(chat).toContain("messageChatBody");
     expect(chat).not.toContain('"/orders"');
     expect(chat).not.toContain("/cancel");

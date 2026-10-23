@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.superfercho.assistant.infrastructure.packagesel.InMemoryPackageSelectionProposalStore;
 import com.superfercho.assistant.application.tool.ToolNames;
 import com.superfercho.assistant.application.tool.ToolRegistry;
 import com.superfercho.assistant.application.tool.ToolResult;
@@ -93,10 +94,22 @@ class InactiveProductAssistantShoppingToolsTest {
         ProductCatalogAdapter catalog = new ProductCatalogAdapter(new FindProductPriceUseCase(
                 productRepository, categoryRepository, productTypeRepository, productVariantRepository));
         CartApplicationService cartService = new CartApplicationService(
-                currentUserProvider, cartRepository, shoppingListRepository, catalog, clockPort);
+                currentUserProvider,
+                cartRepository,
+                shoppingListRepository,
+                catalog,
+                clockPort,
+                org.mockito.Mockito.mock(
+                        com.superfercho.shopping.application.port.out.CartAddOperationPort.class));
         ShoppingListApplicationService shoppingListService = new ShoppingListApplicationService(
                 currentUserProvider, shoppingListRepository, catalog, clockPort);
-        registry = new ToolRegistry(List.of(new AddCartItemTool(cartService), new AddShoppingListItemTool(shoppingListService)));
+        registry = new ToolRegistry(List.of(
+                new AddCartItemTool(
+                        cartService,
+                        org.mockito.Mockito.mock(com.superfercho.assistant.application.port.out.CurrentUserProvider.class),
+                        org.mockito.Mockito.mock(com.superfercho.assistant.application.port.out.ClockPort.class),
+                        new InMemoryPackageSelectionProposalStore()),
+                new AddShoppingListItemTool(shoppingListService)));
     }
 
     @Test
