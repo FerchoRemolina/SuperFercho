@@ -244,22 +244,6 @@ export function SiteHeader() {
                             Mi perfil
                           </Link>
                           <Link
-                            href="/lists"
-                            role="menuitem"
-                            className={accountMenuItemClass}
-                          >
-                            <ClipboardListIcon className="h-[18px] w-[18px] shrink-0 text-sf-muted" />
-                            Mis listas
-                          </Link>
-                          <Link
-                            href="/favorites"
-                            role="menuitem"
-                            className={accountMenuItemClass}
-                          >
-                            <HeartIcon className="h-[18px] w-[18px] shrink-0 text-sf-muted" />
-                            Favoritos
-                          </Link>
-                          <Link
                             href="/orders"
                             role="menuitem"
                             className={accountMenuItemClass}
