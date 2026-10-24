@@ -74,7 +74,8 @@ class AssistantChatControllerTest {
                 .andExpect(jsonPath("$.awaitingConfirmation").value(false))
                 .andExpect(jsonPath("$.confirmationToken").value(Matchers.nullValue()))
                 .andExpect(jsonPath("$.confirmationType").value(Matchers.nullValue()))
-                .andExpect(jsonPath("$.authenticationRequired").value(false));
+                .andExpect(jsonPath("$.authenticationRequired").value(false))
+                .andExpect(jsonPath("$.packageProposal").value(Matchers.nullValue()));
 
         verify(chatUseCase).execute(new ChatCommand(null, "¿Qué productos tienen?", null));
     }
@@ -389,7 +390,8 @@ class AssistantChatControllerTest {
                                 new BigDecimal("2.300"),
                                 PresentationUnit.KG,
                                 List.of(new PackageProposalOptionView(
-                                        2, new BigDecimal("2000.000"), PresentationUnit.G)))));
+                                        2, new BigDecimal("2000.000"), PresentationUnit.G)),
+                                Instant.parse("2026-10-23T18:15:00Z"))));
 
         mockMvc.perform(post("/api/v1/assistant/chat")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -400,7 +402,8 @@ class AssistantChatControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.packageProposal.proposalId").value(proposalId.toString()))
-                .andExpect(jsonPath("$.packageProposal.options[0].packageCount").value(2));
+                .andExpect(jsonPath("$.packageProposal.options[0].packageCount").value(2))
+                .andExpect(jsonPath("$.packageProposal.expiresAt").value("2026-10-23T18:15:00Z"));
     }
 
     @Test

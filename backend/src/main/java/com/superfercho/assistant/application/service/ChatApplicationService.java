@@ -23,6 +23,7 @@ import com.superfercho.assistant.application.exception.InvalidChatRequestExcepti
 import com.superfercho.assistant.application.exception.InvalidConfirmationException;
 import com.superfercho.assistant.application.exception.InvalidPackageSelectionException;
 import com.superfercho.assistant.application.exception.ToolAccessDeniedException;
+import com.superfercho.assistant.application.packagesel.PackageProposalRelevance;
 import com.superfercho.assistant.application.packagesel.PackageProposalViews;
 import com.superfercho.assistant.application.packagesel.PackageSelectionDurations;
 import com.superfercho.assistant.application.packagesel.PackageSelectionProposal;
@@ -156,6 +157,9 @@ public final class ChatApplicationService implements ChatUseCase {
         if (!hasMessage) {
             throw new InvalidChatRequestException("message cannot be blank");
         }
+        if (command.conversationId() == null) {
+            packageSelectionProposalStore.supersedeActiveOffered(userId, now);
+        }
         conversation = conversationStore.save(conversation.append(Message.user(UUID.randomUUID(), command.message(), now), now));
         return completeWithTools(conversation, userId, now, decision.turnId());
     }
@@ -191,6 +195,7 @@ public final class ChatApplicationService implements ChatUseCase {
             resultText = FerchoSensitiveActionCopy.cancellationSucceeded(result.orderNumber(), result.status());
         }
         pendingSensitiveActionStore.delete(pending.token());
+        packageSelectionProposalStore.supersedeActiveOffered(userId, now);
         Conversation updated = conversationStore.save(
                 conversation.append(Message.assistant(UUID.randomUUID(), resultText, now), now));
         return new ChatResponse(updated.id(), resultText, false, null, null, false, null);
@@ -404,7 +409,15 @@ public final class ChatApplicationService implements ChatUseCase {
                 log.info("FERCHO_TRACE rounds={} tools={} total_duration_ms={}", roundsUsed,
                         String.join(",", executedTools), (System.nanoTime() - totalStartNanos) / 1_000_000);
                 return chatResponse(
-                        current.id(), text, false, null, null, authenticationRequired, userId, now);
+                        current.id(),
+                        text,
+                        false,
+                        null,
+                        null,
+                        authenticationRequired,
+                        userId,
+                        now,
+                        executedTools);
             }
             List<MessageToolCall> domainCalls = new ArrayList<>();
             List<Message> toolMessages = new ArrayList<>();
@@ -469,7 +482,15 @@ public final class ChatApplicationService implements ChatUseCase {
         log.info("FERCHO_TRACE rounds={} tools={} total_duration_ms={}", MAX_TOOL_ROUNDS,
                 String.join(",", executedTools), (System.nanoTime() - totalStartNanos) / 1_000_000);
         return chatResponse(
-                current.id(), fallback, false, null, null, authenticationRequired, userId, now);
+                current.id(),
+                fallback,
+                false,
+                null,
+                null,
+                authenticationRequired,
+                userId,
+                now,
+                executedTools);
     }
 
     private ChatResponse pendingConfirmationResponse(
@@ -502,7 +523,11 @@ public final class ChatApplicationService implements ChatUseCase {
             SensitiveActionType confirmationType,
             boolean authenticationRequired,
             UUID userId,
-            Instant now) {
+            Instant now,
+            List<String> executedTools) {
+        if (!awaitingConfirmation && PackageProposalRelevance.shouldDetachActiveOffer(executedTools)) {
+            packageSelectionProposalStore.supersedeActiveOffered(userId, now);
+        }
         PackageProposalView proposal = awaitingConfirmation
                 ? null
                 : packageSelectionProposalStore

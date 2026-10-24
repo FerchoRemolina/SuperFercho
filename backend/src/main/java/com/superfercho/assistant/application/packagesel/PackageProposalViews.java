@@ -21,6 +21,7 @@ public final class PackageProposalViews {
                 proposal.presentationUnit(),
                 proposal.requestedQuantity(),
                 proposal.requestedUnit(),
-                options);
+                options,
+                proposal.expiresAt());
     }
 }

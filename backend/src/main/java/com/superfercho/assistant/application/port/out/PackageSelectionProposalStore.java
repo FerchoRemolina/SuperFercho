@@ -22,6 +22,12 @@ public interface PackageSelectionProposalStore {
 
     Optional<PackageSelectionProposal> findActiveOffered(UUID userId, Instant now);
 
+    /**
+     * Marks the user's current {@code OFFERED} proposal {@code SUPERSEDED}. A live
+     * {@code CONSUMING} lease is left untouched. Does not add cart items.
+     */
+    void supersedeActiveOffered(UUID userId, Instant now);
+
     boolean tryBeginConsuming(
             UUID proposalId, UUID userId, int packageCount, Instant now, Duration lease);
 

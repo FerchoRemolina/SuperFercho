@@ -123,6 +123,40 @@ class InMemoryPackageSelectionProposalStoreTest {
     }
 
     @Test
+    void supersedeActiveOfferedClearsOfferedWithoutTouchingALiveLease() {
+        PackageSelectionProposal offered = proposal(UUID.randomUUID(), USER_ID, PRODUCT_ID, T0, 2);
+        PackageSelectionProposal other = proposal(UUID.randomUUID(), OTHER_USER, PRODUCT_ID, T0, 2);
+        store.replaceOffered(offered, T0);
+        store.replaceOffered(other, T0);
+
+        store.supersedeActiveOffered(USER_ID, T0);
+
+        assertEquals(
+                PackageSelectionProposalStatus.SUPERSEDED,
+                store.findById(offered.proposalId(), T0).orElseThrow().status());
+        assertTrue(store.findActiveOffered(USER_ID, T0).isEmpty());
+        assertEquals(PackageSelectionProposalStatus.OFFERED, store.findById(other.proposalId(), T0).orElseThrow().status());
+        assertFalse(store.tryBeginConsuming(
+                offered.proposalId(), USER_ID, 2, T0, PackageSelectionDurations.CONSUMING_LEASE));
+
+        PackageSelectionProposal consuming = proposal(UUID.randomUUID(), USER_ID, PRODUCT_ID, T0, 2);
+        store.replaceOffered(consuming, T0);
+        assertTrue(store.tryBeginConsuming(
+                consuming.proposalId(), USER_ID, 2, T0, PackageSelectionDurations.CONSUMING_LEASE));
+        store.supersedeActiveOffered(USER_ID, T0);
+        assertEquals(
+                PackageSelectionProposalStatus.CONSUMING,
+                store.findById(consuming.proposalId(), T0).orElseThrow().status());
+        Instant afterLease = T0.plus(PackageSelectionDurations.CONSUMING_LEASE).plusSeconds(1);
+        assertEquals(
+                PackageSelectionProposalStatus.OFFERED,
+                store.findById(consuming.proposalId(), afterLease).orElseThrow().status());
+        assertEquals(
+                consuming.proposalId(),
+                store.findActiveOffered(USER_ID, afterLease).orElseThrow().proposalId());
+    }
+
+    @Test
     void deleteByUserIdRemovesOnlyThatUsersProposals() {
         PackageSelectionProposal mine = proposal(UUID.randomUUID(), USER_ID, PRODUCT_ID, T0, 2);
         PackageSelectionProposal theirs = proposal(UUID.randomUUID(), OTHER_USER, PRODUCT_ID, T0, 2);

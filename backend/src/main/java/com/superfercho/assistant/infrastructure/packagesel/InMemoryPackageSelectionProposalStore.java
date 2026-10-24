@@ -79,6 +79,31 @@ public final class InMemoryPackageSelectionProposalStore implements PackageSelec
     }
 
     @Override
+    public void supersedeActiveOffered(UUID userId, Instant now) {
+        if (userId == null) {
+            return;
+        }
+        activeIdByUser.compute(userId, (id, currentActiveId) -> {
+            if (currentActiveId == null) {
+                return null;
+            }
+            AtomicBoolean keepActive = new AtomicBoolean(false);
+            byId.computeIfPresent(currentActiveId, (proposalId, current) -> {
+                PackageSelectionProposal refreshed = refresh(current, now);
+                if (isLiveConsuming(refreshed, now)) {
+                    keepActive.set(true);
+                    return refreshed;
+                }
+                if (refreshed.status() == PackageSelectionProposalStatus.OFFERED) {
+                    return refreshed.withStatus(PackageSelectionProposalStatus.SUPERSEDED, null);
+                }
+                return refreshed;
+            });
+            return keepActive.get() ? currentActiveId : null;
+        });
+    }
+
+    @Override
     public Optional<PackageSelectionProposal> findBlocking(UUID userId, UUID productId, Instant now) {
         if (userId == null || productId == null) {
             return Optional.empty();

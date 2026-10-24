@@ -1,5 +1,6 @@
 package com.superfercho.assistant.infrastructure.rest.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.superfercho.assistant.application.confirmation.SensitiveActionType;
 import com.superfercho.assistant.application.dto.chat.ChatResponse;
 import com.superfercho.assistant.application.dto.chat.PackageProposalView;
@@ -12,7 +13,7 @@ public record ChatRestResponse(
         String confirmationToken,
         SensitiveActionType confirmationType,
         boolean authenticationRequired,
-        PackageProposalView packageProposal) {
+        @JsonInclude(JsonInclude.Include.ALWAYS) PackageProposalView packageProposal) {
 
     public static ChatRestResponse from(ChatResponse response) {
         return new ChatRestResponse(

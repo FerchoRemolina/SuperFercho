@@ -19,6 +19,7 @@ import com.superfercho.assistant.application.dto.chat.ChatCommand;
 import com.superfercho.assistant.application.dto.chat.ChatResponse;
 import com.superfercho.assistant.application.dto.chat.ExplicitConfirmation;
 import com.superfercho.assistant.application.dto.chat.PackageSelection;
+import com.superfercho.assistant.application.dto.llm.LlmMessage;
 import com.superfercho.assistant.application.dto.llm.LlmResponse;
 import com.superfercho.assistant.application.exception.InvalidChatRequestException;
 import com.superfercho.assistant.application.exception.InvalidPackageSelectionException;
@@ -31,7 +32,14 @@ import com.superfercho.assistant.application.packagesel.PackageSelectionProposal
 import com.superfercho.assistant.application.packagesel.PackageSelectionProposalStatus;
 import com.superfercho.assistant.application.port.out.ClockPort;
 import com.superfercho.assistant.application.port.out.CurrentUserProvider;
+import com.superfercho.assistant.application.tool.AssistantTool;
+import com.superfercho.assistant.application.tool.ToolArguments;
+import com.superfercho.assistant.application.tool.ToolNames;
 import com.superfercho.assistant.application.tool.ToolRegistry;
+import com.superfercho.assistant.application.tool.ToolResult;
+import com.superfercho.assistant.application.tool.ToolRisk;
+import com.superfercho.assistant.application.tool.ToolSchema;
+import com.superfercho.assistant.domain.model.Conversation;
 import com.superfercho.assistant.infrastructure.confirmation.InMemoryPendingSensitiveActionStore;
 import com.superfercho.assistant.infrastructure.conversation.InMemoryConversationStore;
 import com.superfercho.assistant.infrastructure.llm.FakeLlmAdapter;
@@ -60,10 +68,12 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -184,11 +194,245 @@ class ChatApplicationServicePackageSelectionTest {
         PackageSelectionProposal proposal = offer(2, 3);
         llm.enqueue(LlmResponse.text("Dime cuántos paquetes quieres."));
 
-        ChatResponse response = chat.execute(new ChatCommand(null, "sí", null));
+        ChatResponse response = chat.execute(new ChatCommand(existingConversation(), "sí", null));
 
         assertEquals("Dime cuántos paquetes quieres.", response.assistantMessage());
         assertEquals(proposal.proposalId(), response.packageProposal().proposalId());
         verify(applyIdempotentCartAddUseCase, never()).execute(any());
+        assertEquals(
+                PackageSelectionProposalStatus.OFFERED,
+                proposals.findById(proposal.proposalId(), NOW).orElseThrow().status());
+    }
+
+    @Test
+    void newConversationMessageDoesNotReattachPreviousOffer() {
+        PackageSelectionProposal proposal = offer(2, 3);
+        llm.enqueue(LlmResponse.text("Elige paquetes"));
+        ChatResponse sameConversation = chat.execute(new ChatCommand(existingConversation(), "¿cuántos?", null));
+        assertEquals(proposal.proposalId(), sameConversation.packageProposal().proposalId());
+
+        llm.enqueue(LlmResponse.text("Hola, ¿en qué te ayudo?"));
+        ChatResponse fresh = chat.execute(new ChatCommand(null, "hola", null));
+
+        assertNull(fresh.packageProposal());
+        assertEquals(
+                PackageSelectionProposalStatus.SUPERSEDED,
+                proposals.findById(proposal.proposalId(), NOW).orElseThrow().status());
+        assertTrue(proposals.findActiveOffered(USER_ID, NOW).isEmpty());
+        verify(applyIdempotentCartAddUseCase, never()).execute(any());
+    }
+
+    @Test
+    void unrelatedShoppingListTurnDetachesPreviousOffer() {
+        PackageSelectionProposal proposal = offer(2, 3);
+        chat = chatWith(new StubTool(ToolNames.LIST_SHOPPING_LISTS));
+        llm.enqueue(LlmResponse.toolCalls(List.of(new LlmMessage.LlmToolCall(
+                "c1", ToolNames.LIST_SHOPPING_LISTS, Map.of()))));
+        llm.enqueue(LlmResponse.text("Revisé tu mercado mensual y lo agregué al carrito."));
+
+        ChatResponse response = chat.execute(new ChatCommand(
+                existingConversation(), "ayuda con mi mercado mensual", null));
+
+        assertNull(response.packageProposal());
+        assertEquals(
+                PackageSelectionProposalStatus.SUPERSEDED,
+                proposals.findById(proposal.proposalId(), NOW).orElseThrow().status());
+        assertThrows(
+                InvalidPackageSelectionException.class,
+                () -> chat.execute(new ChatCommand(
+                        null, null, null, new PackageSelection(proposal.proposalId(), 2))));
+        verify(applyIdempotentCartAddUseCase, never()).execute(any());
+    }
+
+    @Test
+    void addingShoppingListToCartClearsPendingPotatoOffer() {
+        PackageSelectionProposal potato = offer(3, 4);
+        UUID conversationId = existingConversation();
+        chat = chatWith(
+                new StubTool(ToolNames.ADD_SHOPPING_LIST_TO_CART),
+                new StubTool(ToolNames.GET_CART));
+        llm.enqueue(LlmResponse.toolCalls(List.of(
+                new LlmMessage.LlmToolCall("c1", ToolNames.ADD_SHOPPING_LIST_TO_CART, Map.of()),
+                new LlmMessage.LlmToolCall("c2", ToolNames.GET_CART, Map.of()))));
+        llm.enqueue(LlmResponse.text("Pasé tu mercado mensual al carrito. Subtotal 149900 COP."));
+
+        ChatResponse response = chat.execute(new ChatCommand(
+                conversationId, "quiero comprar mi mercado mensual", null));
+
+        assertNull(response.packageProposal());
+        assertEquals(
+                PackageSelectionProposalStatus.SUPERSEDED,
+                proposals.findById(potato.proposalId(), NOW).orElseThrow().status());
+        assertTrue(proposals.findActiveOffered(USER_ID, NOW).isEmpty());
+        assertThrows(
+                InvalidPackageSelectionException.class,
+                () -> chat.execute(new ChatCommand(
+                        conversationId, null, null, new PackageSelection(potato.proposalId(), 3))));
+        verify(applyIdempotentCartAddUseCase, never()).execute(any());
+    }
+
+    @Test
+    void shoppingListToCartDetachesEvenIfQuantityEquivalenceReruns() {
+        PackageSelectionProposal potato = offer(3, 4);
+        UUID conversationId = existingConversation();
+        AtomicReference<PackageSelectionProposal> rerun = new AtomicReference<>();
+        chat = chatWith(
+                new StubTool(ToolNames.ADD_SHOPPING_LIST_TO_CART),
+                new StubTool(ToolNames.GET_CART),
+                new StubTool(ToolNames.RESOLVE_QUANTITY_EQUIVALENCE, () -> {
+                    PackageSelectionProposal again = newProposal(3, 4);
+                    rerun.set(again);
+                    proposals.replaceOffered(again, NOW);
+                }));
+        llm.enqueue(LlmResponse.toolCalls(List.of(
+                new LlmMessage.LlmToolCall("c1", ToolNames.RESOLVE_QUANTITY_EQUIVALENCE, Map.of()),
+                new LlmMessage.LlmToolCall("c2", ToolNames.ADD_SHOPPING_LIST_TO_CART, Map.of()),
+                new LlmMessage.LlmToolCall("c3", ToolNames.GET_CART, Map.of()))));
+        llm.enqueue(LlmResponse.text("Pasé tu mercado mensual al carrito. Subtotal 149900 COP."));
+
+        ChatResponse response = chat.execute(new ChatCommand(
+                conversationId, "quiero comprar mi mercado mensual", null));
+
+        assertNull(response.packageProposal());
+        assertEquals(
+                PackageSelectionProposalStatus.SUPERSEDED,
+                proposals.findById(potato.proposalId(), NOW).orElseThrow().status());
+        assertEquals(
+                PackageSelectionProposalStatus.SUPERSEDED,
+                proposals.findById(rerun.get().proposalId(), NOW).orElseThrow().status());
+        assertTrue(proposals.findActiveOffered(USER_ID, NOW).isEmpty());
+        verify(applyIdempotentCartAddUseCase, never()).execute(any());
+    }
+
+    @Test
+    void afterListDetachANewPotatoRequestCanOfferAgain() {
+        PackageSelectionProposal potato = offer(3, 4);
+        UUID conversationId = existingConversation();
+        AtomicReference<PackageSelectionProposal> nextOffer = new AtomicReference<>();
+        chat = chatWith(
+                new StubTool(ToolNames.ADD_SHOPPING_LIST_TO_CART),
+                new StubTool(ToolNames.RESOLVE_QUANTITY_EQUIVALENCE, () -> {
+                    PackageSelectionProposal next = newProposal(1, 2);
+                    nextOffer.set(next);
+                    proposals.replaceOffered(next, NOW);
+                }));
+        llm.enqueue(LlmResponse.toolCalls(List.of(new LlmMessage.LlmToolCall(
+                "c1", ToolNames.ADD_SHOPPING_LIST_TO_CART, Map.of()))));
+        llm.enqueue(LlmResponse.text("Pasé tu mercado mensual al carrito."));
+        ChatResponse listTurn = chat.execute(new ChatCommand(
+                conversationId, "quiero comprar mi mercado mensual", null));
+        assertNull(listTurn.packageProposal());
+        assertEquals(
+                PackageSelectionProposalStatus.SUPERSEDED,
+                proposals.findById(potato.proposalId(), NOW).orElseThrow().status());
+
+        llm.enqueue(LlmResponse.toolCalls(List.of(new LlmMessage.LlmToolCall(
+                "c2", ToolNames.RESOLVE_QUANTITY_EQUIVALENCE, Map.of()))));
+        llm.enqueue(LlmResponse.text("Elige paquetes de Papa"));
+        ChatResponse potatoTurn = chat.execute(new ChatCommand(
+                conversationId, "quiero 1.8 kg de papa criolla", null));
+
+        assertEquals(nextOffer.get().proposalId(), potatoTurn.packageProposal().proposalId());
+        assertEquals(1, potatoTurn.packageProposal().options().get(0).packageCount());
+        assertEquals(2, potatoTurn.packageProposal().options().get(1).packageCount());
+        assertEquals(
+                PackageSelectionProposalStatus.OFFERED,
+                proposals.findById(nextOffer.get().proposalId(), NOW).orElseThrow().status());
+    }
+
+    @Test
+    void catalogSearchWithNewQuantityOfferKeepsChips() {
+        AtomicReference<PackageSelectionProposal> fresh = new AtomicReference<>();
+        chat = chatWith(
+                new StubTool(ToolNames.SEARCH_PRODUCTS),
+                new StubTool(ToolNames.RESOLVE_QUANTITY_EQUIVALENCE, () -> {
+                    PackageSelectionProposal next = newProposal(2, 3);
+                    fresh.set(next);
+                    proposals.replaceOffered(next, NOW);
+                }));
+        llm.enqueue(LlmResponse.toolCalls(List.of(
+                new LlmMessage.LlmToolCall("c1", ToolNames.SEARCH_PRODUCTS, Map.of()),
+                new LlmMessage.LlmToolCall("c2", ToolNames.RESOLVE_QUANTITY_EQUIVALENCE, Map.of()))));
+        llm.enqueue(LlmResponse.text("Elige paquetes"));
+
+        ChatResponse response = chat.execute(new ChatCommand(
+                existingConversation(), "quiero 2.3 kg de arroz", null));
+
+        assertEquals(fresh.get().proposalId(), response.packageProposal().proposalId());
+        assertEquals(2, response.packageProposal().options().get(0).packageCount());
+    }
+
+    @Test
+    void laterOfferForSameProductReplacesAttachedOptions() {
+        PackageSelectionProposal first = offer(1, 2);
+        PackageSelectionProposal second = offer(3, 4);
+        llm.enqueue(LlmResponse.text("Elige paquetes"));
+
+        ChatResponse response = chat.execute(new ChatCommand(existingConversation(), "quiero más papa", null));
+
+        assertEquals(second.proposalId(), response.packageProposal().proposalId());
+        assertEquals(3, response.packageProposal().options().get(0).packageCount());
+        assertEquals(4, response.packageProposal().options().get(1).packageCount());
+        assertEquals(
+                PackageSelectionProposalStatus.SUPERSEDED,
+                proposals.findById(first.proposalId(), NOW).orElseThrow().status());
+        assertEquals(
+                PackageSelectionProposalStatus.OFFERED,
+                proposals.findById(second.proposalId(), NOW).orElseThrow().status());
+    }
+
+    @Test
+    void expiredOfferIsNotAttachedAndCannotBeSelected() {
+        PackageSelectionProposal proposal = offer(2, 3);
+        Instant expiredAt = NOW.plus(PackageSelectionDurations.PROPOSAL_TTL);
+        when(clockPort.currentTime()).thenReturn(expiredAt);
+        llm.enqueue(LlmResponse.text("Hola"));
+
+        ChatResponse response = chat.execute(new ChatCommand(existingConversation(), "hola", null));
+
+        assertNull(response.packageProposal());
+        assertTrue(proposals.findActiveOffered(USER_ID, expiredAt).isEmpty());
+        assertThrows(
+                InvalidPackageSelectionException.class,
+                () -> chat.execute(new ChatCommand(
+                        null, null, null, new PackageSelection(proposal.proposalId(), 2))));
+        verify(applyIdempotentCartAddUseCase, never()).execute(any());
+    }
+
+    @Test
+    void consumedProposalIsNotReattachedAndReplayDoesNotAddAgain() {
+        PackageSelectionProposal proposal = offer(2, 3);
+        when(getProductUseCase.execute(any(GetProductCommand.class))).thenReturn(product(8));
+        when(applyIdempotentCartAddUseCase.execute(any()))
+                .thenReturn(IdempotentCartAddResult.applied(cart()));
+        ChatResponse consumed = chat.execute(new ChatCommand(
+                null, null, null, new PackageSelection(proposal.proposalId(), 2)));
+        when(applyIdempotentCartAddUseCase.replayIfApplied(proposal.proposalId(), 2))
+                .thenReturn(Optional.of(IdempotentCartAddResult.replayed(cart())));
+        llm.enqueue(LlmResponse.text("De nada"));
+
+        ChatResponse later = chat.execute(new ChatCommand(consumed.conversationId(), "gracias", null));
+        ChatResponse replay = chat.execute(new ChatCommand(
+                consumed.conversationId(), null, null, new PackageSelection(proposal.proposalId(), 2)));
+
+        assertNull(later.packageProposal());
+        assertNull(replay.packageProposal());
+        assertTrue(replay.assistantMessage().contains("2 paquete"));
+        verify(applyIdempotentCartAddUseCase, times(1)).execute(any());
+    }
+
+    @Test
+    void getCartFollowUpKeepsActiveOffer() {
+        PackageSelectionProposal proposal = offer(2, 3);
+        chat = chatWith(new StubTool(ToolNames.GET_CART));
+        llm.enqueue(LlmResponse.toolCalls(List.of(new LlmMessage.LlmToolCall(
+                "c1", ToolNames.GET_CART, Map.of()))));
+        llm.enqueue(LlmResponse.text("Tu carrito tiene 1 artículo."));
+
+        ChatResponse response = chat.execute(new ChatCommand(
+                existingConversation(), "qué hay en el carrito", null));
+
+        assertEquals(proposal.proposalId(), response.packageProposal().proposalId());
         assertEquals(
                 PackageSelectionProposalStatus.OFFERED,
                 proposals.findById(proposal.proposalId(), NOW).orElseThrow().status());
@@ -473,10 +717,73 @@ class ChatApplicationServicePackageSelectionTest {
         verify(applyIdempotentCartAddUseCase, never()).execute(any());
     }
 
+    private UUID existingConversation() {
+        return conversations.save(Conversation.start(UUID.randomUUID(), USER_ID, NOW)).id();
+    }
+
+    private ChatApplicationService chatWith(AssistantTool... tools) {
+        return new ChatApplicationService(
+                currentUserProvider,
+                clockPort,
+                conversations,
+                pending,
+                llm,
+                new ToolRegistry(List.of(tools)),
+                checkoutUseCase,
+                cancelOrderUseCase,
+                ferchoUsageGate,
+                new FerchoLimits(30, Duration.ofHours(24), Duration.ofMinutes(30), Duration.ofHours(24)),
+                proposals,
+                applyIdempotentCartAddUseCase,
+                getProductUseCase);
+    }
+
     private PackageSelectionProposal offer(int firstCount, int secondCount) {
         PackageSelectionProposal proposal = newProposal(firstCount, secondCount);
         proposals.replaceOffered(proposal, NOW);
         return proposal;
+    }
+
+    private static final class StubTool implements AssistantTool {
+        private final String name;
+        private final Runnable onExecute;
+
+        private StubTool(String name) {
+            this(name, null);
+        }
+
+        private StubTool(String name, Runnable onExecute) {
+            this.name = name;
+            this.onExecute = onExecute;
+        }
+
+        @Override
+        public String name() {
+            return name;
+        }
+
+        @Override
+        public String description() {
+            return name;
+        }
+
+        @Override
+        public ToolSchema schema() {
+            return ToolSchema.of();
+        }
+
+        @Override
+        public ToolRisk risk() {
+            return ToolRisk.QUERY;
+        }
+
+        @Override
+        public ToolResult execute(ToolArguments arguments) {
+            if (onExecute != null) {
+                onExecute.run();
+            }
+            return ToolResult.success("ok");
+        }
     }
 
     private static PackageSelectionProposal newProposal(int firstCount, int secondCount) {

@@ -2,6 +2,7 @@ package com.superfercho.assistant.application.dto.chat;
 
 import com.superfercho.catalog.domain.model.PresentationUnit;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -13,4 +14,5 @@ public record PackageProposalView(
         PresentationUnit presentationUnit,
         BigDecimal requestedQuantity,
         PresentationUnit requestedUnit,
-        List<PackageProposalOptionView> options) {}
+        List<PackageProposalOptionView> options,
+        Instant expiresAt) {}
