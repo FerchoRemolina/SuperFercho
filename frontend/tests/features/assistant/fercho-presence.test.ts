@@ -19,7 +19,8 @@ describe("fercho assistant presence", () => {
     const fab = source("features/assistant/components/fercho-fab.tsx");
 
     expect(fab).toContain("brandingAssets.ferchoIcon");
-    expect(fab).toContain('href="/assistant"');
+    expect(fab).not.toContain('href="/assistant"');
+    expect(fab).toContain("toggle");
     expect(fab).toContain("fixed bottom-");
     expect(fab).toContain("motion-reduce");
     expect(fab).toContain("aria-label");

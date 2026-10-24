@@ -11,6 +11,7 @@ import {
   confirmationChatBody,
   messageChatBody,
   packageProposalFromResponse,
+  packageProposalIsCurrent,
   packageSelectionChatBody,
   pendingFromResponse,
 } from "@/features/assistant/chat-request";
@@ -27,6 +28,7 @@ import {
 } from "@/features/assistant/presentation";
 import { isApiError, type ApiProblem } from "@/shared/errors/api-problem";
 import { messageForApiProblem } from "@/shared/errors/messages";
+import { FerchoPanelHeader } from "@/features/assistant/components/fercho-panel-header";
 import { Alert } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { Container } from "@/shared/ui/container";
@@ -83,7 +85,19 @@ function ferchoPauseFromError(problem: ApiProblem): FerchoPause | null {
   };
 }
 
-export function AssistantChat() {
+export type AssistantChatVariant = "page" | "docked";
+
+export function AssistantChat({
+  variant = "page",
+  isExpanded = false,
+  onToggleExpanded,
+  onMinimize,
+}: {
+  variant?: AssistantChatVariant;
+  isExpanded?: boolean;
+  onToggleExpanded?: () => void;
+  onMinimize?: () => void;
+} = {}) {
   const queryClient = useQueryClient();
   const inputId = useId();
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -102,16 +116,25 @@ export function AssistantChat() {
     pause === null
       ? null
       : pauseRemainingSeconds(pause, nowTick);
+  const proposalIsLive = packageProposalIsCurrent(packageProposal, nowTick);
 
   useEffect(() => {
-    if (pause === null || pauseSecondsLeft === null) {
+    const pauseNeedsTick = pause !== null && pauseSecondsLeft !== null;
+    const proposalNeedsTick = Boolean(packageProposal?.expiresAt);
+    if (!pauseNeedsTick && !proposalNeedsTick) {
       return;
     }
     const timer = window.setInterval(() => {
       setNowTick(Date.now());
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [pause, pauseSecondsLeft]);
+  }, [pause, pauseSecondsLeft, packageProposal?.expiresAt]);
+
+  useEffect(() => {
+    if (packageProposal && !proposalIsLive) {
+      setPackageProposal(null);
+    }
+  }, [packageProposal, proposalIsLive]);
 
   function resetConversation() {
     if (sending) {
@@ -215,7 +238,13 @@ export function AssistantChat() {
   }
 
   async function selectPackage(packageCount: number) {
-    if (!packageProposal || !conversationId || sending || pendingConfirmation) {
+    if (
+      !packageProposal ||
+      !proposalIsLive ||
+      !conversationId ||
+      sending ||
+      pendingConfirmation
+    ) {
       return;
     }
     setError(null);
@@ -240,29 +269,19 @@ export function AssistantChat() {
     }
   }
 
-  return (
-    <Container as="main" className="flex flex-col gap-6 py-10 md:py-16">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
-            Fercho
-          </h1>
-          <p className="mt-2 max-w-2xl text-base text-sf-muted">
-            Tu asistente de SuperFercho. Pregunta por productos, carrito,
-            listas o pedidos.
-          </p>
-        </div>
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={resetConversation}
-          disabled={sending || (messages.length === 0 && !conversationId)}
-        >
-          Nueva conversación
-        </Button>
-      </div>
+  const newConversationButton = (
+    <Button
+      type="button"
+      variant="secondary"
+      onClick={resetConversation}
+      disabled={sending || (messages.length === 0 && !conversationId)}
+    >
+      Nueva conversación
+    </Button>
+  );
 
-      <div className="flex min-h-[28rem] flex-col overflow-hidden rounded-xl border border-sf-border bg-sf-surface">
+  const thread = (
+    <>
         <div
           className="flex flex-1 flex-col gap-3 overflow-y-auto p-4 md:p-6"
           aria-live="polite"
@@ -330,7 +349,7 @@ export function AssistantChat() {
           </div>
         ) : null}
 
-        {packageProposal && !pendingConfirmation ? (
+        {packageProposal && proposalIsLive && !pendingConfirmation ? (
           <div className="border-t border-sf-border px-4 py-4 md:px-6">
             <p className="text-sm font-semibold text-sf-ink">
               {packageProposalTitle(packageProposal)}
@@ -418,6 +437,45 @@ export function AssistantChat() {
             {sending ? "Enviando…" : "Enviar"}
           </Button>
         </form>
+    </>
+  );
+
+  if (variant === "docked") {
+    return (
+      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-sf-surface">
+        <FerchoPanelHeader
+          onNewConversation={resetConversation}
+          newConversationDisabled={
+            sending || (messages.length === 0 && !conversationId)
+          }
+          isExpanded={isExpanded}
+          onToggleExpanded={onToggleExpanded}
+          onMinimize={onMinimize}
+        />
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {thread}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Container as="main" className="flex flex-col gap-6 py-10 md:py-16">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-[2rem] font-bold tracking-tight text-sf-ink md:text-[2.75rem]">
+            Fercho
+          </h1>
+          <p className="mt-2 max-w-2xl text-base text-sf-muted">
+            Tu asistente de SuperFercho. Pregunta por productos, carrito,
+            listas o pedidos.
+          </p>
+        </div>
+        {newConversationButton}
+      </div>
+
+      <div className="flex min-h-[28rem] flex-col overflow-hidden rounded-xl border border-sf-border bg-sf-surface">
+        {thread}
       </div>
     </Container>
   );

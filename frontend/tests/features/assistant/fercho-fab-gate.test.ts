@@ -22,13 +22,14 @@ describe("fercho fab: visibilidad según autenticación", () => {
   it("no se muestra en vistas públicas ni se limita a ocultarse visualmente", () => {
     // Return null temprano: sin nodo, sin burbuja residual, sin interceptar clics.
     expect(fab).toMatch(/return null/);
-    expect(fab.indexOf("return null")).toBeLessThan(fab.indexOf("<Link"));
+    expect(fab.indexOf("return null")).toBeLessThan(fab.indexOf("<button"));
   });
 
   it("conserva sus reglas de ubicación existentes", () => {
     expect(fab).toContain('pathname.startsWith("/assistant")');
     expect(fab).toContain('pathname.startsWith("/checkout")');
-    expect(fab).toContain('href="/assistant"');
+    expect(fab).not.toContain('href="/assistant"');
+    expect(fab).toContain("toggle");
     expect(fab).toContain("brandingAssets.ferchoIcon");
   });
 });

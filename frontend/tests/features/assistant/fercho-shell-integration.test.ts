@@ -10,10 +10,13 @@ function source(relativePath: string): string {
 }
 
 describe("fercho fab and footer shell integration", () => {
-  it("integrates the fab and the footer in the storefront shell", () => {
+  it("integrates the fab, host and footer in the storefront shell", () => {
     const layout = source("app/(storefront)/layout.tsx");
 
+    expect(layout).toContain("<FerchoShellProvider>");
+    expect(layout).toContain("<FerchoHost />");
     expect(layout).toContain("<FerchoFab />");
     expect(layout).toContain("<SiteFooter />");
+    expect(layout).not.toContain("AssistantChat");
   });
 });

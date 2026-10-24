@@ -1,5 +1,7 @@
-import { AssistantChat } from "@/features/assistant/components/assistant-chat";
-
+/**
+ * Fercho lives in the storefront layout (FerchoHost). This route only enforces
+ * CUSTOMER via the parent RequireRole and presents that same instance expanded.
+ */
 export default function AssistantPage() {
-  return <AssistantChat />;
+  return null;
 }

@@ -52,11 +52,29 @@ export function pendingFromResponse(
   return null;
 }
 
+export function packageProposalIsCurrent(
+  proposal: PackageProposal | null | undefined,
+  nowMs: number = Date.now(),
+): boolean {
+  if (!proposal || !proposal.proposalId || proposal.options.length === 0) {
+    return false;
+  }
+  if (!proposal.expiresAt) {
+    return true;
+  }
+  const expires = Date.parse(proposal.expiresAt);
+  return Number.isNaN(expires) || expires > nowMs;
+}
+
 export function packageProposalFromResponse(
   response: ChatRestResponse,
+  nowMs: number = Date.now(),
 ): PackageProposal | null {
+  if (!Object.prototype.hasOwnProperty.call(response, "packageProposal")) {
+    return null;
+  }
   const proposal = response.packageProposal;
-  if (!proposal || !proposal.proposalId || proposal.options.length === 0) {
+  if (proposal == null || !packageProposalIsCurrent(proposal, nowMs)) {
     return null;
   }
   return proposal;

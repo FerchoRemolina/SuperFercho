@@ -29,6 +29,7 @@ export type PackageProposal = {
   requestedQuantity: string | number;
   requestedUnit: string;
   options: PackageProposalOption[];
+  expiresAt?: string | null;
 };
 
 /**

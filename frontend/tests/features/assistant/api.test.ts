@@ -4,6 +4,7 @@ import {
   confirmationChatBody,
   messageChatBody,
   packageProposalFromResponse,
+  packageProposalIsCurrent,
   packageSelectionChatBody,
   pendingFromResponse,
 } from "@/features/assistant/chat-request";
@@ -299,36 +300,69 @@ describe("assistant chat request helpers", () => {
   });
 
   it("replaces chips from packageProposal and clears them when the field is absent", () => {
+    const liveProposal = {
+      proposalId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+      productId: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+      productName: "Arroz",
+      presentationQuantity: "1.000",
+      presentationUnit: "KG",
+      requestedQuantity: "2.300",
+      requestedUnit: "KG",
+      options: [
+        { packageCount: 2, physicalTotalBase: "2000.000", baseUnit: "G" },
+      ],
+      expiresAt: "2026-10-23T18:15:00Z",
+    };
     expect(
-      packageProposalFromResponse({
-        conversationId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-        assistantMessage: "Elige",
-        awaitingConfirmation: false,
-        confirmationToken: null,
-        confirmationType: null,
-        packageProposal: {
-          proposalId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
-          productId: "dddddddd-dddd-dddd-dddd-dddddddddddd",
-          productName: "Arroz",
-          presentationQuantity: "1.000",
-          presentationUnit: "KG",
-          requestedQuantity: "2.300",
-          requestedUnit: "KG",
-          options: [
-            { packageCount: 2, physicalTotalBase: "2000.000", baseUnit: "G" },
-          ],
+      packageProposalFromResponse(
+        {
+          conversationId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          assistantMessage: "Elige",
+          awaitingConfirmation: false,
+          confirmationToken: null,
+          confirmationType: null,
+          packageProposal: liveProposal,
         },
-      })?.proposalId,
+        Date.parse("2026-10-23T18:00:00Z"),
+      )?.proposalId,
     ).toBe("cccccccc-cccc-cccc-cccc-cccccccccccc");
     expect(
       packageProposalFromResponse({
         conversationId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-        assistantMessage: "Listo",
+        assistantMessage: "Pasé tu mercado mensual al carrito.",
         awaitingConfirmation: false,
         confirmationToken: null,
         confirmationType: null,
         packageProposal: null,
       }),
     ).toBeNull();
+    expect(
+      packageProposalFromResponse({
+        conversationId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        assistantMessage: "Pasé tu mercado mensual al carrito.",
+        awaitingConfirmation: false,
+        confirmationToken: null,
+        confirmationType: null,
+      }),
+    ).toBeNull();
+    expect(
+      packageProposalFromResponse(
+        {
+          conversationId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          assistantMessage: "Elige",
+          awaitingConfirmation: false,
+          confirmationToken: null,
+          confirmationType: null,
+          packageProposal: liveProposal,
+        },
+        Date.parse("2026-10-23T18:15:00Z"),
+      ),
+    ).toBeNull();
+    expect(
+      packageProposalIsCurrent(liveProposal, Date.parse("2026-10-23T18:00:00Z")),
+    ).toBe(true);
+    expect(
+      packageProposalIsCurrent(liveProposal, Date.parse("2026-10-23T18:15:00Z")),
+    ).toBe(false);
   });
 });

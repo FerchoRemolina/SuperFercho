@@ -10,9 +10,12 @@ function source(relativePath: string): string {
 }
 
 describe("assistant composition", () => {
-  it("replaces the assistant placeholder with the real chat UI", () => {
+  it("keeps /assistant as a CUSTOMER route without a second chat instance", () => {
     const page = source("app/(storefront)/(customer)/assistant/page.tsx");
-    expect(page).toContain("AssistantChat");
+    const customerLayout = source("app/(storefront)/(customer)/layout.tsx");
+    expect(customerLayout).toContain("RequireRole");
+    expect(customerLayout).toContain('role="CUSTOMER"');
+    expect(page).not.toContain("AssistantChat");
     expect(page).not.toContain("PlaceholderScreen");
     expect(page).not.toContain("aún no está disponible");
   });
@@ -68,8 +71,8 @@ describe("assistant composition", () => {
     // Fercho ya no es una opción más del menú ni un bloque al final de la Home.
     expect(header).not.toContain('href="/assistant"');
     expect(home).not.toContain('href="/assistant"');
-    // Su representación permanente es el asistente flotante.
-    expect(fab).toContain('href="/assistant"');
+    expect(fab).not.toContain('href="/assistant"');
+    expect(fab).toContain("toggle");
     expect(fab).toContain("brandingAssets.ferchoIcon");
     expect(home).not.toContain("aún no");
     expect(home).not.toContain("no está disponible");
